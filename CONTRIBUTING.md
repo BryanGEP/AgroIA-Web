@@ -1,4 +1,4 @@
-# Guía de contribución — AgroIA
+# Guía de contribución — AgroIA-Web
 
 Esta guía explica cómo está organizado el repositorio y cuál es el proceso para hacer cualquier modificación. Léela antes de empezar a trabajar.
 
@@ -27,24 +27,14 @@ La rama `main` tiene un ruleset (`proteger-main`) con estas reglas, que aplican 
 
 ## Primera vez
 
-Si vas a clonar el repositorio:
+Clona el repositorio:
 
 ```powershell
-git clone https://github.com/BryanGEP/AgroIA.git
-cd AgroIA
+git clone https://github.com/BryanGEP/AgroIA-Web.git
+cd AgroIA-Web
 ```
 
-Al clonar quedarás automáticamente en `develop`. Después sigue el README de cada servicio para instalarlo (por ejemplo, [`svc-agente/README.md`](svc-agente/README.md)).
-
-Si ya tenías una copia anterior del repositorio (de antes de que existiera `develop`), actualízala así:
-
-```powershell
-git status                 # debe decir: working tree clean
-git switch main
-git pull
-git fetch --prune
-git switch develop
-```
+Al clonar quedarás automáticamente en `develop`. Después sigue el README de cada servicio para instalarlo, conforme se vayan agregando (consulta la tabla de estructura en el [README](README.md)).
 
 ## Proceso para hacer una modificación
 
@@ -68,7 +58,7 @@ git commit -m "feat(web): descripción corta del cambio"
 
 ### 3. Prueba antes de subir
 
-Corre las pruebas del servicio que modificaste (por ejemplo, `pytest` dentro de `svc-agente`) y levántalo para revisar que todo funcione.
+Corre las pruebas del servicio que modificaste (por ejemplo, `python manage.py test` dentro de `svc-usuarios`) y levántalo para revisar que todo funcione. Si tu cambio es solo de documentación, revisa que los enlaces funcionen.
 
 ### 4. Sube tu rama
 
@@ -101,13 +91,13 @@ git branch -d feat/nombre-de-la-tarea
 
 | Prefijo | Cuándo usarlo | Ejemplo |
 |---|---|---|
-| `feat/` | Funcionalidad nueva | `feat/svc-gestion` |
-| `fix/` | Corrección de un error | `fix/validacion-preguntas` |
+| `feat/` | Funcionalidad nueva | `feat/svc-usuarios` |
+| `fix/` | Corrección de un error | `fix/validacion-login` |
 | `docs/` | Solo documentación | `docs/guia-instalacion` |
-| `test/` | Agregar o arreglar pruebas | `test/endpoints-agente` |
+| `test/` | Agregar o arreglar pruebas | `test/endpoints-catalogo` |
 | `refactor/` | Reorganizar código sin cambiar su funcionamiento | `refactor/estructura-app` |
 
-Usa minúsculas y guiones, sin acentos ni espacios. Los mensajes de commit siguen el formato `tipo(área): descripción`, por ejemplo `fix(api): manejo de pregunta vacía`.
+Usa minúsculas y guiones, sin acentos ni espacios. Los mensajes de commit siguen el formato `tipo(área): descripción`, por ejemplo `fix(usuarios): validación de correo duplicado`.
 
 ## Problemas comunes
 
