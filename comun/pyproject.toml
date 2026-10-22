@@ -4,10 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agroia-comun"
-version = "0.1.0"
+version = "0.2.0"
 description = "Código compartido de los servicios Django de AgroIA-Web: autenticación JWT, permisos y formato de errores."
 requires-python = ">=3.12"
-dependencies = []
+# Django y DRF los fija cada servicio. Estas versiones deben coincidir con las de sus
+# requirements.txt.
+dependencies = [
+    "djangorestframework-simplejwt==5.5.1",
+    "PyJWT==2.15.1",
+    "cryptography==50.0.2",
+]
 
 [tool.setuptools.packages.find]
 include = ["agroia_comun*"]
