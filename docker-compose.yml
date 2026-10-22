@@ -103,6 +103,8 @@ services:
       POSTGRES_DB: tienda_db
       POSTGRES_USER: tienda
       POSTGRES_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
+      COSTO_ENVIO: ${COSTO_ENVIO:-150.00}
+      ENVIO_GRATIS_DESDE: ${ENVIO_GRATIS_DESDE:-1500.00}
     secrets:
       - source: jwt_publica
         target: jwt_publica.pem

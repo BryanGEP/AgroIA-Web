@@ -114,7 +114,30 @@ El agente vive hoy en el repo AgroIA. Mientras se fusionan los proyectos, `svc-i
 
 ## Contratos de API
 
-Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `GET /salud/` que responde `{"estado": "ok"}` para Docker. Los errores siguen el formato `{"error": "codigo_corto", "detalle": "mensaje"}` y los listados usan paginación `?page=` con 20 elementos.
+Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `GET /salud/` que responde `{"estado": "ok"}` para Docker. Los listados usan paginación `?page=` con 20 elementos.
+
+**Formato de errores** (manejador común en `comun/agroia_comun/errores.py`): `{"error": "codigo_corto", "detalle": "mensaje para el usuario"}`. Los errores de validación agregan `"campos"` con los mensajes por campo:
+
+```json
+{"error": "validacion", "detalle": "Revisa los datos enviados.",
+ "campos": {"direccion_envio": {"codigo_postal": ["El código postal debe tener 5 dígitos."]}}}
+```
+
+| Código | HTTP | Cuándo |
+| --- | --- | --- |
+| `validacion` | 400 | Datos inválidos; trae `campos` |
+| `json_invalido` | 400 | El cuerpo no es JSON válido |
+| `no_autenticado` | 401 | Falta el token |
+| `token_invalido` | 401 | Token con firma, emisor o tipo incorrectos, o vencido |
+| `sin_permiso` | 403 | Rol equivocado o correo sin verificar |
+| `no_encontrado` | 404 | No existe, o no es del usuario (no se revela que existe) |
+| `metodo_no_permitido` | 405 | Método HTTP no soportado en esa ruta |
+| `carrito_vacio` | 400 | Se intenta crear un pedido sin productos en el carrito |
+| `stock_insuficiente` | 409 | La cantidad pedida supera el stock disponible |
+| `producto_no_disponible` | 409 | El producto o su categoría están desactivados |
+| `transicion_invalida` | 409 | Cambio de estado del pedido no permitido |
+
+Los códigos de negocio (los cuatro últimos) se lanzan con `ErrorDeNegocio` desde `servicios.py`.
 
 **`svc-usuarios`** — detalle completo en el documento de requerimientos de autenticación.
 
@@ -133,14 +156,17 @@ Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `
 | Método | Ruta | Acceso | Notas |
 | --- | --- | --- | --- |
 | GET | `/categorias/` | público |  |
-| POST, PATCH, DELETE | `/categorias/...` | administrador |  |
+| POST, PATCH, DELETE | `/categorias/...` | administrador | Borrado lógico (`activa=False`) |
 | GET | `/productos/` | público | Filtros: `categoria`, `precio_min`, `precio_max`, `disponible`, `q` (búsqueda). Orden: `precio`, `nombre`, `creado_en` |
 | GET | `/productos/<slug>/` | público |  |
 | POST, PATCH, DELETE | `/productos/...` | administrador | Borrado lógico (`activo=False`) |
-| GET, POST, PATCH, DELETE | `/carrito/`, `/carrito/items/<id>/` | autenticado | Un carrito abierto por usuario |
-| POST | `/pedidos/` | cliente con correo verificado | Convierte el carrito en pedido, valida y descuenta stock en una transacción |
+| GET, DELETE | `/carrito/` | autenticado | Ver o vaciar. Un carrito por usuario; se crea al primer uso |
+| POST | `/carrito/items/` | autenticado | `{"producto": "<slug>", "cantidad"}`. Si ya está, suma; valida stock |
+| PATCH, DELETE | `/carrito/items/<id>/` | autenticado | Cambiar cantidad o quitar |
+| POST | `/pedidos/` | cliente con correo verificado | Recibe `direccion_envio` y `metodo_pago` (`tarjeta`, `transferencia`, `contra_entrega`; todos simulados). Convierte el carrito en pedido, valida y descuenta stock en una transacción. Envío `COSTO_ENVIO`, gratis si el subtotal supera `ENVIO_GRATIS_DESDE` |
 | GET | `/pedidos/`, `/pedidos/<id>/` | dueño o administrador |  |
-| PATCH | `/pedidos/<id>/estado/` | administrador | `pendiente → pagado → enviado → entregado`, o `cancelado` |
+| POST | `/pedidos/<id>/pagar/` | cliente dueño | Pago simulado: `pendiente → pagado`; responde `"pago_simulado": true`. Agregado en la fase 2 |
+| PATCH | `/pedidos/<id>/estado/` | administrador | `pendiente → pagado → enviado → entregado`, o `cancelado` desde `pendiente` o `pagado`; al cancelar se devuelve el stock |
 
 **`svc-contenido`**
 
@@ -249,7 +275,7 @@ La implementa el equipo en `svc-usuarios` desde ahora; después se adaptará al 
 4. Cada servicio valida la firma RS256 con la llave pública, sin consultar `svc-usuarios`, y lee `user_id`, `rol` y `email_verificado` del token.
 5. Si el access venció, el gateway renueva con el refresh y repite la petición.
 
-**Adaptación para que no estorbe en la Entrega 2:** las clases de autenticación y permisos se escriben una vez en `comun/` y se activan con la variable `AUTH_ACTIVA`. Con `False`, los servicios aceptan peticiones sin token durante el desarrollo inicial; con `True`, aplican JWT y roles. Su valor por defecto en el código es `True` y solo el `.env` local puede apagarla; para la entrega debe estar en `True`.
+**Adaptación para que no estorbe en la Entrega 2:** las clases de autenticación y permisos se escriben una vez en `comun/` (implementadas en la fase 2) y se controlan con la variable `AUTH_ACTIVA`. Con `True`, aplican JWT y roles. Con `False` se apagan solo las revisiones de rol: un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario (carrito, pedidos) responden 401 sin token. Para desarrollo, los tokens se generan con `infra/emitir_token.py`. Su valor por defecto en el código es `True`; solo el `.env` local puede apagarla, y solo junto con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Para la entrega debe estar en `True`.
 
 Antes de cerrar la parte de autenticación, revisarla con las skills `insecure-defaults` y `static-analysis` de Claude Code.
 
@@ -284,6 +310,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
+| `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
 | `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | —, `groq`, `openai/gpt-oss-120b` (las mismas del agente de AgroIA) | svc-ia |
 
 Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
@@ -365,9 +392,9 @@ La fase 0 la hace una sola persona porque todo depende de ella. Después, las fa
 
 1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
 2. **Fase 1 · Usuarios y entrada.** En `svc-usuarios`: modelo `Usuario`, envío de correos, registro, verificación, login, renovación, logout, aviso de privacidad, perfil y direcciones. En `web`: Tailwind + daisyUI, tema `agroia`, `base.html` y pantallas de registro, login y perfil.
-3. **Fase 2 · Tienda.** Modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Pantallas de catálogo, detalle, carrito, checkout, mis pedidos y panel de administrador.
+3. **Fase 2 · Tienda.** Modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas de catálogo, detalle, carrito, checkout, mis pedidos y panel de administrador.
 4. **Fase 3 · IA y contenido.** `svc-ia` con el agente del repo AgroIA y el modelo de visión; `svc-contenido` con conversaciones, diagnósticos y bitácora. Pantallas de chat y de diagnóstico con historial.
-5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en todos los servicios, límite de intentos, validación RS256 desde `comun/`, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
+5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en el resto de los servicios (la validación RS256 de `comun/` ya existe desde la fase 2), revisión de `token_version`, límite de intentos, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
 6. **Fase 5 · Calidad y entrega.** Completar pruebas, Swagger con ejemplos, colección de Postman, READMEs de cada servicio y revisión con `insecure-defaults` y `static-analysis`.
 7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
 

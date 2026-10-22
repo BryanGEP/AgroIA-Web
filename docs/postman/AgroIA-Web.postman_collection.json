@@ -1,0 +1,1582 @@
+{
+  "info": {
+    "name": "AgroIA-Web",
+    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. Corre primero `cargar_datos_demo`. Las carpetas están en orden para correrlas con el Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "svc-tienda",
+      "description": "Catálogo, carrito y pedidos (pago simulado). Puerto local 8002.",
+      "item": [
+        {
+          "name": "Salud",
+          "item": [
+            {
+              "name": "Salud",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/salud/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "salud",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Categorías",
+          "item": [
+            {
+              "name": "Listar categorías (público)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear categoría (admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Herbicidas {{$timestamp}}\",\n  \"descripcion\": \"Control de maleza en la huerta.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"categoria_slug\", pm.response.json().slug);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear categoría como cliente → 403",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"No permitido\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Editar categoría (admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/{{categoria_slug}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    "{{categoria_slug}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Herbicidas de contacto y sistémicos.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Desactivar categoría (admin)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/{{categoria_slug}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    "{{categoria_slug}}",
+                    ""
+                  ]
+                },
+                "description": "Borrado lógico: activa=false.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Productos",
+          "item": [
+            {
+              "name": "Listar productos (público)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Filtrar y ordenar productos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/?categoria=fungicidas&precio_max=500&disponible=true&ordering=precio",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "categoria",
+                      "value": "fungicidas"
+                    },
+                    {
+                      "key": "precio_max",
+                      "value": "500"
+                    },
+                    {
+                      "key": "disponible",
+                      "value": "true"
+                    },
+                    {
+                      "key": "ordering",
+                      "value": "precio"
+                    }
+                  ]
+                },
+                "description": "Filtros: categoria, precio_min, precio_max, disponible, q. Orden: precio, nombre, creado_en.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Buscar productos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/?q=cobre",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "cobre"
+                    }
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver producto por slug",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/{{producto_slug}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    "{{producto_slug}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear producto (admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ]
+                },
+                "description": "Para subir imagen, usar form-data (ficha_tecnica como texto JSON).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Fosfito de potasio 1 L {{$timestamp}}\",\n  \"categoria\": \"fertilizantes\",\n  \"descripcion\": \"Bioestimulante que ayuda a la defensa contra Phytophthora.\",\n  \"precio\": \"310.00\",\n  \"stock\": 25,\n  \"unidad\": \"litro\",\n  \"ficha_tecnica\": {\n    \"composicion\": {\n      \"P2O5\": \"30%\",\n      \"K2O\": \"20%\"\n    },\n    \"dosis\": \"2 a 3 L/ha\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"producto_nuevo_slug\", pm.response.json().slug);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear producto con precio negativo → 400",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Inválido\",\n  \"categoria\": \"fertilizantes\",\n  \"precio\": \"-10.00\",\n  \"stock\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Editar producto (admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/{{producto_nuevo_slug}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    "{{producto_nuevo_slug}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"precio\": \"295.00\",\n  \"stock\": 40\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Desactivar producto (admin)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/{{producto_nuevo_slug}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    "{{producto_nuevo_slug}}",
+                    ""
+                  ]
+                },
+                "description": "Borrado lógico: activo=false.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Carrito",
+          "item": [
+            {
+              "name": "Vaciar carrito",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver carrito sin token → 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Agregar al carrito",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/items/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    "items",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"producto\": \"{{producto_slug}}\",\n  \"cantidad\": 2\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"item_id\", pm.response.json().items[0].id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Agregar más que el stock → 409",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/items/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    "items",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"producto\": \"{{producto_slug}}\",\n  \"cantidad\": 9999\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Cambiar cantidad",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/items/{{item_id}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    "items",
+                    "{{item_id}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"cantidad\": 3\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver carrito",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/carrito/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "carrito",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pedidos",
+          "item": [
+            {
+              "name": "Crear pedido sin correo verificado → 403",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_sin_verificar}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"direccion_envio\": {\n    \"alias\": \"Huerta\",\n    \"calle\": \"Camino a La Palma\",\n    \"numero\": \"km 3\",\n    \"colonia\": \"La Palma\",\n    \"municipio\": \"Jiquilpan\",\n    \"estado\": \"Michoacán\",\n    \"codigo_postal\": \"59510\",\n    \"referencias\": \"Portón verde junto a la bodega\"\n  },\n  \"metodo_pago\": \"tarjeta\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear pedido como admin → 403",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"direccion_envio\": {\n    \"alias\": \"Huerta\",\n    \"calle\": \"Camino a La Palma\",\n    \"numero\": \"km 3\",\n    \"colonia\": \"La Palma\",\n    \"municipio\": \"Jiquilpan\",\n    \"estado\": \"Michoacán\",\n    \"codigo_postal\": \"59510\",\n    \"referencias\": \"Portón verde junto a la bodega\"\n  },\n  \"metodo_pago\": \"tarjeta\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear pedido",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ]
+                },
+                "description": "Convierte el carrito en pedido. metodo_pago: tarjeta, transferencia o contra_entrega (simulados).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"direccion_envio\": {\n    \"alias\": \"Huerta\",\n    \"calle\": \"Camino a La Palma\",\n    \"numero\": \"km 3\",\n    \"colonia\": \"La Palma\",\n    \"municipio\": \"Jiquilpan\",\n    \"estado\": \"Michoacán\",\n    \"codigo_postal\": \"59510\",\n    \"referencias\": \"Portón verde junto a la bodega\"\n  },\n  \"metodo_pago\": \"tarjeta\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"pedido_id\", pm.response.json().id);",
+                      "pm.test(\"Pago simulado\", () => pm.expect(pm.response.json().pago_simulado).to.eql(true));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Pagar pedido (simulado)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/pagar/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "pagar",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Pagar otra vez → 409",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/pagar/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "pagar",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mis pedidos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver pedido",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Cliente cambia estado → 403",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/estado/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"estado\": \"enviado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Transición inválida → 409",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/estado/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"estado\": \"entregado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Marcar enviado (admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/estado/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"estado\": \"enviado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Marcar entregado (admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/estado/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"estado\": \"entregado\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Todos los pedidos entregados (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/?estado=entregado",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "estado",
+                      "value": "entregado"
+                    }
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

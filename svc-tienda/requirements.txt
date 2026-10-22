@@ -5,3 +5,11 @@ djangorestframework==3.18.3
 drf-spectacular==0.30.0
 django-filter==26.2
 psycopg[binary]==3.3.6
+
+# Validación de JWT (agroia_comun). Mismas versiones que comun/pyproject.toml.
+djangorestframework-simplejwt==5.5.1
+PyJWT==2.15.1
+cryptography==50.0.2
+
+# ImageField de Producto.
+Pillow==13.0.0
