@@ -1,0 +1,7 @@
+# Dependencias de ejecución de web. Versiones fijas.
+# Django y los paquetes compartidos llevan la misma versión en los cuatro servicios Django.
+Django==5.2.18
+djangorestframework==3.18.3
+drf-spectacular==0.30.0
+django-filter==26.2
+psycopg[binary]==3.3.6
