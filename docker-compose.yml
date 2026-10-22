@@ -1,0 +1,229 @@
+# Entorno local de AgroIA-Web: cinco servicios propios y tres de infraestructura.
+#
+#   docker compose up --build
+#
+# Antes de la primera vez: copiar .env.example a .env y generar las llaves JWT con
+# infra/generar_llaves.py (ver README.md). Cada servicio recibe solo sus variables.
+#
+# Los puertos se publican solo en 127.0.0.1: sirven para probar desde esta computadora
+# y no quedan visibles en la red. Dentro de Docker cada servicio escucha en el 8000 y
+# se llama por su nombre (http://svc-tienda:8000).
+
+name: agroia-web
+
+x-django-env: &django-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Falta DJANGO_SECRET_KEY en .env}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+  JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+
+services:
+  # ---------------------------------------------------------------------------
+  # Servicios propios
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      <<: [*django-env, *postgres-env]
+      POSTGRES_DB: web_db
+      POSTGRES_USER: web
+      POSTGRES_PASSWORD: ${WEB_DB_PASSWORD:?Falta WEB_DB_PASSWORD en .env}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      URL_SVC_USUARIOS: ${URL_SVC_USUARIOS:-http://svc-usuarios:8000}
+      URL_SVC_TIENDA: ${URL_SVC_TIENDA:-http://svc-tienda:8000}
+      URL_SVC_CONTENIDO: ${URL_SVC_CONTENIDO:-http://svc-contenido:8000}
+      URL_SVC_IA: ${URL_SVC_IA:-http://svc-ia:8000}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./web:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-usuarios:
+    build:
+      context: .
+      dockerfile: svc-usuarios/Dockerfile
+    environment:
+      <<: [*django-env, *postgres-env]
+      POSTGRES_DB: usuarios_db
+      POSTGRES_USER: usuarios
+      POSTGRES_PASSWORD: ${USUARIOS_DB_PASSWORD:?Falta USUARIOS_DB_PASSWORD en .env}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt_privada.pem}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
+    # Solo svc-usuarios recibe la llave privada.
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+      - source: jwt_privada
+        target: jwt_privada.pem
+    volumes:
+      - ./svc-usuarios:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-tienda:
+    build:
+      context: .
+      dockerfile: svc-tienda/Dockerfile
+    environment:
+      <<: [*django-env, *postgres-env]
+      POSTGRES_DB: tienda_db
+      POSTGRES_USER: tienda
+      POSTGRES_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-tienda:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-contenido:
+    build:
+      context: .
+      dockerfile: svc-contenido/Dockerfile
+    environment:
+      <<: *django-env
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-contenido:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8003:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-ia:
+    build:
+      context: .
+      dockerfile: svc-ia/Dockerfile
+    environment:
+      AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      # En Windows los cambios de archivos montados no generan eventos dentro del
+      # contenedor; uvicorn --reload necesita revisar por sondeo.
+      WATCHFILES_FORCE_POLLING: "true"
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-ia:/app
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8004:8000"
+    networks: [agroia]
+
+  # ---------------------------------------------------------------------------
+  # Infraestructura
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Falta POSTGRES_SUPERUSER_PASSWORD en .env}
+      # Las lee infra/postgres/init.sql para crear un usuario por servicio.
+      USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:?Falta USUARIOS_DB_PASSWORD en .env}
+      TIENDA_DB_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?Falta WEB_DB_PASSWORD en .env}
+    volumes:
+      - postgres_datos:/var/lib/postgresql/data
+      # Solo corre la primera vez que se crea el volumen.
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # Por TCP: durante la inicialización PostgreSQL solo escucha en el socket local,
+      # así que el servicio no queda "healthy" hasta que init.sql terminó.
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [agroia]
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_datos:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [agroia]
+
+  redis:
+    image: redis:7
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [agroia]
+
+# Llaves JWT generadas con infra/generar_llaves.py (carpeta fuera de git).
+secrets:
+  jwt_publica:
+    file: ./infra/llaves/publica.pem
+  jwt_privada:
+    file: ./infra/llaves/privada.pem
+
+volumes:
+  postgres_datos:
+  mongo_datos:
+
+networks:
+  agroia:
