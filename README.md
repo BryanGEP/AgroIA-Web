@@ -66,6 +66,18 @@ Los puertos (también 5432, 27017 y 6379 de las bases) solo se publican en `127.
 
   > **Cuidado:** `down -v` borra los volúmenes, es decir, **todos los datos** de PostgreSQL y MongoDB. Sin `-v`, `docker compose down` detiene los contenedores y conserva los datos.
 
+### Tokens de desarrollo
+
+Mientras svc-usuarios no emite tokens (Entrega 3), los endpoints protegidos se prueban con tokens firmados por `infra/emitir_token.py`. **Es solo para desarrollo y pruebas**: firma con la llave privada local y los mismos claims que emitirá svc-usuarios.
+
+```powershell
+python infra/emitir_token.py --usuario-id 10 --rol cliente
+python infra/emitir_token.py --usuario-id 1 --rol administrador --minutos 480
+python infra/emitir_token.py --usuario-id 12 --rol cliente --sin-verificar
+```
+
+Pega el token en el botón **Authorize** de `/api/docs/` o en las variables `token`, `token_admin` y `token_sin_verificar` del entorno de Postman (`docs/postman/`).
+
 ## Comandos del día a día
 
 ```bash
