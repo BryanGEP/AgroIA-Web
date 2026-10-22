@@ -251,12 +251,12 @@ Frena ataques de fuerza bruta y el abuso del envío de correos.
 Catálogo, pedidos, agente y diagnóstico reconocen al usuario leyendo el token, sin consultar la base de `svc-usuarios`.
 
 1. **Firmar los tokens con RS256 en `svc-usuarios`.**
-   - Generar el par de llaves una vez: `openssl genrsa -out privada.pem 2048` y `openssl rsa -in privada.pem -pubout -out publica.pem`.
+   - Generar el par de llaves una vez con `python infra/generar_llaves.py` (crea `infra/llaves/privada.pem` y `publica.pem`, sin depender de `openssl`).
    - En `SIMPLE_JWT`: `ALGORITHM = "RS256"`, `SIGNING_KEY` = privada, `VERIFYING_KEY` = pública, `ISSUER = "agroia-usuarios"`.
-   - Las llaves se cargan desde `.env` o desde archivos fuera del repo; agregar `*.pem` al `.gitignore`.
+   - Las llaves se leen de los archivos que indican `JWT_PRIVATE_KEY_PATH` y `JWT_PUBLIC_KEY_PATH`; `infra/llaves/` y `*.pem` están en `.gitignore`.
 2. **Distribuir la llave pública a los demás servicios.**
-   - Cada servicio recibe solo `JWT_PUBLIC_KEY` en su `.env`; la privada nunca sale de `svc-usuarios`.
-   - Con Docker Compose, montar `publica.pem` como volumen de solo lectura en cada contenedor.
+   - Cada servicio recibe solo `JWT_PUBLIC_KEY_PATH`; la privada nunca sale de `svc-usuarios`.
+   - `docker-compose.yml` monta `publica.pem` como *secret* (solo lectura) en `/run/secrets/jwt_publica.pem` de cada contenedor.
 3. **Crear la clase de autenticación compartida.**
    - Usar `JWTStatelessUserAuthentication` de simplejwt: valida firma, expiración e `iss` sin buscar al usuario en la base.
    - Configurarla en `DEFAULT_AUTHENTICATION_CLASSES` de cada servicio, con el mismo bloque `SIMPLE_JWT` (solo `VERIFYING_KEY`, sin `SIGNING_KEY`).

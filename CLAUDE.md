@@ -140,3 +140,4 @@ docker compose logs -f <servicio>
 - Escribe primero las pruebas de la lógica de negocio y los endpoints.
 - No agregues dependencias nuevas sin mencionarlo; si las agregas, fíjalas en el `requirements.txt` del servicio.
 - No hagas cambios fuera del servicio de la tarea salvo que sean necesarios, y dilo explícitamente.
+- Al terminar una tarea, sugiere el mensaje de commit con el formato del proyecto, pero no lo ejecutes. El mensaje nunca debe incluir `Co-Authored-By` ni ninguna mención a Claude o Claude Code.

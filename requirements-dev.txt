@@ -1,0 +1,13 @@
+# Entorno virtual compartido de la raíz (venv/) para el editor, ruff y pytest locales.
+# Cubre web, svc-usuarios, svc-tienda y svc-contenido. svc-ia tiene su propio venv.
+# La forma oficial de correr los servicios y sus pruebas es Docker (ver README.md).
+-r web/requirements-dev.txt
+-r svc-usuarios/requirements-dev.txt
+-r svc-tienda/requirements-dev.txt
+-r svc-contenido/requirements-dev.txt
+
+# Paquete compartido en modo editable.
+-e ./comun
+
+# Para infra/generar_llaves.py.
+cryptography==50.0.2

@@ -34,7 +34,7 @@ git clone https://github.com/BryanGEP/AgroIA-Web.git
 cd AgroIA-Web
 ```
 
-Al clonar quedarás automáticamente en `develop`. Después sigue el README de cada servicio para instalarlo, conforme se vayan agregando (consulta la tabla de estructura en el [README](README.md)).
+Al clonar quedarás automáticamente en `develop`. Después sigue la sección **Levantar el proyecto por primera vez** del [README](README.md): copiar `.env.example` a `.env`, generar las llaves JWT y `docker compose up --build`.
 
 ## Proceso para hacer una modificación
 
@@ -58,7 +58,17 @@ git commit -m "feat(web): descripción corta del cambio"
 
 ### 3. Prueba antes de subir
 
-Corre las pruebas del servicio que modificaste (por ejemplo, `python manage.py test` dentro de `svc-usuarios`) y levántalo para revisar que todo funcione. Si tu cambio es solo de documentación, revisa que los enlaces funcionen.
+Con el proyecto levantado (`docker compose up --build`), corre las pruebas y el estilo del servicio que modificaste dentro de su contenedor:
+
+```powershell
+docker compose exec svc-usuarios pytest
+docker compose exec svc-usuarios ruff check .
+docker compose exec svc-usuarios ruff format --check .
+```
+
+Esa es la forma oficial y la que se revisa en el PR. Si tienes el entorno virtual local (ver [README](README.md#entornos-virtuales-opcional)), también puedes correrlas sin Docker: activa el venv y ejecuta `pytest` desde la carpeta del servicio (`svc-ia` usa su propio `svc-ia/venv`).
+
+Después revisa en el navegador o en `/api/docs/` que todo funcione. Si tu cambio es solo de documentación, revisa que los enlaces funcionen.
 
 ### 4. Sube tu rama
 

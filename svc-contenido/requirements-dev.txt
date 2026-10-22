@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Desarrollo y pruebas. Se instalan también en la imagen para correr pytest y ruff.
+pytest==9.1.1
+pytest-django==4.14.0
+factory-boy==3.3.3
+responses==0.26.3
+ruff==0.17.2
+mongomock==4.3.0

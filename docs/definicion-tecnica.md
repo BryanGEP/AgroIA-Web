@@ -41,7 +41,7 @@ Son cinco servicios propios más tres de infraestructura. Catálogo y pedidos se
 
 | Servicio | Responsabilidad | Base de datos | Puerto local | Pieza del maestro |
 | --- | --- | --- | --- | --- |
-| `web` | Gateway: plantillas, sesión, enruta al resto y valida JWT (Entrega 3) | sesiones en PostgreSQL | 8000 | API Gateway |
+| `web` | Gateway: plantillas, sesión, enruta al resto y valida JWT (Entrega 3) | sesiones en PostgreSQL `web_db` | 8000 | API Gateway |
 | `svc-usuarios` | Registro, login, JWT, recuperación, roles, perfil y direcciones | PostgreSQL `usuarios_db` | 8001 | Identidad y usuarios |
 | `svc-tienda` | Categorías, productos, stock, carrito y pedidos | PostgreSQL `tienda_db` | 8002 | Negocio principal |
 | `svc-contenido` | Conversaciones con el agente, historial de diagnósticos y bitácora de actividad | MongoDB `contenido` | 8003 | Datos no estructurados |
@@ -70,7 +70,7 @@ AgroIA-Web/
 ├── .env.example
 ├── .github/
 ├── docs/                     # entregables y documentación
-├── infra/                    # init de PostgreSQL, script de llaves JWT
+├── infra/                    # postgres/init.sql, generar_llaves.py
 ├── comun/                    # paquete compartido: auth JWT, permisos, errores
 │   ├── pyproject.toml
 │   └── agroia_comun/
@@ -260,8 +260,9 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 **`docker-compose.yml` debe incluir:**
 
 - Los ocho servicios de la tabla de servicios, en una red interna común.
-- `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db` y `tienda_db` con usuarios distintos.
+- `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db`, `tienda_db` y `web_db` (sesiones del gateway), cada una con su propio usuario (`usuarios`, `tienda`, `web`). Las contraseñas no van en el script: psql las lee del entorno con `\getenv`. Solo corre la primera vez que se crea el volumen; para repetirlo, `docker compose down -v` (borra los datos).
 - Volúmenes con nombre para PostgreSQL y MongoDB, para no perder datos al reiniciar.
+- Puertos publicados solo en `127.0.0.1` (también los de las bases): sirven para probar desde la computadora y no quedan visibles en la red.
 - `healthcheck` en las bases y `depends_on: condition: service_healthy` en los servicios que las usan.
 - Código montado como volumen en desarrollo, para que los cambios se vean sin reconstruir la imagen.
 - Al arrancar cada servicio Django: `python manage.py migrate` y luego el servidor.
@@ -272,17 +273,22 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | cadena aleatoria larga | servicios Django |
 | `DJANGO_DEBUG` | `True` en local | servicios Django |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1,web,svc-usuarios,...` | servicios Django |
 | `AUTH_ACTIVA` | `True` | todos |
-| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `postgres`, `5432` | usuarios, tienda, web |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | `postgres`, `5432` | usuarios, tienda, web |
+| `POSTGRES_SUPERUSER_PASSWORD` | contraseña de desarrollo | contenedor `postgres` |
+| `USUARIOS_DB_PASSWORD`, `TIENDA_DB_PASSWORD`, `WEB_DB_PASSWORD` | contraseña de desarrollo | `init.sql` y cada servicio |
 | `MONGO_URL` | `mongodb://mongo:27017/contenido` | svc-contenido |
 | `REDIS_URL` | `redis://redis:6379/0` | usuarios, web |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` | usuarios / todos |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` / `/run/secrets/jwt_publica.pem` | usuarios / todos |
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
-| `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | backend de consola en local | svc-usuarios |
+| `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
-| `OPENAI_API_KEY` u otra del LLM | — | svc-ia |
+| `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | —, `groq`, `openai/gpt-oss-120b` (las mismas del agente de AgroIA) | svc-ia |
 
-Las llaves `.pem` viven en `infra/llaves/`, que está en `.gitignore`. Un script `infra/generar_llaves.sh` las crea la primera vez.
+Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
+
+Las llaves `.pem` viven en `infra/llaves/`, que está en `.gitignore`. El script `infra/generar_llaves.py` (Python con `cryptography`, funciona igual en Windows y Linux, sin `openssl`) las crea la primera vez y nunca las sobrescribe. `docker-compose.yml` las monta como *secrets* en `/run/secrets/`: la pública en todos los servicios y la privada solo en `svc-usuarios`.
 
 **Comandos del día a día:**
 
