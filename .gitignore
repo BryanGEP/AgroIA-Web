@@ -2,15 +2,36 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+build/
+dist/
 
-# Entornos virtuales
+# Entornos virtuales (raíz y svc-ia)
 venv/
+svc-ia/venv/
 .venv/
 env/
 env
 
-# Variables de entorno (¡nunca subir la API key!)
+# Variables de entorno (¡nunca subir la API key ni contraseñas!)
 .env
+
+# Llaves JWT
+infra/llaves/
+*.pem
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Django
+media/
+staticfiles/
+*.sqlite3
+
+# Claude Code (configuración personal)
+.claude/settings.local.json
 
 # Sistema
 .DS_Store
