@@ -141,3 +141,9 @@ docker compose logs -f <servicio>
 - No agregues dependencias nuevas sin mencionarlo; si las agregas, fíjalas en el `requirements.txt` del servicio.
 - No hagas cambios fuera del servicio de la tarea salvo que sean necesarios, y dilo explícitamente.
 - Al terminar una tarea, sugiere el mensaje de commit con el formato del proyecto, pero no lo ejecutes. El mensaje nunca debe incluir `Co-Authored-By` ni ninguna mención a Claude o Claude Code.
+
+## Documentación de avances
+
+- Al terminar una fase o un avance grande, crea o actualiza `docs/avances/<fase>.md` con la misma estructura que `docs/avances/fase-0-base-monorepo.md` y agrega su fila al índice `docs/avances/README.md`.
+- Al terminar cada sesión de trabajo, propón la entrada del día para `docs/bitacora.md` con el formato definido ahí, y pregunta el nombre del integrante (y el sprint) si no lo sabes.
+- No inventes resultados: solo documenta lo que se verificó.
