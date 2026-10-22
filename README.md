@@ -103,6 +103,8 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 
 - [Definición técnica](docs/definicion-tecnica.md): servicios, contratos de API, modelo de datos, frontend, entorno local y plan por fases.
 - [Requerimientos de autenticación](docs/requerimientos-autenticacion.md): registro, verificación, JWT, recuperación, roles, límites de intentos y 2FA.
+- [Avances](docs/avances/): un documento por fase con lo construido, decisiones, verificación y commits.
+- [Bitácora diaria](docs/bitacora.md): qué hizo cada integrante por sesión; evidencia de los dailies para Jira.
 - [CLAUDE.md](CLAUDE.md): reglas que siempre se respetan (resumen para Claude Code y para el equipo).
 - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
 
