@@ -6,6 +6,674 @@
   },
   "item": [
     {
+      "name": "svc-usuarios",
+      "description": "Registro, perfil, direcciones y listado del administrador. Puerto local 8001.\n\nFlujo: 1) Registrar, 2) generar el token con el id real:\n\n    python infra/emitir_token.py --usuario-id {{usuario_id}} --rol cliente\n\ny pegarlo en `token_usuario`, 3) ver el perfil, 4) crear una dirección.",
+      "item": [
+        {
+          "name": "Salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/salud/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "salud",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1. Registrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/registro/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro",
+                ""
+              ]
+            },
+            "description": "Público. Crea la cuenta como cliente, sin verificar. No devuelve tokens.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"maria.{{$timestamp}}@example.com\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Aguacate-Hass-2026\",\n  \"acepto_privacidad\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set(\"usuario_id\", pm.response.json().id);",
+                  "console.log(\"Genera el token con: python infra/emitir_token.py --usuario-id \" + pm.response.json().id + \" --rol cliente\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar con contraseñas distintas → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/registro/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro",
+                ""
+              ]
+            },
+            "description": "campos.password_confirmacion = [\"password_no_coincide\"].",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"maria.{{$timestamp}}@example.com\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Otra-Distinta-2026\",\n  \"acepto_privacidad\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar sin aceptar privacidad → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/registro/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro",
+                ""
+              ]
+            },
+            "description": "campos.acepto_privacidad = [\"privacidad_no_aceptada\"].",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"maria.{{$timestamp}}@example.com\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Aguacate-Hass-2026\",\n  \"acepto_privacidad\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2-3. Ver mi perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                ""
+              ]
+            },
+            "description": "Necesita `token_usuario`, el token del usuario que se acaba de registrar. Mientras no hay login (Entrega 3), genéralo desde la raíz del repo con:\n\n    python infra/emitir_token.py --usuario-id {{usuario_id}} --rol cliente\n\n(el id lo guardó la petición \"Registrar\" en `usuario_id` y lo imprime en la consola de Postman) y pégalo en la variable `token_usuario` del entorno.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar mi perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                ""
+              ]
+            },
+            "description": "Solo cambia nombre, apellidos y teléfono; el rol enviado se ignora.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"3531234567\",\n  \"rol\": \"administrador\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"El rol no cambia\", () => pm.expect(pm.response.json().rol).to.eql(\"cliente\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Crear dirección",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/direcciones/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                "direcciones",
+                ""
+              ]
+            },
+            "description": "La primera dirección queda como predeterminada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Huerta\",\n  \"calle\": \"Camino a La Palma\",\n  \"numero\": \"km 3\",\n  \"colonia\": \"La Palma\",\n  \"municipio\": \"Jiquilpan\",\n  \"estado\": \"Michoacán\",\n  \"codigo_postal\": \"59510\",\n  \"referencias\": \"Portón verde\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set(\"direccion_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear otra como predeterminada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/direcciones/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                "direcciones",
+                ""
+              ]
+            },
+            "description": "La anterior deja de ser la predeterminada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Bodega\",\n  \"calle\": \"Camino a La Palma\",\n  \"numero\": \"km 3\",\n  \"colonia\": \"La Palma\",\n  \"municipio\": \"Jiquilpan\",\n  \"estado\": \"Michoacán\",\n  \"codigo_postal\": \"59510\",\n  \"referencias\": \"Portón verde\",\n  \"predeterminada\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis direcciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/direcciones/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                "direcciones",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver dirección",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/direcciones/{{direccion_id}}/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                "direcciones",
+                "{{direccion_id}}",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Código postal inválido → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/direcciones/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                "direcciones",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Huerta\",\n  \"calle\": \"Camino a La Palma\",\n  \"numero\": \"km 3\",\n  \"colonia\": \"La Palma\",\n  \"municipio\": \"Jiquilpan\",\n  \"estado\": \"Michoacán\",\n  \"codigo_postal\": \"123\",\n  \"referencias\": \"Portón verde\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver mi perfil sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/yo/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "yo",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios como cliente → 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                ""
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/?rol=cliente",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "rol",
+                  "value": "cliente"
+                }
+              ]
+            },
+            "description": "Filtros rol y q. Para un admin real: python manage.py asignar_admin <email>.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "svc-tienda",
       "description": "Catálogo, carrito y pedidos (pago simulado). Puerto local 8002.",
       "item": [
