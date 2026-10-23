@@ -22,3 +22,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** fase 3: API de svc-contenido en MongoDB (conversaciones con límite de 200 mensajes, diagnósticos con imagen y bitácora, índices al arrancar); svc-ia como adaptador del agente del repo AgroIA, que corre en su propio contenedor construido desde GitHub; diagnóstico con interfaz de clasificador y 503 mientras no haya modelo. Pregunta real verificada a través de svc-ia. 69 pruebas en svc-contenido y 55 en svc-ia.
 - **Qué sigue:** svc-usuarios básico (modelo Usuario, registro y perfil, sin login JWT); avisar al equipo de los cambios de contrato; en el repo AgroIA, fijar versiones del agente, aceptar historial y no acumular sesiones.
 - **Bloqueos:** Ninguno.
+
+
+## 2026-10-22 · Sprint 2
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** fase 1 básica de svc-usuarios: modelo Usuario por correo y Direccion con una sola predeterminada, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando asignar_admin; reinicio solo de usuarios_db para el modelo propio. 71 pruebas en svc-usuarios, sin regresiones en los demás servicios.
+- **Qué sigue:** completar calidad de la Entrega 2 (revisión de Swagger y Postman de todos los servicios) y documentar los sprints en Jira.
+- **Bloqueos:** Ninguno.

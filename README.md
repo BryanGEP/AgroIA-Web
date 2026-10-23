@@ -9,7 +9,7 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | Carpeta | Descripción | Base de datos | Puerto local | Detalle |
 | :-- | :-- | :-- | :-- | :-- |
 | `web/` | Gateway: plantillas, sesión, enruta al resto y valida JWT. Único punto de entrada del navegador. | PostgreSQL `web_db` (sesiones) | 8000 | [README](web/README.md) |
-| `svc-usuarios/` | Registro, login (JWT), recuperación de contraseña, roles, perfil y direcciones. | PostgreSQL `usuarios_db` | 8001 | [README](svc-usuarios/README.md) |
+| `svc-usuarios/` | Registro, perfil, direcciones y roles (Entrega 2); login, JWT y recuperación de contraseña en la Entrega 3. | PostgreSQL `usuarios_db` | 8001 | [README](svc-usuarios/README.md) |
 | `svc-tienda/` | Categorías, productos, stock, carrito y pedidos (pago simulado). | PostgreSQL `tienda_db` | 8002 | [README](svc-tienda/README.md) |
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
 | `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
@@ -83,6 +83,10 @@ Los puertos (también 5432, 27017 y 6379 de las bases) solo se publican en `127.
 ### Tokens de desarrollo
 
 Mientras svc-usuarios no emite tokens (Entrega 3), los endpoints protegidos se prueban con tokens firmados por `infra/emitir_token.py`. **Es solo para desarrollo y pruebas**: firma con la llave privada local y los mismos claims que emitirá svc-usuarios.
+
+Para probar con un usuario real, regístralo con `POST http://localhost:8001/api/v1/auth/registro/` y usa el `id` que devuelve como `--usuario-id` (ver el [README de svc-usuarios](svc-usuarios/README.md#probar-con-un-usuario-real)). Los servicios que no consultan a svc-usuarios (tienda, contenido, IA) aceptan cualquier id.
+
+> **Al bajar la fase 1 de usuarios**, cada integrante debe reiniciar una vez `usuarios_db` (ver el [README de svc-usuarios](svc-usuarios/README.md)), sin `docker compose down -v`.
 
 ```powershell
 python infra/emitir_token.py --usuario-id 10 --rol cliente

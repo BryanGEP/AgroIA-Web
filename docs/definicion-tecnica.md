@@ -126,7 +126,7 @@ Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `
 
 | Código | HTTP | Cuándo |
 | --- | --- | --- |
-| `validacion` | 400 | Datos inválidos; trae `campos` |
+| `validacion` | 400 | Datos inválidos; trae `campos`. En el registro, los casos propios llegan como mensaje del campo: `email` → `email_registrado`, `password_confirmacion` → `password_no_coincide`, `acepto_privacidad` → `privacidad_no_aceptada` |
 | `json_invalido` | 400 | El cuerpo no es JSON válido |
 | `no_autenticado` | 401 | Falta el token |
 | `token_invalido` | 401 | Token con firma, emisor o tipo incorrectos, o vencido |
@@ -147,13 +147,15 @@ Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNego
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| POST | `/auth/registro/`, `/auth/login/`, `/auth/token/renovar/` | público |
-| POST | `/auth/verificar-correo/`, `/auth/reenviar-verificacion/` | público |
-| POST | `/auth/recuperar/`, `/auth/restablecer/` | público |
-| POST | `/auth/logout/`, `/auth/cambiar-password/` | autenticado |
-| GET, PATCH | `/usuarios/yo/` | autenticado |
-| CRUD | `/usuarios/yo/direcciones/` | autenticado |
-| GET, PATCH | `/usuarios/`, `/usuarios/<id>/rol/` | administrador |
+| POST | `/auth/registro/` | público. Responde `{"id", "email", "mensaje"}`, sin tokens. **Entrega 2** |
+| POST | `/auth/login/`, `/auth/token/renovar/` | público (Entrega 3) |
+| POST | `/auth/verificar-correo/`, `/auth/reenviar-verificacion/` | público (Entrega 3) |
+| POST | `/auth/recuperar/`, `/auth/restablecer/` | público (Entrega 3) |
+| POST | `/auth/logout/`, `/auth/cambiar-password/` | autenticado (Entrega 3) |
+| GET, PATCH | `/usuarios/yo/` | autenticado. Solo se editan `nombre`, `apellidos` y `telefono`. **Entrega 2** |
+| CRUD | `/usuarios/yo/direcciones/` | autenticado, solo las propias (también el administrador). Una sola predeterminada. **Entrega 2** |
+| GET | `/usuarios/` | administrador. Filtros `rol` y `q`. **Entrega 2** |
+| PATCH | `/usuarios/<id>/rol/` | administrador (Entrega 3; en la Entrega 2 se usa el comando `asignar_admin <email>`) |
 
 **`svc-tienda`**
 
@@ -203,8 +205,8 @@ PostgreSQL guarda lo que necesita integridad y transacciones (usuarios, stock, p
 
 | Tabla | Campos principales |
 | --- | --- |
-| `Usuario` | `email` (único), `nombre`, `apellidos`, `telefono`, `rol`, `email_verificado`, `token_version`, `acepto_privacidad_en`, `version_privacidad`, `tiene_2fa` |
-| `Direccion` | `usuario` FK, `alias`, `calle`, `numero`, `colonia`, `municipio`, `estado`, `codigo_postal`, `referencias`, `predeterminada` |
+| `Usuario` | `AbstractUser` sin `username`; `email` (único, es el login), `nombre`, `apellidos`, `telefono`, `rol`, `email_verificado`, `token_version`, `acepto_privacidad_en`, `version_privacidad`, `tiene_2fa`. `AUTH_USER_MODEL = "usuarios.Usuario"`; su `id` es el `user_id` del JWT |
+| `Direccion` | `usuario` FK, `alias`, `calle`, `numero`, `colonia`, `municipio`, `estado`, `codigo_postal`, `referencias`, `predeterminada` (una sola por usuario, con `UniqueConstraint` condicional), `creada_en` |
 | `Dispositivo2FA`, `CodigoRespaldo` | Ver sección 12 del documento de autenticación |
 
 **PostgreSQL · `tienda_db`**
@@ -316,6 +318,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
+| `VERSION_AVISO_PRIVACIDAD` | `2026-10` | svc-usuarios (versión del aviso que se guarda al registrarse) |
 | `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
 | `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | llave propia de cada integrante, `groq`, `openai/gpt-oss-120b` | contenedor `agente` |
 | `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `30` | svc-ia |
@@ -398,7 +401,7 @@ Un `CLAUDE.md` en la raíz resume este documento en reglas que Claude Code lee a
 La fase 0 la hace una sola persona porque todo depende de ella. Después, las fases 1, 2 y 3 pueden ir en paralelo, una por integrante. Jira se documenta al final, como acordó el equipo.
 
 1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
-2. **Fase 1 · Usuarios y entrada.** En `svc-usuarios`: modelo `Usuario`, envío de correos, registro, verificación, login, renovación, logout, aviso de privacidad, perfil y direcciones. En `web`: Tailwind + daisyUI, tema `agroia`, `base.html` y pantallas de registro, login y perfil.
+2. **Fase 1 · Usuarios y entrada.** Para la Entrega 2 se hizo la versión básica: modelo `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`; lo demás pasa a la Entrega 3. En `svc-usuarios`: modelo `Usuario`, envío de correos, registro, verificación, login, renovación, logout, aviso de privacidad, perfil y direcciones. En `web`: Tailwind + daisyUI, tema `agroia`, `base.html` y pantallas de registro, login y perfil.
 3. **Fase 2 · Tienda.** Modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas de catálogo, detalle, carrito, checkout, mis pedidos y panel de administrador.
 4. **Fase 3 · IA y contenido.** `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Pantallas de chat y de diagnóstico con historial.
 5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en el resto de los servicios (la validación RS256 de `comun/` ya existe desde la fase 2), revisión de `token_version`, límite de intentos, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
