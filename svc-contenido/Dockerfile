@@ -22,5 +22,6 @@ COPY svc-contenido/ .
 
 EXPOSE 8000
 
-# Sin base relacional no hay migraciones (ver config/settings.py).
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Sin base relacional no hay migraciones (ver config/settings.py); en su lugar se
+# crean los índices de MongoDB, que se puede repetir sin problema.
+CMD ["sh", "-c", "python manage.py crear_indices && python manage.py runserver 0.0.0.0:8000"]
