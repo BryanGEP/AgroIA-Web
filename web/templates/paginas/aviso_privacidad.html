@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Aviso de privacidad{% endblock %}
+{% block contenido %}
+<div class="max-w-3xl mx-auto px-4 py-10 md:py-14">
+  <h1 class="text-3xl mb-2">Aviso de privacidad</h1>
+  <p class="mb-8 opacity-80">Última actualización: octubre de 2026 (versión 2026-10).</p>
+
+  <div class="alert alert-info mb-10">
+    <span>AgroIA es un proyecto académico de la carrera de Ingeniería en Sistemas Computacionales del Tecnológico Nacional de México, campus Jiquilpan. No es un servicio comercial. Si se usa con productores reales, este aviso debe revisarlo una persona con conocimientos legales.</span>
+  </div>
+
+  <div class="flex flex-col gap-10 text-lg [&_h2]:mb-3 [&_p]:max-w-prose [&_ul]:list-disc [&_ul]:pl-6 [&_li]:mb-1">
+    <section aria-labelledby="responsable">
+      <h2 id="responsable" class="text-2xl">Quién es responsable de tus datos</h2>
+      <p>El equipo de desarrollo de AgroIA, formado por estudiantes del TecNM campus Jiquilpan, Michoacán, es responsable del uso y la protección de tus datos personales dentro de la plataforma.</p>
+    </section>
+
+    <section aria-labelledby="datos">
+      <h2 id="datos" class="text-2xl">Qué datos recabamos</h2>
+      <ul>
+        <li>Datos de identificación y contacto: nombre, apellidos, correo electrónico y teléfono.</li>
+        <li>Direcciones de envío.</li>
+        <li>Pedidos y productos comprados.</li>
+        <li>Conversaciones con el asistente AgroIA.</li>
+        <li>Imágenes de hojas o frutos que subas para el diagnóstico y su resultado.</li>
+      </ul>
+      <p class="mt-3">No recabamos datos de tarjetas ni de cuentas bancarias: el pago en la plataforma es simulado.</p>
+    </section>
+
+    <section aria-labelledby="finalidades">
+      <h2 id="finalidades" class="text-2xl">Para qué los usamos</h2>
+      <ul>
+        <li>Crear y administrar tu cuenta.</li>
+        <li>Procesar tus pedidos y enviarlos a la dirección que elijas.</li>
+        <li>Responder tus preguntas en el asistente y guardar tu historial de conversaciones y diagnósticos.</li>
+        <li>Mejorar el asistente y el modelo de diagnóstico con datos sin identificarte.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="terceros">
+      <h2 id="terceros" class="text-2xl">Con quién los compartimos</h2>
+      <p>No vendemos ni compartimos tus datos con fines comerciales. Las preguntas que haces al asistente se procesan con un proveedor de modelos de lenguaje para generar la respuesta; no se le envían tu nombre, correo, teléfono ni dirección.</p>
+    </section>
+
+    <section aria-labelledby="arco">
+      <h2 id="arco" class="text-2xl">Tus derechos ARCO</h2>
+      <p>Puedes pedir el acceso a tus datos, su rectificación, su cancelación u oponerte a su uso. Mientras la plataforma no tenga un formulario para hacerlo, escribe al equipo de desarrollo a través de tu docente del TecNM campus Jiquilpan e indica tu nombre, tu correo registrado y el derecho que quieres ejercer.</p>
+    </section>
+
+    <section aria-labelledby="cambios">
+      <h2 id="cambios" class="text-2xl">Cambios a este aviso</h2>
+      <p>Si este aviso cambia, publicaremos la nueva versión en esta página con su fecha y te pediremos aceptarla al iniciar sesión.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

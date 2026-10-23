@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}Insumos y asesoría para tu huerta{% endblock %}
+{% block contenido %}
+
+<section class="border-b border-base-300">
+  <div class="max-w-6xl mx-auto px-4 py-12 md:py-20 grid gap-10 md:grid-cols-[1.3fr_1fr] md:items-center">
+    <div class="flex flex-col gap-6">
+      <h1 class="text-3xl md:text-[3.05rem] max-w-[18ch]">Insumos, asesoría y diagnóstico para tu huerta de aguacate</h1>
+      <p class="text-lg max-w-prose">Fungicidas, fertilizantes, riego y herramientas con su ficha técnica completa, para comprar con la información a la mano.</p>
+      <form action="{% url 'catalogo:lista' %}" method="get" role="search" class="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
+        <label for="buscar-inicio" class="sr-only">Buscar en el catálogo</label>
+        <input id="buscar-inicio" name="q" type="search" class="input input-lg w-full" placeholder="Fungicida, urea, manguera de goteo…" autocomplete="off">
+        <button type="submit" class="btn btn-primary btn-lg">Buscar</button>
+      </form>
+    </div>
+    <div class="hidden md:flex justify-center text-primary" aria-hidden="true">
+      {# Aguacate partido con su hoja: cáscara, pulpa y hueso. #}
+      <svg viewBox="0 0 240 260" class="w-full max-w-xs">
+        <path d="M150 28c26-22 64-20 78-6-14 4-34 20-48 42-10 15-26 22-38 18 2-20 4-38 8-54z" fill="#6e8f3a"/>
+        <path d="M152 30c-12 18-22 38-26 56" stroke="#2e5a1c" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M120 40c46 0 74 64 74 120a74 74 0 0 1-148 0c0-56 28-120 74-120z" fill="currentColor"/>
+        <path d="M120 58c34 0 56 54 56 104a56 56 0 0 1-112 0c0-50 22-104 56-104z" fill="#cbdb6e"/>
+        <path d="M120 74c26 0 44 46 44 88a44 44 0 0 1-88 0c0-42 18-88 44-88z" fill="#dfe8a0"/>
+        <circle cx="120" cy="170" r="30" fill="#6b4a2b"/>
+        <path d="M108 158a16 16 0 0 1 14-8" stroke="#8a6640" stroke-width="5" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="max-w-6xl mx-auto px-4 py-12" aria-labelledby="servicios">
+  <h2 id="servicios" class="text-2xl mb-6">Lo que encuentras en AgroIA</h2>
+  <ul class="divide-y divide-base-300 border-y border-base-300">
+    <li class="grid gap-2 py-5 sm:grid-cols-[14rem_1fr_auto] sm:items-center">
+      <h3 class="text-lg">Tienda de insumos</h3>
+      <p>Productos para el cultivo con precio, existencias y ficha técnica.</p>
+      <a href="{% url 'catalogo:lista' %}" class="btn btn-primary btn-sm justify-self-start">Ver el catálogo</a>
+    </li>
+    <li class="grid gap-2 py-5 sm:grid-cols-[14rem_1fr_auto] sm:items-center">
+      <h3 class="text-lg">AgroIA chat</h3>
+      <p>Pregunta sobre riego, plagas o fertilización y recibe una orientación al momento.</p>
+      <span class="badge badge-outline justify-self-start">Próximamente</span>
+    </li>
+    <li class="grid gap-2 py-5 sm:grid-cols-[14rem_1fr_auto] sm:items-center">
+      <h3 class="text-lg">Diagnóstico por imagen</h3>
+      <p>Sube una foto de la hoja o el fruto para saber si está sano o tiene roña o antracnosis.</p>
+      <span class="badge badge-outline justify-self-start">Próximamente</span>
+    </li>
+  </ul>
+</section>
+
+{% if tienda_disponible %}
+  {% if categorias %}
+  <section class="max-w-6xl mx-auto px-4 pb-12" aria-labelledby="categorias">
+    <h2 id="categorias" class="text-2xl mb-6">Categorías</h2>
+    <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {% for categoria in categorias %}
+        {% with t=categoria.slug|tinte %}
+        <li class="tinte-{{ t }}">
+          <a href="{% url 'catalogo:lista' %}?categoria={{ categoria.slug }}" class="panel-tinte etiqueta-producto flex h-full flex-col gap-3 rounded-box p-4">
+            <span class="block h-14 w-14">{% include "componentes/marcador_categoria.html" with tinte=t nombre=categoria.nombre %}</span>
+            <span class="font-display text-lg font-bold text-base-content">{{ categoria.nombre }}</span>
+          </a>
+        </li>
+        {% endwith %}
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if productos %}
+  <section class="max-w-6xl mx-auto px-4 pb-16" aria-labelledby="destacados">
+    <div class="mb-6 flex items-end justify-between gap-4">
+      <h2 id="destacados" class="text-2xl">Recién llegados</h2>
+      <a href="{% url 'catalogo:lista' %}" class="link link-primary font-medium">Ver todos los productos</a>
+    </div>
+    <ul class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      {% for producto in productos %}
+        <li class="flex">{% include "componentes/tarjeta_producto.html" %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+{% else %}
+  <section class="max-w-6xl mx-auto px-4 pb-16">
+    {% include "componentes/estado_vacio.html" with titulo="El catálogo no está disponible en este momento" texto="Intenta de nuevo en unos minutos." %}
+  </section>
+{% endif %}
+{% endblock %}
