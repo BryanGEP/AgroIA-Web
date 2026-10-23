@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block titulo %}Catálogo no disponible{% endblock %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4">
+  {% include "componentes/error.html" with titulo="El catálogo no está disponible en este momento" texto="No pudimos cargar los productos. Intenta de nuevo en unos minutos." enlace=request.get_full_path accion="Reintentar" %}
+</div>
+{% endblock %}

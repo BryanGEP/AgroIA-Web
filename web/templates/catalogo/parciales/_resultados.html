@@ -1,0 +1,17 @@
+{# Resultados del catálogo: lo que devuelve la vista a HTMX y lo que incluye la página completa. #}
+{% url 'catalogo:lista' as catalogo %}
+{% if pagina_fuera %}
+  {% include "componentes/estado_vacio.html" with titulo="Esa página ya no existe" texto="Puede que haya menos productos con estos filtros." enlace=catalogo accion="Volver a la primera página" %}
+{% elif productos %}
+  <p class="mb-4 text-sm">
+    {{ total }} producto{{ total|pluralize }}{% if total_paginas > 1 %}, página {{ pagina }} de {{ total_paginas }}{% endif %}
+  </p>
+  <ul class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+    {% for producto in productos %}
+      <li class="flex">{% include "componentes/tarjeta_producto.html" %}</li>
+    {% endfor %}
+  </ul>
+  {% include "componentes/paginador.html" %}
+{% else %}
+  {% include "componentes/estado_vacio.html" with titulo="No hay productos con estos filtros" texto="Prueba con otra palabra, quita el rango de precio o elige otra categoría." enlace=catalogo accion="Quitar filtros" %}
+{% endif %}

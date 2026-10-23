@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}{{ producto.nombre }}{% endblock %}
+{% block descripcion %}{{ producto.descripcion|truncatechars:150 }}{% endblock %}
+{% block contenido %}
+{% nombre_categoria producto.categoria categorias as nombre_cat %}
+{% with t=producto.categoria|tinte %}
+<div class="max-w-6xl mx-auto px-4 py-8 md:py-10">
+  <nav class="breadcrumbs text-sm mb-6" aria-label="Ruta">
+    <ul>
+      <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
+      <li><a href="{% url 'catalogo:lista' %}?categoria={{ producto.categoria }}">{{ nombre_cat }}</a></li>
+      <li aria-current="page">{{ producto.nombre }}</li>
+    </ul>
+  </nav>
+
+  <article class="grid gap-8 md:grid-cols-2 md:items-start">
+    <div class="tinte-{{ t }} etiqueta-producto panel-tinte flex aspect-[4/3] items-center justify-center rounded-box p-8 [&_svg]:max-h-56">
+      {% if producto.imagen %}
+        <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" width="800" height="600" fetchpriority="high" class="h-full w-full object-contain">
+      {% else %}
+        {% include "componentes/marcador_categoria.html" with tinte=t nombre=nombre_cat %}
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-2">
+        <h1 class="text-2xl break-words md:text-3xl">{{ producto.nombre }}</h1>
+        <p class="text-sm opacity-80">{{ nombre_cat }}</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <p class="font-display text-3xl font-bold tabular-nums">{{ producto.precio|pesos }}</p>
+        <p class="opacity-80">por {{ producto.unidad|unidad }}</p>
+        {% include "componentes/disponibilidad.html" with stock=producto.stock %}
+      </div>
+
+      <div x-data="{ aviso: false }" class="flex flex-col gap-3">
+        <button type="button" class="btn btn-primary btn-lg self-start" @click="aviso = true" aria-controls="aviso-carrito" {% if producto.stock == 0 %}disabled{% endif %}>
+          {% if producto.stock == 0 %}Agotado{% else %}Agregar al carrito{% endif %}
+        </button>
+        <div id="aviso-carrito" x-show="aviso" x-transition.opacity role="status" class="alert alert-info" style="display:none">
+          <span>Para comprar necesitas iniciar sesión. Muy pronto podrás hacerlo desde aquí.</span>
+        </div>
+        <noscript><p class="text-sm">Para comprar necesitas iniciar sesión. Muy pronto podrás hacerlo desde aquí.</p></noscript>
+      </div>
+
+      {% if producto.descripcion %}
+        <p class="max-w-prose text-lg">{{ producto.descripcion }}</p>
+      {% endif %}
+
+      {% with filas=producto.ficha_tecnica|ficha_filas %}
+      {% if filas %}
+      <section aria-labelledby="ficha" class="mt-2">
+        <h2 id="ficha" class="text-xl mb-3">Ficha técnica</h2>
+        <dl class="divide-y divide-base-300 border-y border-base-300">
+          {% for fila in filas %}
+            <div class="grid gap-1 py-3 sm:grid-cols-[12rem_1fr]">
+              <dt class="font-medium">{{ fila.etiqueta }}</dt>
+              <dd>
+                {% if fila.lista %}
+                  <ul class="flex flex-wrap gap-x-4 gap-y-1">
+                    {% for clave, valor in fila.lista %}<li><span class="font-medium">{{ clave }}</span> {{ valor }}</li>{% endfor %}
+                  </ul>
+                {% else %}
+                  {{ fila.valor }}
+                {% endif %}
+              </dd>
+            </div>
+          {% endfor %}
+        </dl>
+      </section>
+      {% endif %}
+      {% endwith %}
+    </div>
+  </article>
+</div>
+{% endwith %}
+{% endblock %}

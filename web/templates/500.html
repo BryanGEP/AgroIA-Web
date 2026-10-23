@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block titulo %}Algo salió mal{% endblock %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4">
+  {% include "componentes/error.html" with titulo="Algo salió mal de nuestro lado" texto="Intenta de nuevo en unos minutos." enlace="/" accion="Ir al inicio" %}
+</div>
+{% endblock %}

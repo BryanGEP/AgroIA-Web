@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titulo %}Catálogo{% endblock %}
+{% block descripcion %}Fungicidas, fertilizantes, herramientas, riego y protección para huertas de aguacate.{% endblock %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4 py-8 md:py-10">
+  <h1 class="text-3xl mb-6">Catálogo</h1>
+
+  <div class="grid gap-4 md:grid-cols-[16rem_1fr] md:gap-8">
+    {# Sin JavaScript: formulario GET normal con botón Filtrar. Con HTMX: actualiza solo #resultados. #}
+    <form id="filtros" method="get" action="{% url 'catalogo:lista' %}"
+          hx-get="{% url 'catalogo:lista' %}" hx-target="#resultados" hx-push-url="true"
+          hx-trigger="change, submit, input changed delay:400ms from:#id_q, search from:#id_q" hx-indicator="#cargando"
+          hx-on::config-request="for (const [k, v] of Object.entries(event.detail.parameters)) { if (v === '') delete event.detail.parameters[k] }"
+          class="flex flex-col gap-4">
+      <div class="flex flex-col gap-1">
+        <label for="id_q" class="font-medium">Buscar</label>
+        <input type="search" name="q" id="id_q" value="{{ filtros.q.value|default_if_none:'' }}" maxlength="100" class="input w-full" placeholder="Caldo bordelés, urea, goteo…" autocomplete="off">
+      </div>
+
+      {# Abierto por defecto (funciona sin JavaScript); en celular, Alpine lo pliega si no hay filtros. #}
+      <details open x-data x-init="if (window.matchMedia('(max-width: 767px)').matches && !{{ filtros.hay_filtros|yesno:'true,false' }}) $el.open = false">
+        <summary class="btn btn-sm btn-outline w-full md:hidden">Filtros y orden</summary>
+        <div class="mt-4 flex flex-col gap-4 md:mt-0">
+          <div class="flex flex-col gap-1">
+            <label for="id_categoria" class="font-medium">Categoría</label>
+            <select name="categoria" id="id_categoria" class="select w-full">
+              {% for valor, texto in filtros.fields.categoria.choices %}
+                <option value="{{ valor }}" {% if filtros.categoria.value == valor %}selected{% endif %}>{{ texto }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <fieldset class="flex flex-col gap-1">
+            <legend class="font-medium mb-1">Precio (pesos)</legend>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="flex flex-col gap-1">
+                <label for="id_precio_min" class="text-sm">Mínimo</label>
+                <input type="number" name="precio_min" id="id_precio_min" min="0" step="0.01" inputmode="decimal" value="{{ filtros.precio_min.value|default_if_none:'' }}" class="input w-full" {% if filtros.precio_min.errors %}aria-invalid="true" aria-describedby="error-precio-min"{% endif %}>
+              </div>
+              <div class="flex flex-col gap-1">
+                <label for="id_precio_max" class="text-sm">Máximo</label>
+                <input type="number" name="precio_max" id="id_precio_max" min="0" step="0.01" inputmode="decimal" value="{{ filtros.precio_max.value|default_if_none:'' }}" class="input w-full" {% if filtros.precio_max.errors %}aria-invalid="true" aria-describedby="error-precio-max"{% endif %}>
+              </div>
+            </div>
+            {% if filtros.precio_min.errors %}<p id="error-precio-min" class="text-sm text-error">{{ filtros.precio_min.errors.0 }}</p>{% endif %}
+            {% if filtros.precio_max.errors %}<p id="error-precio-max" class="text-sm text-error">{{ filtros.precio_max.errors.0 }}</p>{% endif %}
+          </fieldset>
+
+          <label for="id_disponible" class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="disponible" id="id_disponible" value="on" class="checkbox checkbox-primary" {% if filtros.disponible.value %}checked{% endif %}>
+            <span>Solo con existencias</span>
+          </label>
+
+          <div class="flex flex-col gap-1">
+            <label for="id_orden" class="font-medium">Ordenar por</label>
+            <select name="orden" id="id_orden" class="select w-full">
+              {% for valor, texto in filtros.fields.orden.choices %}
+                <option value="{{ valor }}" {% if filtros.orden.value == valor %}selected{% endif %}>{{ texto }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+            <a href="{% url 'catalogo:lista' %}" class="btn btn-ghost btn-sm">Quitar filtros</a>
+          </div>
+        </div>
+      </details>
+    </form>
+
+    <div>
+      <div class="mb-2 min-h-6">{% include "componentes/cargando.html" with id="cargando" texto="Buscando productos…" %}</div>
+      <div id="resultados" aria-live="polite">
+        {% include "catalogo/parciales/_resultados.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

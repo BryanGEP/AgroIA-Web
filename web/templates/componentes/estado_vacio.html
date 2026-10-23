@@ -1,0 +1,6 @@
+{# Estado vacío con una acción. Parámetros: titulo, texto, enlace, accion. #}
+<div class="flex flex-col items-start gap-3 rounded-box border border-dashed border-base-300 p-8">
+  <h2 class="text-xl">{{ titulo }}</h2>
+  {% if texto %}<p class="max-w-prose">{{ texto }}</p>{% endif %}
+  {% if enlace %}<a href="{{ enlace }}" class="btn btn-primary btn-sm">{{ accion }}</a>{% endif %}
+</div>

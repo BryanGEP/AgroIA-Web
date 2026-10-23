@@ -266,8 +266,12 @@ El gateway renderiza HTML con plantillas de Django. daisyUI da los componentes, 
 5. **Componentes repetidos como `{% include %}`** con parámetros, en `templates/componentes/`: tarjeta de producto, campo de formulario, paginador, estado vacío.
 6. **Indicadores de carga** en toda petición HTMX que tarde: `hx-indicator` con un `loading` de daisyUI. El agente y el diagnóstico pueden tardar varios segundos.
 7. **Responsive desde el inicio:** primero celular, después `md:` y `lg:`. Muchos productores van a entrar desde el teléfono.
-8. **HTMX y Alpine se sirven desde `static/vendor/`**, no desde un CDN, para que funcione sin internet en la demo.
+8. **HTMX y Alpine se sirven desde `static/vendor/`**, no desde un CDN, para que funcione sin internet en la demo. Las fuentes (Barlow y Barlow Semi Condensed, OFL) también son locales, en `static/fonts/`.
 9. **Accesibilidad mínima:** cada `input` con `label`, imágenes con `alt`, contraste del tema revisado.
+10. **Imágenes de otros servicios:** el navegador no alcanza las direcciones internas. El gateway reescribe las URLs de imagen de svc-tienda a `/media/tienda/<ruta>` y esa ruta reenvía el archivo (solo `productos/` e `image/*`), sin publicar svc-tienda. Con Cloud Storage (Entrega 5) las URLs serán públicas y no se reescriben.
+11. **CSS compilado:** `static/css/agroia.css` se genera a partir de `fuente.css` y no se sube al repo; el contenedor `web` lo compila al arrancar.
+
+**Base visual hecha** (ver `docs/avances/web-base-catalogo.md`): temas `agroia` y `agroia-oscuro`, `base.html`, componentes, inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle y aviso de privacidad.
 
 **Pantallas de la Entrega 2:** inicio, catálogo con filtros, detalle de producto, carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico por imagen con historial, registro, login, recuperar contraseña, perfil con direcciones, y panel de administrador para productos y pedidos.
 

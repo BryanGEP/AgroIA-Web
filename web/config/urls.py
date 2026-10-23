@@ -1,13 +1,17 @@
-"""Rutas del servicio: /salud/, /api/docs/ y, desde la fase 1, /api/v1/."""
+"""Rutas del gateway: páginas, catálogo, /salud/ y /api/docs/."""
 
-from django.urls import path
+from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from config.views import salud
 
 urlpatterns = [
+    path("", include("apps.paginas.urls")),
+    path("", include("apps.catalogo.urls")),
     path("salud/", salud, name="salud"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
-    # path("api/v1/", include(...)),  # fase 1 en adelante
 ]
+
+handler404 = "apps.paginas.views.no_encontrado"
+handler500 = "apps.paginas.views.error_servidor"
