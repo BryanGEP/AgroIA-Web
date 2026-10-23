@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AgroIA-Web",
-    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. Corre primero `cargar_datos_demo`. Las carpetas están en orden para correrlas con el Runner.",
+    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. svc-tienda: corre primero `cargar_datos_demo`. En las peticiones con imagen, selecciona el archivo en la pestaña Body. Las carpetas están en orden para correrlas con el Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1569,6 +1569,1215 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "svc-contenido",
+      "description": "Conversaciones, diagnósticos y bitácora (MongoDB). Puerto local 8003.",
+      "item": [
+        {
+          "name": "Salud",
+          "item": [
+            {
+              "name": "Salud",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/salud/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "salud",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Conversaciones",
+          "item": [
+            {
+              "name": "Crear conversación",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"titulo\": \"Manchas en el fruto\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"conversacion_id\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mensaje del usuario",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/mensajes/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "mensajes",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"usuario\",\n  \"texto\": \"¿Qué es la antracnosis?\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mensaje del agente con fuentes",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/mensajes/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "mensajes",
+                    ""
+                  ]
+                },
+                "description": "Máximo 200 mensajes por conversación (409 conversacion_llena).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"agente\",\n  \"texto\": \"Es una enfermedad causada por hongos.\",\n  \"fuentes\": [\n    \"Guía técnica\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Fuentes en mensaje de usuario → 400",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/mensajes/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "mensajes",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rol\": \"usuario\",\n  \"texto\": \"x\",\n  \"fuentes\": [\n    \"no aplica\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mis conversaciones",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver conversación",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "El admin no ve conversaciones ajenas → 404",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    ""
+                  ]
+                },
+                "description": "Las conversaciones son privadas, también para el administrador.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Id inválido → 404",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/no-es-un-id/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "no-es-un-id",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Borrar conversación",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Diagnósticos",
+          "item": [
+            {
+              "name": "Guardar diagnóstico",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    ""
+                  ]
+                },
+                "description": "multipart/form-data. Selecciona una foto de hoja o fruto (JPG, PNG o WebP, máx. 5 MB). probabilidades va como texto JSON.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "imagen",
+                      "type": "file",
+                      "src": [],
+                      "description": "Selecciona una foto de hoja o fruto (JPG, PNG o WebP, máx. 5 MB)."
+                    },
+                    {
+                      "key": "clase",
+                      "value": "antracnosis",
+                      "type": "text"
+                    },
+                    {
+                      "key": "confianza",
+                      "value": "0.91",
+                      "type": "text"
+                    },
+                    {
+                      "key": "probabilidades",
+                      "value": "{\"sano\": 0.03, \"rona\": 0.06, \"antracnosis\": 0.91}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "modelo_version",
+                      "value": "v1",
+                      "type": "text"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                      "pm.environment.set(\"diagnostico_id\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Confianza incoherente → 400",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "imagen",
+                      "type": "file",
+                      "src": [],
+                      "description": "Selecciona una foto de hoja o fruto (JPG, PNG o WebP, máx. 5 MB)."
+                    },
+                    {
+                      "key": "clase",
+                      "value": "antracnosis",
+                      "type": "text"
+                    },
+                    {
+                      "key": "confianza",
+                      "value": "0.50",
+                      "type": "text"
+                    },
+                    {
+                      "key": "probabilidades",
+                      "value": "{\"sano\": 0.03, \"rona\": 0.06, \"antracnosis\": 0.91}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "modelo_version",
+                      "value": "v1",
+                      "type": "text"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mis diagnósticos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Ver diagnóstico",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_id}}/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_id}}",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Todos los diagnósticos (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Bitácora",
+          "item": [
+            {
+              "name": "Registrar evento (admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tipo\": \"pedido_creado\",\n  \"usuario_id\": 10,\n  \"servicio\": \"svc-tienda\",\n  \"datos\": {\n    \"pedido_id\": 7\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Consultar con filtros (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?tipo=pedido_creado&desde=2026-10-01",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "tipo",
+                      "value": "pedido_creado"
+                    },
+                    {
+                      "key": "desde",
+                      "value": "2026-10-01"
+                    }
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Consultar como cliente → 403",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "svc-ia",
+      "description": "Adaptador del agente y diagnóstico por imagen. Puerto local 8004. Necesita GROQ_API_KEY en el contenedor agente.",
+      "item": [
+        {
+          "name": "Salud",
+          "item": [
+            {
+              "name": "Salud",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_ia}}/salud/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "salud",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Agente",
+          "item": [
+            {
+              "name": "Preguntar al agente",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_ia}}/agente/preguntar/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "agente",
+                    "preguntar",
+                    ""
+                  ]
+                },
+                "description": "Responde 503 agente_no_disponible si el agente no está o no tiene GROQ_API_KEY.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pregunta\": \"¿Y cada cuánto lo aplico?\",\n  \"historial\": [\n    {\n      \"rol\": \"usuario\",\n      \"texto\": \"Mis aguacates tienen manchas negras hundidas.\"\n    },\n    {\n      \"rol\": \"agente\",\n      \"texto\": \"Puede ser antracnosis; se recomienda un fungicida cúprico.\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.environment.set(\"solicitud_id\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Pregunta vacía → 400",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_ia}}/agente/preguntar/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "agente",
+                    "preguntar",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pregunta\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Sin token → 401",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_ia}}/agente/preguntar/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "agente",
+                    "preguntar",
+                    ""
+                  ]
+                },
+                "description": "",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pregunta\": \"Hola\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado de la solicitud",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_ia}}/solicitudes/{{solicitud_id}}/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "solicitudes",
+                    "{{solicitud_id}}",
+                    ""
+                  ]
+                },
+                "description": "En la Entrega 2 siempre listo; se guarda en memoria.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Diagnóstico",
+          "item": [
+            {
+              "name": "Diagnosticar imagen → 503 (sin modelo)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_ia}}/diagnostico/",
+                  "host": [
+                    "{{base_ia}}"
+                  ],
+                  "path": [
+                    "diagnostico",
+                    ""
+                  ]
+                },
+                "description": "El modelo de visión se integra en una entrega posterior: responde 503 modelo_no_disponible.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "imagen",
+                      "type": "file",
+                      "src": [],
+                      "description": "Selecciona una foto JPG o PNG, máx. 5 MB."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 503\", () => pm.response.to.have.status(503));"
                     ]
                   }
                 }
