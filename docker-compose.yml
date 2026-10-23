@@ -146,10 +146,11 @@ services:
       dockerfile: svc-ia/Dockerfile
     environment:
       AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+      DEBUG: ${DJANGO_DEBUG:-False}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
-      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      # svc-ia no llama al LLM: traduce el contrato y llama al contenedor agente.
+      URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
+      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-30}
       # En Windows los cambios de archivos montados no generan eventos dentro del
       # contenedor; uvicorn --reload necesita revisar por sondeo.
       WATCHFILES_FORCE_POLLING: "true"
@@ -161,6 +162,32 @@ services:
       - ./ruff.toml:/ruff.toml:ro
     ports:
       - "127.0.0.1:8004:8000"
+    networks: [agroia]
+
+  # Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (rama main).
+  # No se copia su código: evoluciona en ese repo. svc-ia lo llama por la red interna;
+  # el puerto 8005 es solo para probarlo desde esta computadora.
+  agente:
+    build:
+      context: https://github.com/BryanGEP/AgroIA.git#main:svc-agente
+    environment:
+      # Cada integrante usa su propia llave gratuita de Groq (ver README.md).
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+    ports:
+      - "127.0.0.1:8005:8000"
+    healthcheck:
+      # La imagen del agente no trae curl.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     networks: [agroia]
 
   # ---------------------------------------------------------------------------

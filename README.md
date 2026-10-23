@@ -12,17 +12,18 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `svc-usuarios/` | Registro, login (JWT), recuperación de contraseña, roles, perfil y direcciones. | PostgreSQL `usuarios_db` | 8001 | [README](svc-usuarios/README.md) |
 | `svc-tienda/` | Categorías, productos, stock, carrito y pedidos (pago simulado). | PostgreSQL `tienda_db` | 8002 | [README](svc-tienda/README.md) |
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
-| `svc-ia/` | Agente AgroIA (FastAPI, desde el repo [AgroIA](https://github.com/BryanGEP/AgroIA)) y clasificación de imágenes: sano, roña o antracnosis. | ninguna | 8004 | [README](svc-ia/README.md) |
+| `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
 | `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django. | — | — | [README](comun/README.md) |
 | `infra/` | `postgres/init.sql` (bases y usuarios) y `generar_llaves.py` (llaves JWT). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
-Además corren tres contenedores de infraestructura: `postgres` (16), `mongo` (7) y `redis` (7).
+Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), y el contenedor **`agente`**: el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA), que Docker Compose construye directamente desde GitHub (carpeta `svc-agente`, rama `main`). Solo está en la red interna; se publica en `127.0.0.1:8005` para pruebas.
 
 ## Requisitos
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) con Docker Compose.
 - Python 3.12, solo para generar las llaves y para el entorno virtual del editor.
+- Una llave de API de Groq **propia** (gratuita) para que el agente responda. Ver [Llave de Groq](#llave-de-groq).
 
 ## Levantar el proyecto por primera vez
 
@@ -30,6 +31,7 @@ Desde la raíz del repo, en PowerShell:
 
 ```powershell
 # 1. Variables de entorno: copia el ejemplo y cambia las contraseñas y la DJANGO_SECRET_KEY.
+#    Pon tu propia GROQ_API_KEY (ver "Llave de Groq").
 Copy-Item .env.example .env
 
 # 2. Llaves JWT (se crean en infra/llaves/, que nunca se sube al repo).
@@ -38,9 +40,20 @@ python infra/generar_llaves.py
 #    O sin venv, usando Docker:
 docker run --rm -v "${PWD}:/repo" -w /repo python:3.12-slim sh -c "pip install -q cryptography==50.0.2 && python infra/generar_llaves.py"
 
-# 3. Construir y levantar todo.
+# 3. Construir y levantar todo (la primera vez descarga el agente desde GitHub).
 docker compose up --build
 ```
+
+### Llave de Groq
+
+El agente usa el LLM de [Groq](https://groq.com/). **Cada integrante necesita su propia llave gratuita**; no se comparten ni se suben al repo:
+
+1. Entra a https://console.groq.com/keys e inicia sesión.
+2. Crea una llave ("Create API Key") y cópiala.
+3. Pégala en tu `.env`: `GROQ_API_KEY=gsk_...`
+4. Reinicia el agente: `docker compose up -d agente`.
+
+La llave solo llega al contenedor `agente`, no a svc-ia. Sin llave el sistema arranca igual, pero `POST /agente/preguntar/` responde 503 `agente_no_disponible`. Para traer la versión más reciente del agente desde GitHub: `docker compose build --no-cache agente`.
 
 Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /salud/` y tiene su documentación en `/api/docs/`:
 
@@ -51,6 +64,7 @@ Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /sal
 | svc-tienda | http://localhost:8002/salud/ | http://localhost:8002/api/docs/ |
 | svc-contenido | http://localhost:8003/salud/ | http://localhost:8003/api/docs/ |
 | svc-ia | http://localhost:8004/salud/ | http://localhost:8004/api/docs/ |
+| agente (solo pruebas) | http://localhost:8005/health | — (chat propio en http://localhost:8005/) |
 
 Los puertos (también 5432, 27017 y 6379 de las bases) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`.
 

@@ -10,6 +10,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from agroia_comun.configuracion import configurar_jwt, leer_llave_publica, validar_modo_auth
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -33,9 +35,13 @@ SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
-# Autenticación: True por defecto. Solo el .env local puede ponerla en False.
+# Autenticación: True por defecto. Solo el .env local puede ponerla en False, y solo
+# con DEBUG=True. Con False se apagan las revisiones de rol, pero los endpoints siguen
+# pidiendo token porque todo es por usuario (ver comun/README.md).
 AUTH_ACTIVA = booleano("AUTH_ACTIVA", True)
+validar_modo_auth(AUTH_ACTIVA, DEBUG)
 JWT_PUBLIC_KEY_PATH = os.environ.get("JWT_PUBLIC_KEY_PATH", "")
+SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA))
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -44,6 +50,9 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "drf_spectacular",
+    "apps.conversaciones",
+    "apps.diagnosticos",
+    "apps.bitacora",
 ]
 
 MIDDLEWARE = [
@@ -97,8 +106,10 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    # Fase 4: las clases de autenticación y permisos de agroia_comun (JWT + AUTH_ACTIVA).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["agroia_comun.autenticacion.AutenticacionJWT"],
+    # Todo pide token salvo los endpoints que declaran AllowAny.
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "EXCEPTION_HANDLER": "agroia_comun.errores.manejador_de_excepciones",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
@@ -113,4 +124,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Conversaciones con el agente, historial de diagnósticos y bitácora.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Esquemas separados de entrada y salida (necesario para subir la imagen con multipart).
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }

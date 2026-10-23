@@ -17,7 +17,7 @@ AgroIA-Web se construye con Django 5.2 LTS y DRF en el backend, y Tailwind + dai
 | Base relacional | PostgreSQL | 16 | Usuarios, catálogo y pedidos |
 | Base de documentos | MongoDB + pymongo | 7 | Conversaciones, diagnósticos y bitácora |
 | Caché / mensajería | Redis | 7 | Throttling ahora; eventos en la Entrega 4 |
-| Servicio de IA | FastAPI | la del repo AgroIA | Agente (LangChain) y modelo de visión |
+| Servicio de IA | FastAPI | la del repo AgroIA | Adaptador del agente (contenedor `agente` del repo AgroIA, LangChain + Groq) y modelo de visión |
 | Estilos | Tailwind CSS + daisyUI | 4.x + 5.x | Diseño y componentes, sin Node con `django-tailwind-cli` |
 | Interactividad | HTMX + django-htmx | 2.x | Actualizar partes de la página sin recargar |
 | Interactividad ligera | Alpine.js | 3.x | Menús, modales, vista previa de imágenes |
@@ -37,7 +37,7 @@ El gateway es el único punto de entrada: recibe al navegador y reparte cada pet
 
 ## Servicios
 
-Son cinco servicios propios más tres de infraestructura. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
+Son cinco servicios propios, el contenedor `agente` (construido desde el repo AgroIA) y tres de infraestructura. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
 
 | Servicio | Responsabilidad | Base de datos | Puerto local | Pieza del maestro |
 | --- | --- | --- | --- | --- |
@@ -45,7 +45,8 @@ Son cinco servicios propios más tres de infraestructura. Catálogo y pedidos se
 | `svc-usuarios` | Registro, login, JWT, recuperación, roles, perfil y direcciones | PostgreSQL `usuarios_db` | 8001 | Identidad y usuarios |
 | `svc-tienda` | Categorías, productos, stock, carrito y pedidos | PostgreSQL `tienda_db` | 8002 | Negocio principal |
 | `svc-contenido` | Conversaciones con el agente, historial de diagnósticos y bitácora de actividad | MongoDB `contenido` | 8003 | Datos no estructurados |
-| `svc-ia` | Responde preguntas con el agente y clasifica imágenes de aguacate | ninguna | 8004 | Integración de IA |
+| `svc-ia` | Adaptador: traduce el contrato al agente y clasifica imágenes de aguacate (modelo pendiente) | ninguna | 8004 | Integración de IA |
+| `agente` | Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (`main:svc-agente`). Solo red interna | ninguna | 8005 (solo pruebas) | — |
 | `postgres` | Un contenedor con una base por servicio | — | 5432 | — |
 | `mongo` | Base de documentos | — | 27017 | — |
 | `redis` | Caché para throttling; eventos en la Entrega 4 | — | 6379 | — |
@@ -110,7 +111,7 @@ svc-tienda/
 
 El gateway `web/` sigue la misma base, con `templates/` (una carpeta por módulo y `parciales/` para los fragmentos que devuelve HTMX), `static/css/fuente.css` (entrada de Tailwind) y `clientes/` (un cliente HTTP por servicio).
 
-El agente vive hoy en el repo AgroIA. Mientras se fusionan los proyectos, `svc-ia` copia su código y agrega el endpoint de diagnóstico; los cambios del agente se hacen primero en AgroIA.
+El agente vive en el repo AgroIA y sigue evolucionando ahí; no se copia su código. Docker Compose construye el contenedor `agente` desde `https://github.com/BryanGEP/AgroIA.git#main:svc-agente` y `svc-ia` lo llama por HTTP, traduciendo el contrato de AgroIA-Web a la API del agente (`POST /chat`). Los cambios del agente se hacen en AgroIA.
 
 ## Contratos de API
 
@@ -136,8 +137,11 @@ Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `
 | `stock_insuficiente` | 409 | La cantidad pedida supera el stock disponible |
 | `producto_no_disponible` | 409 | El producto o su categoría están desactivados |
 | `transicion_invalida` | 409 | Cambio de estado del pedido no permitido |
+| `conversacion_llena` | 409 | La conversación llegó a 200 mensajes; hay que iniciar otra |
+| `agente_no_disponible` | 503 | El agente no respondió, falló o tardó más que `AGENTE_TIMEOUT` (svc-ia) |
+| `modelo_no_disponible` | 503 | No hay modelo de visión configurado; se integra en una entrega posterior (svc-ia) |
 
-Los códigos de negocio (los cuatro últimos) se lanzan con `ErrorDeNegocio` desde `servicios.py`.
+Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNegocio` desde `servicios.py`; svc-ia, que no usa `comun`, produce los suyos con el mismo formato. Un ObjectId mal formado en svc-contenido responde `no_encontrado` (404), igual que uno inexistente o ajeno.
 
 **`svc-usuarios`** — detalle completo en el documento de requerimientos de autenticación.
 
@@ -172,22 +176,24 @@ Los códigos de negocio (los cuatro últimos) se lanzan con `ErrorDeNegocio` des
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| GET, POST | `/conversaciones/` | autenticado (solo las propias) |
-| GET, DELETE | `/conversaciones/<id>/` | dueño |
-| POST | `/conversaciones/<id>/mensajes/` | dueño |
-| GET, POST | `/diagnosticos/` | autenticado (solo los propios) |
+| GET, POST | `/conversaciones/` | autenticado (solo las propias; también el administrador) |
+| GET, DELETE | `/conversaciones/<id>/` | dueño (las conversaciones son privadas: el administrador recibe 404) |
+| POST | `/conversaciones/<id>/mensajes/` | dueño. `{"rol": "usuario" \| "agente", "texto", "fuentes"?}`; máximo 200 mensajes (`conversacion_llena`) |
+| GET, POST | `/diagnosticos/` | autenticado (solo los propios; el administrador lista todos). POST en `multipart`: imagen JPG, PNG o WebP (máx. 5 MB) y el resultado de svc-ia |
 | GET | `/diagnosticos/<id>/` | dueño o administrador |
-| GET | `/bitacora/` | administrador |
+| GET, POST | `/bitacora/` | administrador. Filtros `tipo`, `desde`, `hasta`. POST manual por ahora; en la Entrega 4 la llenan los eventos |
 
 **`svc-ia`** — diseñado desde ahora para volverse asíncrono en la Entrega 4: cada respuesta trae `id` y `estado`.
 
 | Método | Ruta | Recibe | Devuelve |
 | --- | --- | --- | --- |
 | POST | `/agente/preguntar/` | `{"pregunta", "historial": [...]}` | `{"id", "estado": "listo", "respuesta", "fuentes"}` |
-| POST | `/diagnostico/` | imagen `multipart`, máx. 5 MB, JPG o PNG | `{"id", "estado": "listo", "clase": "sano" \| "rona" \| "antracnosis", "confianza": 0.0–1.0}` |
-| GET | `/solicitudes/<id>/` | — | Estado de una solicitud; en la Entrega 2 siempre `listo` |
+| POST | `/diagnostico/` | imagen `multipart`, máx. 5 MB, JPG o PNG | `{"id", "estado": "listo", "clase": "sano" \| "rona" \| "antracnosis", "confianza": 0.0–1.0, "probabilidades", "modelo_version"}`. **Entrega 2: 503 `modelo_no_disponible`**, el modelo de visión todavía no existe |
+| GET | `/solicitudes/<id>/` | — | Estado de una solicitud (dueño o administrador); en la Entrega 2 siempre `listo`, guardada en memoria (pasa a Redis en la Entrega 4) |
 
-En la Entrega 2, `web` llama a `svc-ia` y después guarda el resultado en `svc-contenido`. En la Entrega 4, `svc-ia` responderá `estado: "pendiente"` y publicará el resultado como evento.
+`historial` es una lista de `{"rol": "usuario" | "agente", "texto"}`; svc-ia envía al agente las últimas 10 entradas como contexto y un `session_id` nuevo por petición. `fuentes` llega vacío hasta que el agente tenga RAG. Si el agente falla: 503 `agente_no_disponible`.
+
+En la Entrega 2, svc-ia y svc-contenido no se llaman entre sí: `web` llama a `svc-ia` y después guarda el resultado en `svc-contenido`. En la Entrega 4, `svc-ia` responderá `estado: "pendiente"` y publicará el resultado como evento.
 
 ## Modelo de datos
 
@@ -224,7 +230,7 @@ Los pedidos copian el nombre, el precio y la dirección: si después cambian, el
                 { "rol": "agente", "texto": "...", "fuentes": ["..."], "fecha": ISODate } ] }
 
 // diagnosticos
-{ "_id": ObjectId, "usuario_id": 12, "imagen_url": "...",
+{ "_id": ObjectId, "usuario_id": 12, "imagen": "diagnosticos/<uuid>.png",
   "clase": "antracnosis", "confianza": 0.91,
   "probabilidades": { "sano": 0.03, "rona": 0.06, "antracnosis": 0.91 },
   "modelo_version": "v1", "creado_en": ISODate }
@@ -234,7 +240,7 @@ Los pedidos copian el nombre, el precio y la dirección: si después cambian, el
   "servicio": "svc-tienda", "datos": { ... }, "fecha": ISODate }
 ```
 
-Índices: `usuario_id` + `actualizada_en` en conversaciones, `usuario_id` + `creado_en` en diagnósticos, `tipo` + `fecha` en bitácora. Los mensajes van dentro de su conversación porque siempre se leen juntos; si una conversación pasa de 200 mensajes, se inicia otra.
+Índices: `usuario_id` + `actualizada_en` en conversaciones, `usuario_id` + `creado_en` en diagnósticos, `tipo` + `fecha` y `fecha` en bitácora; los crea `python manage.py crear_indices` al arrancar el contenedor. En diagnósticos se guarda el nombre del archivo en `default_storage` (`imagen`) y la API calcula `imagen_url`, para que siga funcionando al pasar a Cloud Storage. Los mensajes van dentro de su conversación porque siempre se leen juntos; si una conversación pasa de 200 mensajes, se inicia otra.
 
 ## Frontend
 
@@ -285,7 +291,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 
 **`docker-compose.yml` debe incluir:**
 
-- Los ocho servicios de la tabla de servicios, en una red interna común.
+- Los nueve contenedores de la tabla de servicios (incluido `agente`), en una red interna común.
 - `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db`, `tienda_db` y `web_db` (sesiones del gateway), cada una con su propio usuario (`usuarios`, `tienda`, `web`). Las contraseñas no van en el script: psql las lee del entorno con `\getenv`. Solo corre la primera vez que se crea el volumen; para repetirlo, `docker compose down -v` (borra los datos).
 - Volúmenes con nombre para PostgreSQL y MongoDB, para no perder datos al reiniciar.
 - Puertos publicados solo en `127.0.0.1` (también los de las bases): sirven para probar desde la computadora y no quedan visibles en la red.
@@ -311,7 +317,8 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
 | `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
-| `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | —, `groq`, `openai/gpt-oss-120b` (las mismas del agente de AgroIA) | svc-ia |
+| `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | llave propia de cada integrante, `groq`, `openai/gpt-oss-120b` | contenedor `agente` |
+| `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `30` | svc-ia |
 
 Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
 
@@ -393,7 +400,7 @@ La fase 0 la hace una sola persona porque todo depende de ella. Después, las fa
 1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
 2. **Fase 1 · Usuarios y entrada.** En `svc-usuarios`: modelo `Usuario`, envío de correos, registro, verificación, login, renovación, logout, aviso de privacidad, perfil y direcciones. En `web`: Tailwind + daisyUI, tema `agroia`, `base.html` y pantallas de registro, login y perfil.
 3. **Fase 2 · Tienda.** Modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas de catálogo, detalle, carrito, checkout, mis pedidos y panel de administrador.
-4. **Fase 3 · IA y contenido.** `svc-ia` con el agente del repo AgroIA y el modelo de visión; `svc-contenido` con conversaciones, diagnósticos y bitácora. Pantallas de chat y de diagnóstico con historial.
+4. **Fase 3 · IA y contenido.** `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Pantallas de chat y de diagnóstico con historial.
 5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en el resto de los servicios (la validación RS256 de `comun/` ya existe desde la fase 2), revisión de `token_version`, límite de intentos, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
 6. **Fase 5 · Calidad y entrega.** Completar pruebas, Swagger con ejemplos, colección de Postman, READMEs de cada servicio y revisión con `insecure-defaults` y `static-analysis`.
 7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
@@ -406,7 +413,7 @@ El equipo aprobó estas decisiones el 22 de octubre de 2026. En el documento de 
 | --- | --- | --- |
 | Servicios fusionados | Catálogo y pedidos en `svc-tienda`; agente y diagnóstico en `svc-ia` | Crear un pedido descuenta stock en la misma transacción; separarlos obligaría a una transacción distribuida. Agente y visión comparten dependencias y despliegue |
 | Ficha técnica | `JSONField` en PostgreSQL | MongoDB queda para conversaciones, diagnósticos y bitácora, que son los datos que realmente crecen y cambian de forma |
-| `svc-ia` | FastAPI, reutilizando el agente de AgroIA | El maestro lo permite y evita reescribir el agente. Valida el JWT con PyJWT, porque las clases de `comun/` son de DRF |
+| `svc-ia` | FastAPI como adaptador: el agente corre en su propio contenedor, construido desde el repo AgroIA, y svc-ia traduce el contrato (decisión revisada en la fase 3) | El agente sigue evolucionando en su repo sin copias que se desincronicen. Valida el JWT con PyJWT, porque las clases de `comun/` son de DRF |
 | Proveedor del LLM | El que ya usa el agente | Llave solo en `.env` y límite de gasto en la cuenta del proveedor |
 | Pago | Simulado: botón "Pagar" que marca el pedido como `pagado`, con etiqueta visible "pago simulado" | Ninguna entrega califica pagos |
 | Imágenes | Volumen local, siempre con `STORAGES` y `default_storage` de Django, nunca rutas a mano | En la Entrega 5 se pasa a Cloud Storage con `django-storages` cambiando solo la configuración. Las imágenes de diagnóstico las guarda `svc-contenido`; `svc-ia` no guarda nada |

@@ -1,11 +1,12 @@
 """Configuración del microservicio: lee variables de entorno (y .env en local).
 
-Sigue el mismo patrón que app/config.py del agente de AgroIA para que, en la fase 3,
-su código se copie sin cambios: ahí se agregan groq_api_key, llm_provider y llm_model.
+svc-ia no llama al LLM: es un adaptador que traduce el contrato de AgroIA-Web a la API
+del contenedor `agente` (repo BryanGEP/AgroIA). Las variables del LLM van a ese
+contenedor, no a este.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
@@ -18,10 +19,23 @@ def _booleano(valor: str) -> bool:
 
 @dataclass
 class Settings:
-    # True por defecto; solo el .env local puede apagarla.
-    auth_activa: bool = _booleano(os.getenv("AUTH_ACTIVA", "True"))
-    # Llave pública para validar el JWT con PyJWT (fase 4).
-    jwt_public_key_path: str = os.getenv("JWT_PUBLIC_KEY_PATH", "")
+    # Igual que DJANGO_DEBUG en los servicios Django (compose lo pasa como DEBUG).
+    debug: bool = field(default_factory=lambda: _booleano(os.getenv("DEBUG", "False")))
+    # True por defecto; solo el .env local puede apagarla, y solo con DEBUG=True.
+    auth_activa: bool = field(default_factory=lambda: _booleano(os.getenv("AUTH_ACTIVA", "True")))
+    # Llave pública para validar el JWT con PyJWT.
+    jwt_public_key_path: str = field(default_factory=lambda: os.getenv("JWT_PUBLIC_KEY_PATH", ""))
+    # Contenedor del agente (red interna de Docker).
+    url_agente: str = field(default_factory=lambda: os.getenv("URL_AGENTE", "http://agente:8000"))
+    agente_timeout: float = field(default_factory=lambda: float(os.getenv("AGENTE_TIMEOUT", "30")))
 
 
 settings = Settings()
+
+
+def validar(config: Settings) -> None:
+    """Impide arrancar con la autenticación apagada fuera del desarrollo local."""
+    if not config.auth_activa and not config.debug:
+        raise RuntimeError("AUTH_ACTIVA=False solo se permite con DEBUG=True (desarrollo local).")
+    if config.agente_timeout <= 0:
+        raise RuntimeError("AGENTE_TIMEOUT debe ser mayor que 0.")
