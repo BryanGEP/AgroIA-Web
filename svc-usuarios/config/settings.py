@@ -10,6 +10,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from agroia_comun.configuracion import configurar_jwt, leer_llave_publica, validar_modo_auth
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -33,13 +35,24 @@ SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
-# Autenticación: True por defecto. Solo el .env local puede ponerla en False.
+# Autenticación: True por defecto. Solo el .env local puede ponerla en False, y solo
+# con DEBUG=True. Con False se apagan las revisiones de rol, pero los endpoints por
+# usuario siguen pidiendo token (ver comun/README.md).
 AUTH_ACTIVA = booleano("AUTH_ACTIVA", True)
+validar_modo_auth(AUTH_ACTIVA, DEBUG)
 JWT_PUBLIC_KEY_PATH = os.environ.get("JWT_PUBLIC_KEY_PATH", "")
+# En la Entrega 2 svc-usuarios solo valida tokens; en la Entrega 3 también los firmará.
+SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA))
 
 # Solo svc-usuarios recibe la llave privada (firma los JWT).
 JWT_PRIVATE_KEY_PATH = os.environ.get("JWT_PRIVATE_KEY_PATH", "")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+
+# Versión vigente del aviso de privacidad; se guarda en cada usuario al registrarse.
+# Si el aviso cambia, se sube aquí y el gateway pedirá aceptar la nueva (Entrega 3).
+VERSION_AVISO_PRIVACIDAD = variable("VERSION_AVISO_PRIVACIDAD", "2026-10")
+
+AUTH_USER_MODEL = "usuarios.Usuario"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -51,6 +64,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "drf_spectacular",
+    "apps.usuarios",
 ]
 
 MIDDLEWARE = [
@@ -94,8 +108,14 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "OPTIONS": {"user_attributes": ["email", "nombre", "apellidos"]},
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -120,8 +140,10 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    # Fase 4: las clases de autenticación y permisos de agroia_comun (JWT + AUTH_ACTIVA).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["agroia_comun.autenticacion.AutenticacionJWT"],
+    # Todo pide token salvo los endpoints que declaran AllowAny.
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "EXCEPTION_HANDLER": "agroia_comun.errores.manejador_de_excepciones",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
@@ -136,4 +158,6 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Registro, login, JWT, recuperación de contraseña, roles, perfil y direcciones.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
