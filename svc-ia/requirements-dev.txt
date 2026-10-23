@@ -1,8 +1,8 @@
 -r requirements.txt
 
 # Desarrollo y pruebas. Se instalan también en la imagen para correr pytest y ruff.
+# El agente se simula con httpx.MockTransport (incluido en httpx).
 pytest==9.1.1
-httpx==0.28.1
 # Cliente que usa el TestClient de starlette (también está en el venv del agente).
 httpx2==2.13.1
 ruff==0.17.2

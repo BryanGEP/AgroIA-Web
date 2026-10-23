@@ -1,5 +1,6 @@
-# Dependencias de ejecución de svc-ia. Versiones fijas, iguales a las que usa el agente
-# del repo AgroIA (svc-agente) para poder copiarlo en la fase 3 sin cambios.
+# Dependencias de ejecución de svc-ia. Versiones fijas.
+# FastAPI, starlette, uvicorn, pydantic y python-dotenv son las mismas que usa el agente
+# del repo AgroIA (svc-agente). svc-ia no instala LangChain: llama al contenedor agente.
 fastapi==0.141.1
 # Fijada porque fastapi acepta un rango; 1.7.0 es la que usa el agente.
 starlette==1.7.0
@@ -7,6 +8,10 @@ uvicorn[standard]==0.53.0
 pydantic==2.13.5
 python-dotenv==1.2.3
 
-# Fase 3 (agente): langchain==1.4.2, langchain-core==1.6.4, langchain-groq==1.1.3
-# Fase 3 (diagnóstico): python-multipart y el runtime del modelo de visión
-# Fase 4 (JWT): PyJWT y cryptography
+# Cliente HTTP para llamar al agente.
+httpx==0.28.1
+# Subida de archivos (UploadFile) en POST /diagnostico/.
+python-multipart==0.0.32
+# Validación del JWT RS256 (svc-ia no usa comun). Mismas versiones que comun.
+PyJWT==2.15.1
+cryptography==50.0.2

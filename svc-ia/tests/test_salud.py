@@ -1,25 +1,35 @@
 """Pruebas de los endpoints de infraestructura: salud y documentación."""
 
-from fastapi.testclient import TestClient
 
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_salud_responde_ok():
-    respuesta = client.get("/salud/")
+def test_salud_responde_ok(cliente_http):
+    respuesta = cliente_http.get("/salud/")
 
     assert respuesta.status_code == 200
     assert respuesta.json() == {"estado": "ok"}
 
 
-def test_salud_solo_acepta_get():
-    respuesta = client.post("/salud/")
+def test_salud_solo_acepta_get(cliente_http):
+    respuesta = cliente_http.post("/salud/")
 
     assert respuesta.status_code == 405
+    assert respuesta.json()["error"] == "metodo_no_permitido"
 
 
-def test_documentacion_disponible():
-    assert client.get("/api/docs/").status_code == 200
-    assert "/salud/" in client.get("/api/schema/").json()["paths"]
+def test_documentacion_disponible(cliente_http):
+    assert cliente_http.get("/api/docs/").status_code == 200
+    esquema = cliente_http.get("/api/schema/").json()
+    assert {
+        "/salud/",
+        "/agente/preguntar/",
+        "/diagnostico/",
+        "/solicitudes/{id_solicitud}/",
+    } <= set(esquema["paths"])
+    assert esquema["components"]["securitySchemes"]["jwtAuth"]["scheme"] == "bearer"
+    assert "422" not in esquema["paths"]["/agente/preguntar/"]["post"]["responses"]
+
+
+def test_ruta_inexistente_404(cliente_http):
+    respuesta = cliente_http.get("/no-existe/")
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["error"] == "no_encontrado"
