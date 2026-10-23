@@ -1,0 +1,222 @@
+/*
+ * Entrada de Tailwind CSS 4 + daisyUI 5 (django-tailwind-cli, sin Node).
+ * Se compila en static/css/agroia.css:  python manage.py tailwind build
+ *
+ * Paleta tomada del aguacate Hass: cáscara (primario), hueso (secundario, café tierra),
+ * pulpa (acento) y un fondo claro con un tono verde pálido.
+ */
+
+@import "tailwindcss";
+
+@source "../../templates";
+@source "../../apps";
+
+@plugin "daisyui" {
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "agroia";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #f5f8ef; /* fondo */
+  --color-base-200: #ecf1e2;
+  --color-base-300: #d7decb; /* líneas */
+  --color-base-content: #1f2b1b; /* tinta */
+  --color-primary: #2e5a1c; /* cáscara */
+  --color-primary-content: #ffffff;
+  --color-secondary: #6b4a2b; /* hueso */
+  --color-secondary-content: #ffffff;
+  --color-accent: #cbdb6e; /* pulpa */
+  --color-accent-content: #1f2b1b;
+  --color-neutral: #2f3a2a;
+  --color-neutral-content: #f5f8ef;
+  --color-info: #2f6f8f;
+  --color-info-content: #ffffff;
+  --color-success: #2e6b34;
+  --color-success-content: #ffffff;
+  --color-warning: #e2b33c;
+  --color-warning-content: #2b2008;
+  --color-error: #a63a2b;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.375rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "agroia-oscuro";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #131a11;
+  --color-base-200: #1c2618;
+  --color-base-300: #34422e;
+  --color-base-content: #e7ecdf;
+  --color-primary: #9cc46a;
+  --color-primary-content: #12200c;
+  --color-secondary: #c9a47c;
+  --color-secondary-content: #231609;
+  --color-accent: #cbdb6e;
+  --color-accent-content: #1f2b1b;
+  --color-neutral: #e7ecdf;
+  --color-neutral-content: #131a11;
+  --color-info: #7cb8d6;
+  --color-info-content: #0b1a22;
+  --color-success: #8cc68f;
+  --color-success-content: #0e2410;
+  --color-warning: #e8c45e;
+  --color-warning-content: #2b2008;
+  --color-error: #ef8f80;
+  --color-error-content: #2a0c07;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.375rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* Barlow (OFL), servida localmente para que funcione sin internet. */
+@font-face {
+  font-family: "Barlow";
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/barlow-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/barlow-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/barlow-semi-condensed-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/barlow-semi-condensed-latin-700-normal.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Semi Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
+  /* Escala 1.25 */
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5625rem;
+  --text-2xl: 1.953rem;
+  --text-3xl: 2.441rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  /* Foco siempre visible: anillo color pulpa con borde oscuro para fondos claros y oscuros. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px var(--color-base-content);
+    border-radius: 0.25rem;
+  }
+}
+
+/*
+ * Tinte por categoría: la franja de la tarjeta-etiqueta (--franja) y el panel de la
+ * ilustración (--panel, --trazo). Las franjas son decorativas; el texto nunca va encima.
+ */
+@layer components {
+  .tinte-fungicidas { --franja: #2e5a1c; --panel: #e3ecd6; --trazo: #2e5a1c; }
+  .tinte-fertilizantes { --franja: #9fb02f; --panel: #f0f3d1; --trazo: #5d6a12; }
+  .tinte-herramientas { --franja: #6b4a2b; --panel: #efe6db; --trazo: #6b4a2b; }
+  .tinte-riego { --franja: #3f7f74; --panel: #dcece9; --trazo: #2f6b61; }
+  .tinte-proteccion { --franja: #6e7458; --panel: #e7e9de; --trazo: #555b41; }
+  .tinte-general { --franja: #8a9a7b; --panel: #eef1e8; --trazo: #4f5c43; }
+
+  .etiqueta-producto {
+    border-top: 6px solid var(--franja);
+  }
+  .franja-categoria {
+    background-color: var(--franja);
+  }
+  .panel-tinte {
+    background-color: var(--panel);
+    color: var(--trazo);
+  }
+}
+
+/* En el tema oscuro los paneles bajan de brillo para no deslumbrar. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; }
+    .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; }
+    .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; }
+    .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; }
+    .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; }
+    .tinte-general { --panel: #262b21; --trazo: #b8c4aa; }
+  }
+}
+[data-theme="agroia-oscuro"] {
+  .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; }
+  .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; }
+  .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; }
+  .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; }
+  .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; }
+  .tinte-general { --panel: #262b21; --trazo: #b8c4aa; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+[x-cloak] {
+  display: none !important;
+}
+
+/* Indicador de carga de HTMX: oculto salvo durante la petición. */
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-flex;
+}

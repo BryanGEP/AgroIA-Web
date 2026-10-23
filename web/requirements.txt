@@ -5,3 +5,9 @@ djangorestframework==3.18.3
 drf-spectacular==0.30.0
 django-filter==26.2
 psycopg[binary]==3.3.6
+
+# Frontend: Tailwind 4 + daisyUI 5 sin Node, y HTMX en las vistas.
+django-tailwind-cli==4.8.1
+django-htmx==1.29.0
+# Cliente HTTP hacia los servicios internos.
+httpx==0.28.1

@@ -42,6 +42,8 @@ URL_SVC_USUARIOS = os.environ.get("URL_SVC_USUARIOS", "http://svc-usuarios:8000"
 URL_SVC_TIENDA = os.environ.get("URL_SVC_TIENDA", "http://svc-tienda:8000")
 URL_SVC_CONTENIDO = os.environ.get("URL_SVC_CONTENIDO", "http://svc-contenido:8000")
 URL_SVC_IA = os.environ.get("URL_SVC_IA", "http://svc-ia:8000")
+# Segundos máximos de espera al llamar a svc-tienda.
+TIENDA_TIMEOUT = float(os.environ.get("TIENDA_TIMEOUT", "5"))
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
 INSTALLED_APPS = [
@@ -53,6 +55,10 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "drf_spectacular",
+    "django_htmx",
+    "django_tailwind_cli",
+    "apps.paginas",
+    "apps.catalogo",
 ]
 
 MIDDLEWARE = [
@@ -63,6 +69,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -71,7 +78,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -104,6 +111,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -135,3 +143,18 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+# Mensajes en cookie: las páginas públicas no tocan la base (la sesión llega con el login).
+MESSAGE_STORAGE = "django.contrib.messages.storage.cookie.CookieStorage"
+
+# Tailwind 4 + daisyUI 5 con django-tailwind-cli (sin Node). El ejecutable se descarga al
+# construir la imagen en /opt/tailwind (fuera del volumen del código); en local, en
+# web/.django_tailwind_cli/. Entrada: static/css/fuente.css; salida: static/css/agroia.css.
+TAILWIND_CLI_USE_DAISY_UI = True
+TAILWIND_CLI_VERSION = "2.10.32"  # tailwind-cli-extra: Tailwind 4.3.3 + daisyUI 5.7.47
+TAILWIND_CLI_PATH = os.environ.get("TAILWIND_CLI_PATH", ".django_tailwind_cli")
+TAILWIND_CLI_SRC_CSS = "static/css/fuente.css"
+TAILWIND_CLI_DIST_CSS = "css/agroia.css"
+# CLAUDE.md fija la entrada en static/css/fuente.css. El aviso solo importa con un storage de
+# manifiesto (ManifestStaticFilesStorage), que este proyecto no usa.
+SILENCED_SYSTEM_CHECKS = ["django_tailwind_cli.W001"]

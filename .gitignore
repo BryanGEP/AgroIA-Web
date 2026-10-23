@@ -26,6 +26,9 @@ infra/llaves/
 htmlcov/
 
 # Django
+# CSS que genera Tailwind y su ejecutable local (se crean con: python manage.py tailwind build)
+web/static/css/agroia.css
+web/.django_tailwind_cli/
 media/
 staticfiles/
 *.sqlite3
