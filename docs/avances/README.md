@@ -8,3 +8,4 @@ Un documento por fase o avance grande: qué se construyó, decisiones, verificac
 | 1 · Usuarios (versión básica) | 2026-10-22 | [fase-1-usuarios-basico.md](fase-1-usuarios-basico.md) | Entrega 2 |
 | 2 · API de la tienda | 2026-10-22 | [fase-2-tienda.md](fase-2-tienda.md) | Entrega 2 |
 | 3 · API de contenido e IA | 2026-10-22 | [fase-3-contenido-ia.md](fase-3-contenido-ia.md) | Entrega 2 |
+| Web · Base del gateway y catálogo público | 2026-10-22 | [web-base-catalogo.md](web-base-catalogo.md) | Entrega 2 |

@@ -29,3 +29,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** fase 1 básica de svc-usuarios: modelo Usuario por correo y Direccion con una sola predeterminada, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando asignar_admin; reinicio solo de usuarios_db para el modelo propio. 71 pruebas en svc-usuarios, sin regresiones en los demás servicios.
 - **Qué sigue:** completar calidad de la Entrega 2 (revisión de Swagger y Postman de todos los servicios) y documentar los sprints en Jira.
 - **Bloqueos:** Ninguno.
+
+
+## 2026-10-22 · Sprint 2
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** base visual del gateway web (Tailwind 4 + daisyUI 5 sin Node, tema agroia claro y oscuro, HTMX y Alpine locales, base.html y componentes) y páginas públicas: inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle con ficha técnica y aviso de privacidad; reenvío de imágenes desde svc-tienda. Revisado en celular, tableta y escritorio. 45 pruebas en web, sin regresiones.
+- **Qué sigue:** revisión final de calidad de la Entrega 2 (Swagger y Postman de todos los servicios) y documentar los sprints en Jira.
+- **Bloqueos:** Ninguno.
