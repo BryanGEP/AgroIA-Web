@@ -1,0 +1,90 @@
+{% load static tailwind_cli %}<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f8ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131a11" media="(prefers-color-scheme: dark)">
+  <title>{% block titulo %}AgroIA{% endblock %} · AgroIA</title>
+  <meta name="description" content="{% block descripcion %}Insumos, asesoría y diagnóstico para huertas de aguacate.{% endblock %}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c6 0 10 8 10 16a10 10 0 0 1-20 0C6 10 10 2 16 2z' fill='%232e5a1c'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%236b4a2b'/%3E%3C/svg%3E">
+  {# Aplica el tema elegido antes de pintar, para que no parpadee. #}
+  <script>
+    try {
+      var tema = JSON.parse(localStorage.getItem("agroia-tema"));
+      if (tema) document.documentElement.dataset.theme = tema;
+    } catch (e) {}
+  </script>
+  <link rel="preload" href="{% static 'fonts/barlow-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'fonts/barlow-semi-condensed-latin-700-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  {% tailwind_css %}
+  <script defer src="{% static 'vendor/htmx-2.0.11.min.js' %}"></script>
+  <script defer src="{% static 'vendor/alpine-persist-3.17.4.min.js' %}"></script>
+  <script defer src="{% static 'vendor/alpine-3.17.4.min.js' %}"></script>
+  {% block cabeza %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-base-100 text-base-content antialiased"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 btn btn-sm btn-accent">Saltar al contenido</a>
+
+  <header class="border-b border-base-300 bg-base-100">
+    <nav class="navbar max-w-6xl mx-auto px-4 gap-2" aria-label="Principal">
+      <div class="flex-1">
+        <a href="{% url 'paginas:inicio' %}" class="inline-flex items-center gap-2 font-display text-xl font-bold text-primary" aria-label="AgroIA, inicio">
+          {% include "componentes/logo.html" %}
+          <span translate="no">AgroIA</span>
+        </a>
+      </div>
+
+      {# Escritorio #}
+      <ul class="hidden md:flex items-center gap-1">
+        <li><a href="{% url 'catalogo:lista' %}" class="btn btn-ghost btn-sm {% if request.resolver_match.app_name == 'catalogo' %}btn-active{% endif %}" {% if request.resolver_match.app_name == 'catalogo' %}aria-current="page"{% endif %}>Catálogo</a></li>
+        <li><span class="inline-flex items-center gap-2 whitespace-nowrap px-3 text-sm font-medium text-base-content/70">AgroIA chat <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+        <li><span class="inline-flex items-center gap-2 whitespace-nowrap px-3 text-sm font-medium text-base-content/70">Diagnóstico <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+      </ul>
+
+      <div class="flex items-center gap-1">
+        {% include "componentes/selector_tema.html" %}
+        <span class="tooltip tooltip-bottom hidden sm:inline-block" data-tip="Próximamente">
+          <button type="button" class="btn btn-outline btn-primary btn-sm cursor-not-allowed whitespace-nowrap" aria-describedby="sesion-proximamente" onclick="return false">Iniciar sesión</button>
+        </span>
+        <span id="sesion-proximamente" class="sr-only">Próximamente</span>
+
+        {# Celular: menú plegable que funciona sin JavaScript #}
+        <details class="dropdown dropdown-end md:hidden">
+          <summary class="btn btn-ghost btn-sm" aria-label="Abrir menú">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </summary>
+          <ul class="menu dropdown-content z-20 mt-2 w-64 rounded-box border border-base-300 bg-base-100 p-2">
+            <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
+            <li><span class="pointer-events-none text-base-content/70">AgroIA chat <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+            <li><span class="pointer-events-none text-base-content/70">Diagnóstico <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+            <li><span class="pointer-events-none text-base-content/70">Iniciar sesión <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+          </ul>
+        </details>
+      </div>
+    </nav>
+  </header>
+
+  {% if messages %}
+    <div class="max-w-6xl mx-auto w-full px-4 pt-4 space-y-2" role="status">
+      {% for mensaje in messages %}
+        <div class="alert {% if mensaje.tags == 'error' %}alert-error{% elif mensaje.tags == 'warning' %}alert-warning{% elif mensaje.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">
+          <span>{{ mensaje }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main id="contenido" class="flex-1" tabindex="-1">
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-base-300 bg-base-200">
+    <div class="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
+      <p>AgroIA · Insumos y asesoría para productores de aguacate de Michoacán.</p>
+      <a href="{% url 'paginas:aviso_privacidad' %}" class="link link-hover font-medium">Aviso de privacidad</a>
+    </div>
+  </footer>
+</body>
+</html>

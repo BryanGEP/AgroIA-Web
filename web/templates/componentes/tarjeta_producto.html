@@ -1,0 +1,25 @@
+{% load agroia %}
+{# Tarjeta-etiqueta: franja e ilustración con el tinte de la categoría. Parámetros: producto, categorias. #}
+{% with t=producto.categoria|tinte %}
+<article class="group tinte-{{ t }} flex w-full flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 transition-colors hover:border-primary">
+  <div class="franja-categoria h-1.5" aria-hidden="true"></div>
+  <a href="{% url 'catalogo:detalle' producto.slug %}" class="flex flex-1 flex-col focus-visible:outline-offset-4">
+    <div class="panel-tinte flex aspect-[4/3] items-center justify-center overflow-hidden p-4 sm:p-6">
+      {% if producto.imagen %}
+        <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" width="400" height="300" loading="lazy" decoding="async" class="h-full w-full object-contain">
+      {% else %}
+        {% nombre_categoria producto.categoria categorias as nombre_cat %}
+        {% include "componentes/marcador_categoria.html" with tinte=t nombre=nombre_cat %}
+      {% endif %}
+    </div>
+    <div class="flex flex-1 flex-col gap-1.5 p-3 sm:gap-2 sm:p-4">
+      <h3 class="text-base leading-snug break-words group-hover:underline sm:text-lg">{{ producto.nombre }}</h3>
+      <p class="text-sm opacity-80">Por {{ producto.unidad|unidad }}</p>
+      <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2">
+        <p class="font-display text-lg font-bold tabular-nums sm:text-xl">{{ producto.precio|pesos }}</p>
+        {% include "componentes/disponibilidad.html" with stock=producto.stock %}
+      </div>
+    </div>
+  </a>
+</article>
+{% endwith %}

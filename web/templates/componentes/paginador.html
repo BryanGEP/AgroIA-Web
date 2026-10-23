@@ -1,0 +1,19 @@
+{% comment %} Paginador que conserva los filtros. Con HTMX actualiza solo los resultados;
+   sin JavaScript, los enlaces cargan la página. Parámetros: pagina, total_paginas, paginas. {% endcomment %}
+{% if total_paginas > 1 %}
+<nav class="join mt-8" aria-label="Páginas del catálogo">
+  {% if pagina > 1 %}
+    <a class="join-item btn btn-sm" href="{% querystring page=pagina|add:-1 %}" hx-get="{% querystring page=pagina|add:-1 %}" hx-target="#resultados" hx-push-url="true" hx-indicator="#cargando" rel="prev">Anterior</a>
+  {% endif %}
+  {% for numero in paginas %}
+    {% if numero == pagina %}
+      <span class="join-item btn btn-sm btn-primary" aria-current="page">{{ numero }}</span>
+    {% else %}
+      <a class="join-item btn btn-sm" href="{% querystring page=numero %}" hx-get="{% querystring page=numero %}" hx-target="#resultados" hx-push-url="true" hx-indicator="#cargando" aria-label="Página {{ numero }}">{{ numero }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if pagina < total_paginas %}
+    <a class="join-item btn btn-sm" href="{% querystring page=pagina|add:1 %}" hx-get="{% querystring page=pagina|add:1 %}" hx-target="#resultados" hx-push-url="true" hx-indicator="#cargando" rel="next">Siguiente</a>
+  {% endif %}
+</nav>
+{% endif %}

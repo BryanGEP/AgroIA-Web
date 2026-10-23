@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titulo %}Página no encontrada{% endblock %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4">
+  {% if recurso == "producto" %}
+    {% url 'catalogo:lista' as catalogo %}
+    {% include "componentes/error.html" with titulo="Este producto no está en el catálogo" texto="Puede que se haya retirado o que el enlace esté mal escrito. Busca uno parecido en el catálogo." enlace=catalogo accion="Ver el catálogo" %}
+  {% else %}
+    {% url 'paginas:inicio' as inicio %}
+    {% include "componentes/error.html" with titulo="No encontramos esta página" texto="Revisa la dirección o vuelve al inicio." enlace=inicio accion="Ir al inicio" %}
+  {% endif %}
+</div>
+{% endblock %}
