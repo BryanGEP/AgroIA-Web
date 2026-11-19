@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from apps.usuarios.models import Direccion, Usuario
+from apps.usuarios.models import CambioRol, Direccion, Usuario
 
 
 class DireccionInline(admin.TabularInline):
@@ -41,3 +41,19 @@ class DireccionAdmin(admin.ModelAdmin):
     list_display = ["usuario", "alias", "municipio", "estado", "codigo_postal", "predeterminada"]
     list_filter = ["estado", "predeterminada"]
     search_fields = ["usuario__email", "alias", "calle", "colonia", "municipio"]
+
+
+@admin.register(CambioRol)
+class CambioRolAdmin(admin.ModelAdmin):
+    """Historial de cambios de rol: solo lectura."""
+
+    list_display = ["usuario", "rol_anterior", "rol_nuevo", "cambiado_por", "cambiado_en"]
+    list_filter = ["rol_nuevo"]
+    search_fields = ["usuario__email", "cambiado_por__email"]
+    readonly_fields = ["usuario", "rol_anterior", "rol_nuevo", "cambiado_por", "cambiado_en"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

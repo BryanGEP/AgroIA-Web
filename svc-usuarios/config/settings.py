@@ -6,11 +6,20 @@ las que falten.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from agroia_comun.configuracion import configurar_jwt, leer_llave_publica, validar_modo_auth
+from agroia_comun.configuracion import (
+    ISSUER_POR_DEFECTO,
+    configurar_jwt,
+    configurar_logging,
+    leer_llave_publica,
+    validar_backend_de_correo,
+    validar_modo_auth,
+    validar_secret_key,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,8 +40,11 @@ def lista(nombre: str, defecto: str = "") -> list[str]:
     return [valor.strip() for valor in os.environ.get(nombre, defecto).split(",") if valor.strip()]
 
 
+NOMBRE_SERVICIO = "svc-usuarios"
 SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
+# Con DEBUG=False no arranca con la clave de .env.example ni con una débil.
+validar_secret_key(SECRET_KEY, DEBUG)
 ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Autenticación: True por defecto. Solo el .env local puede ponerla en False, y solo
@@ -41,12 +53,55 @@ ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 AUTH_ACTIVA = booleano("AUTH_ACTIVA", True)
 validar_modo_auth(AUTH_ACTIVA, DEBUG)
 JWT_PUBLIC_KEY_PATH = os.environ.get("JWT_PUBLIC_KEY_PATH", "")
-# En la Entrega 2 svc-usuarios solo valida tokens; en la Entrega 3 también los firmará.
-SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA))
+JWT_ISSUER = os.environ.get("JWT_ISSUER", ISSUER_POR_DEFECTO)
 
-# Solo svc-usuarios recibe la llave privada (firma los JWT).
-JWT_PRIVATE_KEY_PATH = os.environ.get("JWT_PRIVATE_KEY_PATH", "")
+# Solo svc-usuarios recibe la llave privada: firma los tokens al iniciar sesión y al
+# renovar. Sin ella (o sin la pública) el servicio no arranca, aunque AUTH_ACTIVA sea
+# False. Contrato en docs/contrato-identidad.md.
+JWT_PRIVATE_KEY_PATH = variable("JWT_PRIVATE_KEY_PATH")
+if not Path(JWT_PRIVATE_KEY_PATH).is_file():
+    raise ImproperlyConfigured(
+        f"No se encontró la llave privada JWT en '{JWT_PRIVATE_KEY_PATH}'. "
+        "Genera las llaves con infra/generar_llaves.py."
+    )
+SIMPLE_JWT = {
+    **configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, True), issuer=JWT_ISSUER),
+    "SIGNING_KEY": Path(JWT_PRIVATE_KEY_PATH).read_text(encoding="utf-8"),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "USER_ID_FIELD": "id",
+    "UPDATE_LAST_LOGIN": False,  # el login lo actualiza en servicios.py
+}
+
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+# Caché compartida por los procesos del servicio: guarda los contadores del límite de
+# intentos de DRF.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "KEY_PREFIX": "svc-usuarios",
+    }
+}
+
+# Correos (ver apps/usuarios/correos.py). En desarrollo se imprimen en la consola del
+# contenedor: docker compose logs -f svc-usuarios.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+# Con DEBUG=False exige SMTP: la consola dejaría los enlaces de recuperación en el log.
+validar_backend_de_correo(EMAIL_BACKEND, DEBUG)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = booleano("EMAIL_USE_TLS", True)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or "AgroIA <no-responder@agroia.local>"
+# Los enlaces de los correos apuntan al gateway, que tendrá las pantallas.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8000").rstrip("/")
+# Vigencia del enlace de recuperación de contraseña (segundos).
+PASSWORD_RESET_TIMEOUT = 3600
 
 # Versión vigente del aviso de privacidad; se guarda en cada usuario al registrarse.
 # Si el aviso cambia, se sube aquí y el gateway pedirá aceptar la nueva (Entrega 3).
@@ -64,6 +119,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "drf_spectacular",
+    "rest_framework_simplejwt.token_blacklist",
+    "axes",
     "apps.usuarios",
 ]
 
@@ -75,7 +132,30 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Debe ir al final (documentación de django-axes).
+    "axes.middleware.AxesMiddleware",
 ]
+
+# AxesStandaloneBackend primero: rechaza el intento si la combinación correo + IP está
+# bloqueada, antes de revisar la contraseña.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# Bloqueo temporal tras 5 intentos fallidos de la misma combinación correo + IP: nadie
+# puede bloquear la cuenta de otro desde su propia IP.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_USERNAME_FORM_FIELD = "email"
+AXES_USERNAME_CALLABLE = "apps.usuarios.bloqueo.correo_del_intento"
+# Misma IP que el límite de intentos de DRF (NUM_PROXIES = 1).
+AXES_CLIENT_IP_CALLABLE = "agroia_comun.seguridad.ip_cliente"
+# Respuesta del bloqueo con el formato común de errores (también en /admin/).
+AXES_LOCKOUT_CALLABLE = "apps.usuarios.bloqueo.respuesta_de_bloqueo"
+AXES_VERBOSE = False
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -151,7 +231,23 @@ REST_FRAMEWORK = {
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.OrderingFilter",
     ],
+    # Un proxy de confianza (el gateway): la IP del cliente es el último valor de
+    # X-Forwarded-For. Ver docs/contrato-identidad.md.
+    "NUM_PROXIES": 1,
+    # Límite de intentos (ver apps/usuarios/throttles.py). Los `_correo` cuentan por el
+    # correo del cuerpo; cambiar_password por usuario; los demás por IP.
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "10/min",
+        "registro": "5/hour",
+        "recuperar": "3/hour",
+        "recuperar_correo": "3/hour",
+        "reenviar_verificacion": "3/hour",
+        "reenviar_verificacion_correo": "3/hour",
+        "cambiar_password": "5/hour",
+    },
 }
+
+LOGGING = configurar_logging()
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "AgroIA-Web · svc-usuarios",

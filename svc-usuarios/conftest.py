@@ -1,11 +1,11 @@
 """Fixtures compartidas: usuarios en la base y clientes de API con su token.
 
-El `user_id` del token es el `id` del Usuario, así que cada fixture crea al usuario con
-un id fijo y firma el token para ese id.
+El `user_id` del token es el `id` (UUID) del Usuario, así que cada fixture crea al usuario
+con un id fijo y firma el token para ese id.
 """
 
 import pytest
-from django.db import connection
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.usuarios.tests.factories import UsuarioFactory
@@ -13,16 +13,16 @@ from tests.datos import ADMIN_ID, CLIENTE_ID, OTRO_CLIENTE_ID
 from tests.tokens import api_con, token
 
 
+@pytest.fixture(autouse=True)
+def limite_de_intentos_limpio():
+    """Cada prueba empieza con los contadores del límite de intentos en cero."""
+    cache.clear()
+    yield
+    cache.clear()
+
+
 def con_id_fijo(**campos):
-    """Crea un usuario con id fijo y adelanta la secuencia de ids de PostgreSQL, para que
-    los usuarios que cree el registro después no choquen con él."""
-    usuario = UsuarioFactory(**campos)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT setval(pg_get_serial_sequence('usuarios_usuario', 'id'), "
-            "(SELECT MAX(id) FROM usuarios_usuario))"
-        )
-    return usuario
+    return UsuarioFactory(**campos)
 
 
 @pytest.fixture

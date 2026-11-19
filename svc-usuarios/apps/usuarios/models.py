@@ -1,3 +1,6 @@
+import uuid
+
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
@@ -11,12 +14,14 @@ validar_codigo_postal = RegexValidator(r"^\d{5}$", "El código postal debe tener
 
 
 class Usuario(AbstractUser):
-    """Usuario de AgroIA-Web. Se identifica por correo; el `id` es el `user_id` del JWT."""
+    """Usuario de AgroIA-Web. Se identifica por correo; el `id` (UUID, como en ms-usuarios)
+    es el `user_id` del JWT y el `usuario_id` que guardan los demás servicios."""
 
     class Rol(models.TextChoices):
         CLIENTE = "cliente", "Cliente"
         ADMINISTRADOR = "administrador", "Administrador"
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = None
     first_name = None
     last_name = None
@@ -27,10 +32,12 @@ class Usuario(AbstractUser):
     telefono = models.CharField(max_length=16, blank=True, validators=[validar_telefono])
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.CLIENTE)
     email_verificado = models.BooleanField(default=False)
-    # Se incrementa para invalidar todos los tokens del usuario (Entrega 3).
+    # Se incrementa para que ningún refresh emitido antes vuelva a renovar (logout-todo,
+    # restablecer o cambiar la contraseña). Viaja en el claim `token_version`.
     token_version = models.PositiveIntegerField(default=0)
     acepto_privacidad_en = models.DateTimeField(null=True, blank=True)
     version_privacidad = models.CharField(max_length=20, blank=True)
+    # Sin endpoint para activarlo todavía: el login responde 501 (sección 12).
     tiene_2fa = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
@@ -40,7 +47,7 @@ class Usuario(AbstractUser):
     objects = UsuarioManager()
 
     class Meta:
-        ordering = ["-date_joined", "-id"]
+        ordering = ["-date_joined", "email"]
         verbose_name = "usuario"
         verbose_name_plural = "usuarios"
 
@@ -81,3 +88,27 @@ class Direccion(models.Model):
 
     def __str__(self) -> str:
         return self.alias or f"{self.calle} {self.numero}, {self.colonia}"
+
+
+class CambioRol(models.Model):
+    """Quién cambió el rol de un usuario y cuándo (PATCH /usuarios/<id>/rol/)."""
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="cambios_de_rol")
+    rol_anterior = models.CharField(max_length=20, choices=Usuario.Rol.choices)
+    rol_nuevo = models.CharField(max_length=20, choices=Usuario.Rol.choices)
+    # Si se borra al administrador, el registro se conserva sin él.
+    cambiado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="roles_cambiados",
+    )
+    cambiado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-cambiado_en", "-id"]
+        verbose_name = "cambio de rol"
+        verbose_name_plural = "cambios de rol"
+
+    def __str__(self) -> str:
+        return f"{self.usuario}: {self.rol_anterior} → {self.rol_nuevo}"
