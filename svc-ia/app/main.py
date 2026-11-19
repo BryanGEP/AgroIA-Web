@@ -36,6 +36,30 @@ app = FastAPI(
 registrar_manejadores(app)
 
 
+def _error(codigo: str, detalle: str, **extra) -> dict:
+    return {"summary": codigo, "value": {"error": codigo, "detalle": detalle, **extra}}
+
+
+# Ejemplos por omisión de cada estado, con los mensajes reales de errores.py y seguridad.py.
+EJEMPLOS_ERROR = {
+    400: {
+        "validacion": _error(
+            "validacion",
+            "Revisa los datos enviados.",
+            campos={"pregunta": ["Este campo es requerido."]},
+        )
+    },
+    401: {
+        "no_autenticado": _error(
+            "no_autenticado", "No se enviaron las credenciales de autenticación."
+        ),
+        "token_invalido": _error("token_invalido", "El token no es válido o ya venció."),
+    },
+    403: {"sin_permiso": _error("sin_permiso", "No tienes permiso para hacer esta acción.")},
+    404: {"no_encontrado": _error("no_encontrado", "No se encontró la solicitud.")},
+}
+
+
 def _respuestas(*codigos: int, **ejemplos) -> dict:
     descripciones = {
         400: "Datos inválidos (`validacion`, con `campos`).",
@@ -48,7 +72,12 @@ def _respuestas(*codigos: int, **ejemplos) -> dict:
     for codigo in codigos:
         respuesta = {"model": Error, "description": descripciones[codigo]}
         if f"e{codigo}" in ejemplos:
-            respuesta["content"] = {"application/json": {"example": ejemplos[f"e{codigo}"]}}
+            valor = ejemplos[f"e{codigo}"]
+            examples = {valor["error"]: {"summary": valor["error"], "value": valor}}
+        else:
+            examples = EJEMPLOS_ERROR.get(codigo, {})
+        if examples:
+            respuesta["content"] = {"application/json": {"examples": examples}}
         respuestas[codigo] = respuesta
     return respuestas
 
@@ -83,8 +112,9 @@ def preguntar(
     """Envía la pregunta y las últimas 10 entradas del historial al agente.
 
     Si el agente no responde, falla o tarda más que `AGENTE_TIMEOUT`, responde 503
-    `agente_no_disponible`: nunca se inventa una respuesta. `fuentes` llega vacío hasta
-    que el agente tenga RAG.
+    `agente_no_disponible`: nunca se inventa una respuesta. `fuentes` son las
+    referencias de la base de conocimiento del agente que usó para responder; va vacía
+    en saludos, en temas no técnicos o si el agente no pudo consultar su base.
     """
     historial = [mensaje.model_dump() for mensaje in datos.historial]
     try:

@@ -54,8 +54,14 @@ class RespuestaAgente(BaseModel):
                 {
                     "id": "4f1c2b0a9d8e4c7b8a6f5e4d3c2b1a09",
                     "estado": "listo",
-                    "respuesta": "Aplica un fungicida cúprico cada 15 a 21 días en lluvias.",
-                    "fuentes": [],
+                    "respuesta": (
+                        "La roña es causada por el hongo Elsinoë perseae: forma costras "
+                        "cafés, ásperas y corchosas en la cáscara. Confírmalo con un técnico."
+                    ),
+                    "fuentes": [
+                        "Marroquín-Pimentel (1999), Revista Chapingo Serie Horticultura 5",
+                        "Ramírez Dávila et al. (2013), Acta Zoológica Mexicana 29(3)",
+                    ],
                 }
             ]
         }
@@ -93,6 +99,25 @@ class Diagnostico(BaseModel):
 
 
 class Solicitud(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "4f1c2b0a9d8e4c7b8a6f5e4d3c2b1a09",
+                    "estado": "listo",
+                    "tipo": "agente",
+                    "creada_en": "2026-11-18T22:50:21-06:00",
+                    "resultado": {
+                        "respuesta": "La roña es causada por el hongo Elsinoë perseae.",
+                        "fuentes": [
+                            "Marroquín-Pimentel (1999), Revista Chapingo Serie Horticultura 5"
+                        ],
+                    },
+                }
+            ]
+        }
+    )
+
     id: str
     estado: Literal["listo"]
     tipo: Literal["agente", "diagnostico"]
