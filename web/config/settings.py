@@ -10,6 +10,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from agroia_comun.configuracion import validar_secret_key
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -31,6 +33,8 @@ def lista(nombre: str, defecto: str = "") -> list[str]:
 
 SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
+# Con DEBUG=False no arranca con la clave de .env.example ni con una débil.
+validar_secret_key(SECRET_KEY, DEBUG)
 ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Autenticación: True por defecto. Solo el .env local puede ponerla en False.
