@@ -9,12 +9,12 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | Carpeta | Descripción | Base de datos | Puerto local | Detalle |
 | :-- | :-- | :-- | :-- | :-- |
 | `web/` | Gateway: plantillas, sesión, enruta al resto y valida JWT. Único punto de entrada del navegador. | PostgreSQL `web_db` (sesiones) | 8000 | [README](web/README.md) |
-| `svc-usuarios/` | Registro, perfil, direcciones y roles (Entrega 2); login, JWT y recuperación de contraseña en la Entrega 3. | PostgreSQL `usuarios_db` | 8001 | [README](svc-usuarios/README.md) |
+| `svc-usuarios/` | Identidad: registro, login con JWT, renovación, verificación de correo, recuperación de contraseña, roles, perfil y direcciones. | PostgreSQL `usuarios_db` | 8001 | [README](svc-usuarios/README.md) |
 | `svc-tienda/` | Categorías, productos, stock, carrito y pedidos (pago simulado). | PostgreSQL `tienda_db` | 8002 | [README](svc-tienda/README.md) |
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
 | `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
 | `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django. | — | — | [README](comun/README.md) |
-| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT) y `emitir_token.py` (tokens de desarrollo). | — | — | — |
+| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT) y `emitir_token.py` (tokens solo para pruebas). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
 Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), y **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector). En total, diez contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
@@ -46,9 +46,12 @@ docker compose up --build -d
 # 4. Cargar la base de conocimiento del agente (una vez; ver abajo).
 docker compose run --rm agente python -m ingesta.cargar
 
-# 5. Opcional: productos de demostración para la tienda.
+# 5. Opcional: productos de demostración y cuentas de demostración (solo desarrollo).
 docker compose exec svc-tienda python manage.py cargar_datos_demo
+docker compose exec svc-usuarios python manage.py cargar_usuarios_demo
 ```
+
+**¿Ya tenías el proyecto y bajas la rama de la Entrega 3?** El id de los usuarios pasó a UUID: reinicia los datos de prueba una vez con los pasos del [README de svc-usuarios](svc-usuarios/README.md#al-bajar-la-rama-de-la-entrega-3-feate3-identidad-reiniciar-los-datos-de-prueba) (vaciar `usuarios_db` y las colecciones de MongoDB y reconstruir). No uses `docker compose down -v`: borraría también el catálogo, la base de conocimiento del agente y el modelo descargado.
 
 ### Base de conocimiento del agente
 
@@ -81,7 +84,7 @@ Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /sal
 | svc-ia | http://localhost:8004/salud/ | http://localhost:8004/api/docs/ |
 | agente (solo pruebas) | http://localhost:8005/health | — (chat propio en http://localhost:8005/) |
 
-Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`.
+Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`. Además, los servicios confían en el `X-Forwarded-For` que pondrá el gateway, que desde un puerto directo se podría falsificar: nunca los publiques en `0.0.0.0` (ver [`docs/contrato-identidad.md`](docs/contrato-identidad.md#ip-del-cliente-y-puertos-publicados)).
 
 ### Bases de datos
 
@@ -93,21 +96,36 @@ Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica
   docker compose up --build
   ```
 
-  > **Cuidado:** `down -v` borra los volúmenes, es decir, **todos los datos** de PostgreSQL y MongoDB. Sin `-v`, `docker compose down` detiene los contenedores y conserva los datos.
+  > **Cuidado:** `down -v` borra los volúmenes, es decir, **todos los datos** de PostgreSQL y MongoDB, la base de conocimiento del agente y el modelo descargado. Sin `-v`, `docker compose down` detiene los contenedores y conserva los datos.
 
-### Tokens de desarrollo
+### Iniciar sesión y tokens
 
-Mientras svc-usuarios no emite tokens (Entrega 3), los endpoints protegidos se prueban con tokens firmados por `infra/emitir_token.py`. **Es solo para desarrollo y pruebas**: firma con la llave privada local y los mismos claims que emitirá svc-usuarios.
+Desde la Entrega 3 los tokens los emite svc-usuarios: `POST http://localhost:8001/api/v1/auth/login/` con `{"email", "password"}` devuelve el `access` (15 minutos) y el `refresh` (7 días). Pega el `access` en el botón **Authorize** de `/api/docs/` de cualquier servicio o úsalo como `Authorization: Bearer <access>`. El contrato completo está en [`docs/contrato-identidad.md`](docs/contrato-identidad.md).
 
-Para probar con un usuario real, regístralo con `POST http://localhost:8001/api/v1/auth/registro/` y usa el `id` que devuelve como `--usuario-id` (ver el [README de svc-usuarios](svc-usuarios/README.md#probar-con-un-usuario-real)). Los servicios que no consultan a svc-usuarios (tienda, contenido, IA) aceptan cualquier id.
+Para tener cuentas listas en desarrollo:
 
 ```powershell
-python infra/emitir_token.py --usuario-id 10 --rol cliente
-python infra/emitir_token.py --usuario-id 1 --rol administrador --minutos 480
-python infra/emitir_token.py --usuario-id 12 --rol cliente --sin-verificar
+docker compose exec svc-usuarios python manage.py cargar_usuarios_demo
 ```
 
-Pega el token en el botón **Authorize** de `/api/docs/` o en las variables `token`, `token_admin` y `token_sin_verificar` del entorno de Postman (`docs/postman/`).
+Crea `cliente@demo.agroia.test` (verificado), `sin-verificar@demo.agroia.test` y `admin@demo.agroia.test` con la contraseña `solo-demo-no-usar-en-produccion`. **Esas cuentas no deben existir fuera de desarrollo**: el comando se niega a correr con `DJANGO_DEBUG=False`. Los correos (verificación, recuperación) se imprimen en `docker compose logs -f svc-usuarios`.
+
+`infra/emitir_token.py` se conserva **solo para pruebas y desarrollo**, para lo que el login no cubre: un token vencido (`--vencido`), un usuario que no existe o probar un servicio sin levantar svc-usuarios. Firma con la llave privada local.
+
+```powershell
+python infra/emitir_token.py --rol cliente
+python infra/emitir_token.py --vencido
+```
+
+### Postman
+
+La colección [`docs/postman/`](docs/postman/) inicia sesión sola: la carpeta «Autenticación» guarda los tokens en el entorno y no hay que pegar ninguno, salvo `token_vencido` para un caso opcional de «Seguridad». Antes de la primera corrida: `cargar_datos_demo` y `cargar_usuarios_demo`. Con Newman, desde la raíz:
+
+```powershell
+newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var "token_vencido=$(python infra/emitir_token.py --vencido)"
+```
+
+La carpeta «Seguridad» agota el límite de 10 logins por minuto: entre dos corridas espera un minuto.
 
 ## Comandos del día a día
 

@@ -39,3 +39,16 @@ def test_json_mal_formado():
 
     assert respuesta.status_code == 400
     assert respuesta.json()["error"] == "json_invalido"
+
+
+def test_exceso_de_peticiones_429_con_retry_after():
+    from django.core.cache import cache
+
+    cache.clear()
+    assert APIClient().post("/limitada/").status_code == 200
+    respuesta = APIClient().post("/limitada/")
+
+    assert respuesta.status_code == 429
+    assert respuesta.json()["error"] == "demasiados_intentos"
+    assert respuesta.json()["detalle"].startswith("Demasiados intentos. Intenta de nuevo en ")
+    assert int(respuesta.headers["Retry-After"]) > 0

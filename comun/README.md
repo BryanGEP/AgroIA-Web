@@ -6,10 +6,11 @@ Código que comparten los servicios Django (`web`, `svc-usuarios`, `svc-tienda` 
 | --- | --- |
 | `configuracion.py` | `validar_modo_auth`, `leer_llave_publica` y `configurar_jwt`, para `config/settings.py` (no importa Django) |
 | `autenticacion.py` | `AutenticacionJWT`: valida el JWT RS256 con la llave pública, sin consultar svc-usuarios. Registra el esquema Bearer en Swagger |
-| `permisos.py` | `EsAdministrador`, `EsCliente`, `CorreoVerificado`, `EsDuenoOAdmin` y los helpers `usuario_id`, `rol_de`, `es_administrador` |
+| `permisos.py` | `EsAdministrador`, `EsCliente`, `CorreoVerificado` (403 `email_no_verificado`), `EsDuenoOAdmin` y los helpers `usuario_id` (devuelve un `uuid.UUID`), `rol_de`, `es_administrador` |
+| `seguridad.py` | Log de seguridad: `registrar_evento(evento, request, **datos)` escribe una línea JSON en el logger `seguridad`, sin contraseñas ni tokens; `ip_cliente(request)` (un proxy de confianza) |
 | `errores.py` | Manejador de excepciones con el formato común y `ErrorDeNegocio` para las reglas de negocio |
 | `openapi.py` | Hook de drf-spectacular `documentar_errores`: agrega a cada respuesta de error de Swagger el esquema común y un ejemplo por código |
-| `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` |
+| `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` (con `usuario_id` UUID y `emisor=`) |
 
 ## Cómo se usa en un servicio
 
@@ -43,17 +44,27 @@ En las vistas: `permission_classes = [IsAuthenticated, EsCliente, CorreoVerifica
 
 ## Autenticación
 
-- El token se firma en svc-usuarios con la llave privada (RS256, emisor `agroia-usuarios`). Cada servicio recibe solo la llave pública (`JWT_PUBLIC_KEY_PATH`, montada en `/run/secrets/jwt_publica.pem`).
-- Se valida la firma, el vencimiento, el emisor y que sea un token de acceso (`token_type: "access"`). Los claims que se leen son `user_id`, `rol` y `email_verificado`.
-- Sin token: **401** (`no_autenticado`). Token inválido o vencido: **401** (`token_invalido`). Rol equivocado, token sin `rol` o correo sin verificar donde se pide: **403** (`sin_permiso`).
-- Todavía no se revisa `token_version` (cerrar sesión en todos los dispositivos): necesita a svc-usuarios y llega en la Entrega 3 (fase 4 del plan).
+Contrato completo en [`docs/contrato-identidad.md`](../docs/contrato-identidad.md).
+
+- El token se firma en svc-usuarios con la llave privada (RS256). Cada servicio recibe solo la llave pública (`JWT_PUBLIC_KEY_PATH`, montada en `/run/secrets/jwt_publica.pem`) y el emisor esperado (`JWT_ISSUER`, por defecto `agroia-usuarios`):
+
+  ```python
+  JWT_ISSUER = os.environ.get("JWT_ISSUER", ISSUER_POR_DEFECTO)
+  SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA), issuer=JWT_ISSUER)
+  LOGGING = configurar_logging()
+  ```
+
+- Se valida la firma, el vencimiento, el emisor, que sea un token de acceso (`token_type: "access"`) y que `user_id` sea un UUID. Los claims que se leen son `user_id`, `rol` y `email_verificado`.
+- Sin token: **401** (`no_autenticado`). Token inválido, vencido o con un `user_id` que no es UUID: **401** (`token_invalido`). Rol equivocado o token sin `rol`: **403** (`sin_permiso`). Correo sin verificar donde se pide: **403** (`email_no_verificado`).
+- `token_version` y la blacklist solo los revisa svc-usuarios al renovar: un access ya emitido sirve hasta que vence (máximo 15 minutos). Ver los límites conocidos del contrato.
+- Cada 401 y 403 queda como `acceso_denegado` en el log `seguridad`. Los `ErrorDeNegocio` no, porque el servicio los registra con un evento propio.
 
 ### `AUTH_ACTIVA`
 
 | Valor | Comportamiento |
 | --- | --- |
 | `True` (por defecto en el código) | Se aplican JWT y roles. |
-| `False` (solo en el `.env` local) | Se apagan las revisiones de rol (`EsAdministrador`, `EsCliente`, `CorreoVerificado`, `EsDuenoOAdmin`). Un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario siguen respondiendo **401** sin token. No hay usuario de desarrollo: los tokens se generan con `infra/emitir_token.py`. |
+| `False` (solo en el `.env` local) | Se apagan las revisiones de rol (`EsAdministrador`, `EsCliente`, `CorreoVerificado`, `EsDuenoOAdmin`). Un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario siguen respondiendo **401** sin token. No hay usuario de desarrollo: el token sale del login de svc-usuarios (o de `infra/emitir_token.py`, solo para pruebas). |
 
 `AUTH_ACTIVA=False` solo se acepta con `DJANGO_DEBUG=True`; con `DEBUG=False` el servicio no arranca. Con `AUTH_ACTIVA=True` y sin la llave pública, tampoco arranca. Para la entrega debe estar en `True`.
 

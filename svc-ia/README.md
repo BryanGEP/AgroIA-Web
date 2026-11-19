@@ -63,12 +63,12 @@ Devuelve `{"id", "estado": "listo", "tipo": "agente" | "diagnostico", "creada_en
 
 svc-ia no usa `comun` (sus clases son de DRF): valida el JWT con PyJWT en `app/seguridad.py`, con las mismas reglas:
 
-- RS256 con la llave pública (`JWT_PUBLIC_KEY_PATH`), emisor `agroia-usuarios`, `exp` obligatorio, `token_type: "access"` y `user_id` entero.
-- Sin token o token inválido: **401**. Token sin rol válido: **403**.
+- RS256 con la llave pública (`JWT_PUBLIC_KEY_PATH`), emisor `JWT_ISSUER` (`agroia-usuarios` por defecto), `exp` obligatorio, `token_type: "access"` y `user_id` UUID (ver [`docs/contrato-identidad.md`](../docs/contrato-identidad.md)).
+- Sin token o token inválido: **401**. Token sin rol válido: **403**. Cada 401 y 403 queda como `acceso_denegado` en el log `seguridad` (`app/eventos.py`, mismo formato que `agroia_comun.seguridad`).
 - `AUTH_ACTIVA=False` solo apaga la revisión de rol; el token sigue siendo obligatorio. Solo se acepta con `DEBUG=True` (compose lo toma de `DJANGO_DEBUG`); si no, el servicio no arranca. Con `AUTH_ACTIVA=True` y sin la llave pública, tampoco arranca.
 - Mismo formato de errores que los servicios Django. Los errores de validación responden **400** con `campos` (FastAPI usaría 422).
 
-Tokens de desarrollo: `python infra/emitir_token.py --usuario-id 10 --rol cliente` (ver el [README raíz](../README.md#tokens-de-desarrollo)).
+El token sale del login de svc-usuarios (ver el [README raíz](../README.md#iniciar-sesión-y-tokens)); `infra/emitir_token.py` queda solo para pruebas.
 
 ## Variables de entorno
 
@@ -77,6 +77,7 @@ Tokens de desarrollo: `python infra/emitir_token.py --usuario-id 10 --rol client
 | `AUTH_ACTIVA` | Revisión de rol (`True` por defecto) |
 | `DEBUG` | Permite `AUTH_ACTIVA=False`; compose lo toma de `DJANGO_DEBUG` |
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar el JWT |
+| `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `URL_AGENTE` | Dirección del agente (`http://agente:8000`) |
 | `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`30`) |
 

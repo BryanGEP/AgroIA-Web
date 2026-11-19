@@ -1,0 +1,7 @@
+{% extends "emails/base.html" %}
+{% block contenido %}
+<p>Hola, {{ nombre }}:</p>
+<p>Gracias por crear tu cuenta en AgroIA. Confirma que este correo es tuyo para poder comprar en la tienda.</p>
+{% include "emails/_boton.html" with texto_boton="Verificar mi correo" %}
+<p><strong>El enlace vence en 24 horas.</strong> Si no creaste esta cuenta, ignora este correo.</p>
+{% endblock %}

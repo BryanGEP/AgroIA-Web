@@ -1,13 +1,520 @@
 {
   "info": {
     "name": "AgroIA-Web",
-    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. svc-tienda: corre primero `cargar_datos_demo`. Las carpetas están en orden para correrlas con el Runner.\n\n**Correr la colección completa:** las peticiones con imagen usan `archivos/imagen-prueba.png`. En Postman, en *Settings → General → Working directory*, elige la carpeta `docs/postman/` (o selecciona el archivo a mano en el cuerpo). Con Newman, desde la raíz del repo: `newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman` más los tokens con `--env-var token=...` (ver el README raíz).",
+    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`.\n\n**Antes de la primera corrida:** `docker compose exec svc-tienda python manage.py cargar_datos_demo` y `docker compose exec svc-usuarios python manage.py cargar_usuarios_demo` (cuentas de demostración, solo en desarrollo).\n\n**Tokens:** la carpeta «Autenticación» inicia sesión y guarda `token` (cliente verificado), `token_sin_verificar` y `token_admin`; svc-usuarios registra una cuenta nueva y guarda `token_usuario`. No hay que pegar tokens a mano, salvo `token_vencido` (opcional, para un caso de «Seguridad»): `python infra/emitir_token.py --vencido`.\n\n**Correr la colección completa:** las carpetas están en orden para el Runner. Las peticiones con imagen usan `archivos/imagen-prueba.png`: en *Settings → General → Working directory* elige la carpeta `docs/postman/`. Con Newman, desde la raíz del repo: `newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var token_vencido=$(python infra/emitir_token.py --vencido)`.\n\n**Límites:** «Seguridad» agota los 10 logins por minuto; espera un minuto antes de otra corrida. Cada corrida usa 2 de los 5 registros por hora por IP y 1 de los 3 correos de recuperación y de reenvío por hora.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
+      "name": "Autenticación",
+      "description": "Corre primero. Inicia sesión con las tres cuentas de demostración y guarda los tokens en el entorno (`token`, `token_sin_verificar`, `token_admin`): el resto de la colección ya no necesita pegar tokens. Antes, una sola vez: `docker compose exec svc-usuarios python manage.py cargar_usuarios_demo`.",
+      "item": [
+        {
+          "name": "Iniciar sesión (cliente verificado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Inicia sesión con la cuenta de demostración `{{email_cliente}}` y guarda el `access` en `token`. Las cuentas las crea `python manage.py cargar_usuarios_demo` (solo en desarrollo).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_cliente}}\",\n  \"password\": \"{{password_demo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Trae access, refresh y el usuario\", () => {",
+                  "    pm.expect(cuerpo.access).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.refresh).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.usuario.id).to.match(/^[0-9a-f-]{36}$/);",
+                  "});",
+                  "pm.environment.set(\"token\", cuerpo.access);",
+                  "pm.environment.set(\"refresh\", cuerpo.refresh);",
+                  "pm.environment.set(\"cliente_id\", cuerpo.usuario.id);",
+                  "pm.test(\"Cliente con correo verificado\", () => {",
+                  "    pm.expect(cuerpo.usuario.rol).to.eql(\"cliente\");",
+                  "    pm.expect(cuerpo.usuario.email_verificado).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión (cliente sin verificar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Inicia sesión con la cuenta de demostración `{{email_sin_verificar}}` y guarda el `access` en `token_sin_verificar`. Las cuentas las crea `python manage.py cargar_usuarios_demo` (solo en desarrollo).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_sin_verificar}}\",\n  \"password\": \"{{password_demo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Trae access, refresh y el usuario\", () => {",
+                  "    pm.expect(cuerpo.access).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.refresh).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.usuario.id).to.match(/^[0-9a-f-]{36}$/);",
+                  "});",
+                  "pm.environment.set(\"token_sin_verificar\", cuerpo.access);",
+                  "pm.test(\"Correo sin verificar\", () => pm.expect(cuerpo.usuario.email_verificado).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión (administrador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Inicia sesión con la cuenta de demostración `{{email_admin}}` y guarda el `access` en `token_admin`. Las cuentas las crea `python manage.py cargar_usuarios_demo` (solo en desarrollo).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_admin}}\",\n  \"password\": \"{{password_demo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Trae access, refresh y el usuario\", () => {",
+                  "    pm.expect(cuerpo.access).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.refresh).to.be.a(\"string\");",
+                  "    pm.expect(cuerpo.usuario.id).to.match(/^[0-9a-f-]{36}$/);",
+                  "});",
+                  "pm.environment.set(\"token_admin\", cuerpo.access);",
+                  "pm.environment.set(\"admin_id\", cuerpo.usuario.id);",
+                  "pm.test(\"Rol administrador\", () => pm.expect(cuerpo.usuario.rol).to.eql(\"administrador\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar el token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/token/renovar/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar",
+                ""
+              ]
+            },
+            "description": "Con el `refresh` del cliente devuelve un par nuevo; el anterior entra a la blacklist. Guarda el par nuevo en `token` y `refresh`, y el viejo en `refresh_anterior`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Par nuevo distinto del anterior\", () => {",
+                  "    pm.expect(cuerpo.refresh).to.not.eql(pm.environment.get(\"refresh\"));",
+                  "    pm.expect(cuerpo.access).to.be.a(\"string\");",
+                  "});",
+                  "pm.environment.set(\"refresh_anterior\", pm.environment.get(\"refresh\"));",
+                  "pm.environment.set(\"refresh\", cuerpo.refresh);",
+                  "pm.environment.set(\"token\", cuerpo.access);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reusar el refresh anterior → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/token/renovar/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar",
+                ""
+              ]
+            },
+            "description": "El refresh rotado ya está en la blacklist: no vuelve a renovar.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_anterior}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error refresh_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"refresh_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo con token alterado → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/verificar-correo/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar-correo",
+                ""
+              ]
+            },
+            "description": "El token válido llega en el enlace del correo, que en desarrollo se imprime en `docker compose logs svc-usuarios`. Uno alterado responde `token_invalido`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"no-es-un-token-firmado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error token_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"token_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reenviar verificación (respuesta genérica)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/reenviar-verificacion/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reenviar-verificacion",
+                ""
+              ]
+            },
+            "description": "Responde lo mismo exista o no la cuenta. Límite: 3 por hora por IP y por correo.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_sin_verificar}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.json().mensaje).to.include(\"Si el correo está registrado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedir recuperación de contraseña (respuesta genérica)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/recuperar/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "recuperar",
+                ""
+              ]
+            },
+            "description": "Responde lo mismo exista o no la cuenta; aquí, una que no existe. El enlace `{FRONTEND_URL}/restablecer/<uid>/<token>/` llega por correo (consola en desarrollo). Límite: 3 por hora por IP y por correo.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nadie@demo.agroia.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.json().mensaje).to.include(\"Si el correo está registrado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restablecer con enlace inválido → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/restablecer/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "restablecer",
+                ""
+              ]
+            },
+            "description": "Con un `uid` y `token` que no son de un enlace real responde `enlace_invalido`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"bm8tZXMtdW4tdXN1YXJpbw\",\n  \"token\": \"no-es-un-token\",\n  \"password\": \"Hass-Mendez-2026\",\n  \"password_confirmacion\": \"Hass-Mendez-2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error enlace_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"enlace_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "svc-usuarios",
-      "description": "Registro, perfil, direcciones y listado del administrador. Puerto local 8001.\n\nFlujo: 1) Registrar, 2) generar el token con el id real:\n\n    python infra/emitir_token.py --usuario-id {{usuario_id}} --rol cliente\n\ny pegarlo en `token_usuario`, 3) ver el perfil, 4) crear una dirección.",
+      "description": "Registro, login, perfil, direcciones, roles y cambio de contraseña. Puerto local 8001.\n\nFlujo: 1) registrar una cuenta nueva, 2) iniciar sesión con ella (guarda `token_usuario`), 3) ver el perfil, 4) crear una dirección; luego el administrador le cambia el rol y la cuenta cambia su contraseña.",
       "item": [
         {
           "name": "Salud",
@@ -64,13 +571,73 @@
                 ""
               ]
             },
-            "description": "Público. Crea la cuenta como cliente, sin verificar. No devuelve tokens.",
+            "description": "Público. Crea la cuenta como cliente, sin verificar, y envía el correo de verificación (en desarrollo se imprime en `docker compose logs svc-usuarios`). No devuelve tokens: la siguiente petición inicia sesión. Límite: 5 registros por hora por IP.",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"maria.{{$timestamp}}@example.com\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Aguacate-Hass-2026\",\n  \"acepto_privacidad\": true\n}",
+              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"{{email_usuario}}\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Aguacate-Hass-2026\",\n  \"acepto_privacidad\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"email_usuario\", `maria.${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es un UUID\", () => pm.expect(pm.response.json().id).to.match(/^[0-9a-f-]{36}$/));",
+                  "pm.environment.set(\"usuario_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión con la cuenta nueva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Guarda el `access` en `token_usuario` y el `refresh` en `refresh_usuario`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_usuario}}\",\n  \"password\": \"Aguacate-Hass-2026\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -84,9 +651,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
-                  "pm.environment.set(\"usuario_id\", pm.response.json().id);",
-                  "console.log(\"Genera el token con: python infra/emitir_token.py --usuario-id \" + pm.response.json().id + \" --rol cliente\");"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Es la cuenta recién creada\", () => pm.expect(cuerpo.usuario.id).to.eql(pm.environment.get(\"usuario_id\")));",
+                  "pm.environment.set(\"token_usuario\", cuerpo.access);",
+                  "pm.environment.set(\"refresh_usuario\", cuerpo.refresh);"
                 ]
               }
             }
@@ -147,60 +716,6 @@
           ]
         },
         {
-          "name": "Registrar sin aceptar privacidad → 400",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_usuarios}}/api/v1/auth/registro/",
-              "host": [
-                "{{base_usuarios}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "registro",
-                ""
-              ]
-            },
-            "description": "campos.acepto_privacidad = [\"privacidad_no_aceptada\"].",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nombre\": \"María\",\n  \"apellidos\": \"López Ramírez\",\n  \"email\": \"maria.{{$timestamp}}@example.com\",\n  \"password\": \"Aguacate-Hass-2026\",\n  \"password_confirmacion\": \"Aguacate-Hass-2026\",\n  \"acepto_privacidad\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
-                  "pm.test(\"Formato común de error\", () => {",
-                  "    const cuerpo = pm.response.json();",
-                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
-                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "2-3. Ver mi perfil",
           "request": {
             "method": "GET",
@@ -218,7 +733,7 @@
                 ""
               ]
             },
-            "description": "Necesita `token_usuario`, el token del usuario que se acaba de registrar. Mientras no hay login (Entrega 3), genéralo desde la raíz del repo con:\n\n    python infra/emitir_token.py --usuario-id {{usuario_id}} --rol cliente\n\n(el id lo guardó la petición \"Registrar\" en `usuario_id` y lo imprime en la consola de Postman) y pégalo en la variable `token_usuario` del entorno.",
+            "description": "Con `token_usuario`, el token que guardó «Iniciar sesión con la cuenta nueva».",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -236,7 +751,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es el usuario del token\", () => pm.expect(pm.response.json().id).to.eql(pm.environment.get(\"usuario_id\")));"
                 ]
               }
             }
@@ -691,6 +1207,363 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar el rol (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/{{usuario_id}}/rol/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuario_id}}",
+                "rol",
+                ""
+              ]
+            },
+            "description": "Solo administrador. Queda registrado quién y cuándo (admin de Django, «Cambios de rol»).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"administrador\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Rol nuevo\", () => pm.expect(pm.response.json().rol).to.eql(\"administrador\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Devolver el rol de cliente (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/{{usuario_id}}/rol/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuario_id}}",
+                "rol",
+                ""
+              ]
+            },
+            "description": "Deja la cuenta como estaba.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"cliente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Rol cliente\", () => pm.expect(pm.response.json().rol).to.eql(\"cliente\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quitarse el propio rol de administrador → 409",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/{{admin_id}}/rol/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{admin_id}}",
+                "rol",
+                ""
+              ]
+            },
+            "description": "Un administrador no puede quitarse su propio rol.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"cliente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Error auto_degradacion\", () => pm.expect(pm.response.json().error).to.eql(\"auto_degradacion\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar mi contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/cambiar-password/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "cambiar-password",
+                ""
+              ]
+            },
+            "description": "Cierra las demás sesiones y devuelve un par nuevo para este dispositivo, que se guarda en `token_usuario` y `refresh_usuario`. El refresh anterior queda en `refresh_usuario_anterior`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password_actual\": \"Aguacate-Hass-2026\",\n  \"password_nueva\": \"Hass-Mendez-2026\",\n  \"password_confirmacion\": \"Hass-Mendez-2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.environment.set(\"refresh_usuario_anterior\", pm.environment.get(\"refresh_usuario\"));",
+                  "pm.environment.set(\"token_usuario\", cuerpo.access);",
+                  "pm.environment.set(\"refresh_usuario\", cuerpo.refresh);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El refresh de antes del cambio ya no renueva → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/token/renovar/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar",
+                ""
+              ]
+            },
+            "description": "Cambiar la contraseña sube `token_version`: los refresh emitidos antes dejan de servir.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_usuario_anterior}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error refresh_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"refresh_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contraseña actual incorrecta → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/cambiar-password/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "cambiar-password",
+                ""
+              ]
+            },
+            "description": "La contraseña actual no coincide.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password_actual\": \"No-Es-La-2026\",\n  \"password_nueva\": \"Otra-Mas-2026\",\n  \"password_confirmacion\": \"Otra-Mas-2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error password_actual_incorrecta\", () => pm.expect(pm.response.json().error).to.eql(\"password_actual_incorrecta\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -3579,6 +4452,580 @@
           "description": "Clasificación de imágenes de aguacate. En la Entrega 2 no hay modelo de visión: después de validar la imagen responde 503 `modelo_no_disponible`."
         }
       ]
+    },
+    {
+      "name": "Seguridad",
+      "description": "Casos de acceso denegado. Cada uno queda en el log de seguridad del servicio (`docker compose logs svc-tienda | grep acceso_denegado`). Corre al final: el último caso agota el límite de 10 logins por minuto, así que una segunda corrida debe esperar un minuto.",
+      "item": [
+        {
+          "name": "Sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/carrito/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "carrito",
+                ""
+              ]
+            },
+            "description": "Endpoint protegido sin `Authorization`.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error no_autenticado\", () => pm.expect(pm.response.json().error).to.eql(\"no_autenticado\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token vencido → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/carrito/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "carrito",
+                ""
+              ]
+            },
+            "description": "Necesita la variable `token_vencido`, la única que se genera a mano porque hace falta la llave privada: `python infra/emitir_token.py --vencido` (con Newman: `--env-var token_vencido=...`). Si está vacía, la petición se omite.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vencido}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"token_vencido\")) {",
+                  "    console.log(\"token_vencido vacío: genera uno con python infra/emitir_token.py --vencido\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error token_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"token_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token firmado con otra llave → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/carrito/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "carrito",
+                ""
+              ]
+            },
+            "description": "`token_otra_llave` (variable de la colección) dice ser de un administrador y vence en 2099, pero lo firmó una llave que no es la de svc-usuarios.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_otra_llave}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error token_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"token_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token de renovación como acceso → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/carrito/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "carrito",
+                ""
+              ]
+            },
+            "description": "Un `refresh` no sirve como `access` (claim `token_type`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refresh}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error token_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"token_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rol equivocado → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/categorias/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categorias",
+                ""
+              ]
+            },
+            "description": "Un cliente no puede crear categorías.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"No debería crearse\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Error sin_permiso\", () => pm.expect(pm.response.json().error).to.eql(\"sin_permiso\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Comprar sin correo verificado → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_tienda}}/api/v1/pedidos/",
+              "host": [
+                "{{base_tienda}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pedidos",
+                ""
+              ]
+            },
+            "description": "El claim `email_verificado` es false: responde `email_no_verificado`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_sin_verificar}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direccion_envio\": {\n    \"calle\": \"Camino a La Palma\",\n    \"numero\": \"km 3\",\n    \"colonia\": \"La Palma\",\n    \"municipio\": \"Jiquilpan\",\n    \"estado\": \"Michoacán\",\n    \"codigo_postal\": \"59510\"\n  },\n  \"metodo_pago\": \"tarjeta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Error email_no_verificado\", () => pm.expect(pm.response.json()).to.eql({",
+                  "    error: \"email_no_verificado\",",
+                  "    detalle: \"Verifica tu correo para poder hacer esta acción.\",",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/logout/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout",
+                ""
+              ]
+            },
+            "description": "Mete a la blacklist el refresh de la cuenta creada en svc-usuarios.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_usuario}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 205\", () => pm.response.to.have.status(205));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh en blacklist → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/token/renovar/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar",
+                ""
+              ]
+            },
+            "description": "El refresh de la sesión cerrada ya no renueva.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_usuario}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error refresh_invalido\", () => pm.expect(pm.response.json().error).to.eql(\"refresh_invalido\"));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intento fallido de login (5 veces)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Con el Runner se repite 5 veces con un correo inventado (`correo_bloqueo`, nuevo en cada corrida): no bloquea ninguna cuenta real. Los primeros 4 responden 401 y el quinto, 403 `cuenta_bloqueada_temporalmente` (bloqueo de 15 minutos para ese correo desde esta IP).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{correo_bloqueo}}\",\n  \"password\": \"no-es-la-contrasena\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"intentos_bloqueo\")) {",
+                  "    pm.collectionVariables.set(\"correo_bloqueo\", `bloqueo.${Date.now()}@demo.agroia.test`);",
+                  "    pm.collectionVariables.set(\"intentos_bloqueo\", 0);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const intento = Number(pm.collectionVariables.get(\"intentos_bloqueo\")) + 1;",
+                  "pm.collectionVariables.set(\"intentos_bloqueo\", intento);",
+                  "if (intento < 5) {",
+                  "    pm.test(`Intento ${intento}: 401 credenciales_invalidas`, () => {",
+                  "        pm.response.to.have.status(401);",
+                  "        pm.expect(pm.response.json().error).to.eql(\"credenciales_invalidas\");",
+                  "    });",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "    pm.test(\"Quinto intento: 403 cuenta_bloqueada_temporalmente\", () => {",
+                  "        pm.response.to.have.status(403);",
+                  "        pm.expect(pm.response.json().error).to.eql(\"cuenta_bloqueada_temporalmente\");",
+                  "    });",
+                  "    pm.collectionVariables.unset(\"intentos_bloqueo\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exceso de logins → 429",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/auth/login/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Repite el login (con correos inventados) hasta rebasar 10 por minuto por IP; responde 429 `demasiados_intentos` con `Retry-After`. Va al final: después hay que esperar un minuto para volver a iniciar sesión desde esta IP.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"limite.{{$timestamp}}{{$randomInt}}@demo.agroia.test\",\n  \"password\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const vuelta = Number(pm.collectionVariables.get(\"vueltas_limite\") || 0) + 1;",
+                  "pm.collectionVariables.set(\"vueltas_limite\", vuelta);",
+                  "if (pm.response.code !== 429 && vuelta < 12) {",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "    pm.collectionVariables.unset(\"vueltas_limite\");",
+                  "    pm.test(\"Responde 429 con Retry-After\", () => {",
+                  "        pm.response.to.have.status(429);",
+                  "        pm.expect(Number(pm.response.headers.get(\"Retry-After\"))).to.be.above(0);",
+                  "    });",
+                  "    pm.test(\"Error demasiados_intentos\", () => pm.expect(pm.response.json().error).to.eql(\"demasiados_intentos\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "token_otra_llave",
+      "value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwidXNlcl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMCIsInJvbCI6ImFkbWluaXN0cmFkb3IiLCJlbWFpbF92ZXJpZmljYWRvIjp0cnVlLCJ0b2tlbl92ZXJzaW9uIjowLCJpc3MiOiJhZ3JvaWEtdXN1YXJpb3MiLCJpYXQiOjE3OTUwNDY0MDAsImV4cCI6NDA3MDkwODgwMCwianRpIjoiNGJlMTQwODhhMWFhNGNiZGJlYmM3MTQzYzU2Nzg0NjQifQ.Q-iWf1-yF5kD3Fv4BVBgfsJ8RjGJeFXsLklWCxPZPuWRmdO97XuL8K5_Kla_VUNYpTIvuQocpy23uksU8IBkmd4q_Iy9EdTVUh2YjpeKt1c02Bybgh8bUuvbqgQQL7RVIt-F3Qno28K3SIxvPfFDFnna4fbW8mxGwvg-lu_5LtjYyoMzcTLjkF_l-8uTPoAYscN1diJYvgcv_t_xknblHA899hFFbP3qtxYRXAWDA5CWeMQUwFzmMgSSWa6YU9bMA7fYc7qEsFTqsjRMtVMI1Yz168nytLM4DAnOSj3RpfmdUi1fOjs9O2rCkbYOPudFwWODfi5q7JnFAieZbOffSA",
+      "type": "string",
+      "description": "Firmado con una llave descartable: debe dar 401 en todos los servicios."
     }
   ]
 }

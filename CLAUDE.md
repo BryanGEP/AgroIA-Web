@@ -57,7 +57,7 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 
 - El navegador solo habla con `web`. Ningún servicio interno se expone hacia afuera.
 - Cada servicio es dueño de su base. Nunca leas ni escribas la base de otro servicio; usa su API.
-- Entre servicios no hay ForeignKey: guarda `usuario_id` como entero.
+- Entre servicios no hay ForeignKey: guarda `usuario_id` como UUID (el `id` de svc-usuarios, compatible con ms-usuarios; en MongoDB, como texto). El contrato de los tokens está en `docs/contrato-identidad.md`.
 - Código compartido (autenticación JWT, permisos, formato de errores) solo en `comun/agroia_comun/`. No lo copies a los servicios.
 - Llamadas entre servicios: HTTP síncrono por ahora, siempre con timeout. En la Entrega 4 se pasarán a eventos por Redis; no acoples la lógica al transporte.
 - `svc-ia` responde siempre con `id` y `estado`, aunque hoy siempre sea `"listo"`. No guarda nada: las imágenes y resultados de diagnóstico los guarda `svc-contenido`.
@@ -94,6 +94,7 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - No metas datos sensibles en los claims del JWT (teléfono, dirección).
 - No registres contraseñas ni tokens en logs.
 - Endpoints protegidos: 401 sin token, 403 con rol equivocado.
+- Los 401 y 403 se registran solos en el log `seguridad` (`agroia_comun.seguridad`); los eventos propios usan `registrar_evento`, nunca `print` ni datos sensibles.
 
 ## Frontend (`web/`)
 

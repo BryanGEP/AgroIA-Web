@@ -1,5 +1,7 @@
 """Endpoints de registro, perfil, direcciones y listado del administrador."""
 
+import uuid
+
 import pytest
 from django.test import override_settings
 
@@ -151,7 +153,7 @@ def test_ver_mi_perfil(cliente, usuario_cliente):
 
     assert respuesta.status_code == 200
     cuerpo = respuesta.json()
-    assert cuerpo["id"] == CLIENTE_ID
+    assert cuerpo["id"] == str(CLIENTE_ID)
     assert cuerpo["email"] == "cliente@example.com"
     assert cuerpo["rol"] == "cliente"
     assert "password" not in cuerpo
@@ -203,7 +205,7 @@ def test_editar_perfil_invalido(cliente, datos, campo):
 
 
 def test_perfil_de_un_token_sin_usuario_404(anonimo):
-    respuesta = api_con(token(999)).get(YO)
+    respuesta = api_con(token(uuid.uuid4())).get(YO)
 
     assert respuesta.status_code == 404
     assert respuesta.json()["error"] == "no_encontrado"
@@ -320,7 +322,9 @@ def test_direcciones_401_y_403(anonimo, sin_rol, usuario_cliente):
 
 
 def test_direcciones_de_un_token_sin_usuario_404():
-    assert api_con(token(999)).post(DIRECCIONES, DIRECCION, format="json").status_code == 404
+    assert (
+        api_con(token(uuid.uuid4())).post(DIRECCIONES, DIRECCION, format="json").status_code == 404
+    )
 
 
 # --- Listado del administrador ------------------------------------------------
@@ -361,9 +365,12 @@ def test_listado_401_y_403(anonimo, cliente):
     assert cliente.get(USUARIOS).status_code == 403
 
 
-def test_no_hay_cambio_de_rol_por_api(admin, usuario_cliente):
-    respuesta = admin.patch(f"{USUARIOS}{CLIENTE_ID}/rol/", {"rol": "administrador"}, format="json")
+def test_registro_con_contrasena_de_mas_de_128_caracteres_400(anonimo):
+    larga = "Aguacate-Hass-" + "x" * 120
+    datos = {**REGISTRO, "password": larga, "password_confirmacion": larga}
 
-    assert respuesta.status_code in (404, 405)
-    usuario_cliente.refresh_from_db()
-    assert usuario_cliente.rol == "cliente"
+    respuesta = anonimo.post("/api/v1/auth/registro/", datos, format="json")
+
+    assert respuesta.status_code == 400
+    assert "password" in respuesta.json()["campos"]
+    assert not Usuario.objects.filter(email=REGISTRO["email"]).exists()

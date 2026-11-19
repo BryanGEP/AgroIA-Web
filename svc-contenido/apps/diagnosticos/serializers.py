@@ -63,7 +63,7 @@ class CrearDiagnosticoSerializer(serializers.Serializer):
             "Diagnóstico",
             value={
                 "id": "6adad34bdf98ab47ebafa190",
-                "usuario_id": 10,
+                "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
                 "imagen_url": "http://127.0.0.1:8003/media/diagnosticos/449afb67798e4a89af85ed31976fbf04.png",
                 "clase": "antracnosis",
                 "confianza": 0.91,
@@ -77,7 +77,7 @@ class CrearDiagnosticoSerializer(serializers.Serializer):
 )
 class DiagnosticoSerializer(serializers.Serializer):
     id = serializers.CharField(source="_id", read_only=True)
-    usuario_id = serializers.IntegerField(read_only=True)
+    usuario_id = serializers.UUIDField(read_only=True)
     imagen_url = serializers.SerializerMethodField()
     clase = serializers.ChoiceField(choices=CLASES, read_only=True)
     confianza = serializers.FloatField(read_only=True)

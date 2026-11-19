@@ -16,7 +16,7 @@ def test_crear_conversacion():
     conversacion = servicios.crear(CLIENTE_ID, "Manchas en hojas")
 
     assert isinstance(conversacion["_id"], ObjectId)
-    assert conversacion["usuario_id"] == CLIENTE_ID
+    assert conversacion["usuario_id"] == str(CLIENTE_ID)  # texto en Mongo
     assert conversacion["titulo"] == "Manchas en hojas"
     assert conversacion["mensajes"] == []
     assert conversacion["creada_en"] == conversacion["actualizada_en"]

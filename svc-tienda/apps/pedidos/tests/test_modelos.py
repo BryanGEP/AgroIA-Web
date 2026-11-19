@@ -9,15 +9,16 @@ from apps.pedidos.tests.factories import (
     ItemPedidoFactory,
     PedidoFactory,
 )
+from tests.datos import CLIENTE_ID
 
 pytestmark = pytest.mark.django_db
 
 
 def test_un_carrito_por_usuario():
-    CarritoFactory(usuario_id=50)
+    CarritoFactory(usuario_id=CLIENTE_ID)
 
     with pytest.raises(IntegrityError), transaction.atomic():
-        CarritoFactory(usuario_id=50)
+        CarritoFactory(usuario_id=CLIENTE_ID)
 
 
 def test_un_producto_solo_aparece_una_vez_por_carrito():

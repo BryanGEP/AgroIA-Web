@@ -166,7 +166,7 @@ class ItemPedidoSerializer(serializers.ModelSerializer):
             "Pedido",
             value={
                 "id": 12,
-                "usuario_id": 10,
+                "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
                 "estado": "pendiente",
                 "direccion_envio": EJEMPLO_DIRECCION,
                 "items": [

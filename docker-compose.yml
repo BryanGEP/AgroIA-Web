@@ -7,7 +7,9 @@
 # infra/generar_llaves.py (ver README.md). Cada servicio recibe solo sus variables.
 #
 # Los puertos se publican solo en 127.0.0.1: sirven para probar desde esta computadora
-# y no quedan visibles en la red. Dentro de Docker cada servicio escucha en el 8000 y
+# y no quedan visibles en la red. Además, los servicios confían en el último valor de
+# X-Forwarded-For (lo pone el gateway); desde un puerto directo se podría falsificar, por
+# eso nunca deben publicarse en 0.0.0.0 (ver docs/contrato-identidad.md). Dentro de Docker cada servicio escucha en el 8000 y
 # se llama por su nombre (http://svc-tienda:8000).
 
 name: agroia-web
@@ -18,6 +20,7 @@ x-django-env: &django-env
   DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
   AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
   JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+  JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -150,6 +153,7 @@ services:
       AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
       DEBUG: ${DJANGO_DEBUG:-False}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+      JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
       # svc-ia no llama al LLM: traduce el contrato y llama al contenedor agente.
       URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
       AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-30}

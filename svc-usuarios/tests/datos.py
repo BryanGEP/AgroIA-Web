@@ -1,8 +1,10 @@
 """Datos de ejemplo compartidos por las pruebas."""
 
-CLIENTE_ID = 10
-OTRO_CLIENTE_ID = 11
-ADMIN_ID = 1
+import uuid
+
+CLIENTE_ID = uuid.UUID("c1e2a3b4-0000-4000-8000-000000000010")
+OTRO_CLIENTE_ID = uuid.UUID("c1e2a3b4-0000-4000-8000-000000000011")
+ADMIN_ID = uuid.UUID("a0d1e2f3-0000-4000-8000-000000000001")
 
 DIRECCION = {
     "alias": "Huerta",

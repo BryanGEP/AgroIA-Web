@@ -4,7 +4,7 @@ Conversaciones con el agente, historial de diagnósticos y bitácora de activida
 
 - **Puerto local:** 8003 (dentro de Docker escucha en el 8000 y se llama `http://svc-contenido:8000`).
 - **Datos:** MongoDB, base `contenido` (pymongo). No usa base relacional.
-- **Documentación de la API:** http://localhost:8003/api/docs/ (botón **Authorize** para pegar un token)
+- **Documentación de la API:** http://localhost:8003/api/docs/ (botón **Authorize** para pegar el `access` del login de svc-usuarios)
 - **Salud:** `GET http://localhost:8003/salud/` → `{"estado": "ok"}`
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
@@ -25,17 +25,17 @@ Las apps no tienen `models.py` ni `admin.py` porque no hay ORM. `config/mongo.py
 
 ```json
 // conversaciones — índice usuario_id + actualizada_en
-{"_id": ObjectId, "usuario_id": 12, "titulo": "Manchas en hojas", "creada_en": ISODate, "actualizada_en": ISODate,
+{"_id": ObjectId, "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d", "titulo": "Manchas en hojas", "creada_en": ISODate, "actualizada_en": ISODate,
  "mensajes": [{"rol": "usuario", "texto": "...", "fecha": ISODate},
               {"rol": "agente", "texto": "...", "fuentes": ["..."], "fecha": ISODate}]}
 
 // diagnosticos — índice usuario_id + creado_en
-{"_id": ObjectId, "usuario_id": 12, "imagen": "diagnosticos/<uuid>.png", "clase": "antracnosis",
+{"_id": ObjectId, "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d", "imagen": "diagnosticos/<uuid>.png", "clase": "antracnosis",
  "confianza": 0.91, "probabilidades": {"sano": 0.03, "rona": 0.06, "antracnosis": 0.91},
  "modelo_version": "v1", "creado_en": ISODate}
 
 // bitacora — índices tipo + fecha y fecha
-{"_id": ObjectId, "tipo": "pedido_creado", "usuario_id": 12, "servicio": "svc-tienda", "datos": {...}, "fecha": ISODate}
+{"_id": ObjectId, "tipo": "pedido_creado", "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d", "servicio": "svc-tienda", "datos": {...}, "fecha": ISODate}
 ```
 
 `imagen` guarda el nombre del archivo en `default_storage`, no la URL: la respuesta calcula `imagen_url`, así sigue funcionando cuando se pase a Cloud Storage (Entrega 5). En desarrollo (`DEBUG=True`) el servicio sirve las imágenes en `/media/`.
@@ -64,7 +64,7 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 
 ## Autenticación
 
-Usa la autenticación, los permisos y el formato de errores de [`comun`](../comun/README.md), igual que svc-tienda. Los tokens de desarrollo se generan con `infra/emitir_token.py` (ver el [README raíz](../README.md#tokens-de-desarrollo)). Con `AUTH_ACTIVA=False` (solo con `DJANGO_DEBUG=True`) se apaga la revisión de roles, pero todos los endpoints siguen pidiendo token, porque todo es por usuario.
+Usa la autenticación, los permisos y el formato de errores de [`comun`](../comun/README.md), igual que svc-tienda. El token sale del login de svc-usuarios (ver el [README raíz](../README.md#iniciar-sesión-y-tokens)). `usuario_id` se guarda en MongoDB como el UUID en texto. Con `AUTH_ACTIVA=False` (solo con `DJANGO_DEBUG=True`) se apaga la revisión de roles, pero todos los endpoints siguen pidiendo token, porque todo es por usuario.
 
 ## Variables de entorno
 
@@ -73,6 +73,7 @@ Usa la autenticación, los permisos y el formato de errores de [`comun`](../comu
 | `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS` | Django |
 | `AUTH_ACTIVA` | Revisión de roles (`True` por defecto) |
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar los JWT |
+| `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `MONGO_URL` | Conexión a MongoDB, con la base al final (`mongodb://mongo:27017/contenido`) |
 
 ## MongoDB y Django

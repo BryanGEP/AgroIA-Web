@@ -9,11 +9,11 @@ from apps.catalogo.tests.factories import CategoriaFactory, ProductoFactory
 from apps.pedidos import servicios
 from apps.pedidos.models import Carrito, ItemCarrito, Pedido
 from apps.pedidos.tests.factories import ItemPedidoFactory, PedidoFactory
-from tests.datos import DIRECCION
+from tests.datos import CLIENTE_ID, DIRECCION
 
 pytestmark = pytest.mark.django_db
 
-USUARIO = 10
+USUARIO = CLIENTE_ID
 
 
 def codigo_de(error) -> str:

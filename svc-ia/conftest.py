@@ -14,7 +14,14 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from tests.tokens import LLAVE_PUBLICA, encabezado, firmar_token
+from tests.tokens import (
+    ADMIN_ID,
+    CLIENTE_ID,
+    LLAVE_PUBLICA,
+    OTRO_CLIENTE_ID,
+    encabezado,
+    firmar_token,
+)
 
 _RUTA = Path(tempfile.mkdtemp(prefix="agroia-ia-")) / "publica.pem"
 _RUTA.write_text(LLAVE_PUBLICA, encoding="utf-8")
@@ -24,6 +31,7 @@ os.environ["DEBUG"] = "False"
 os.environ["JWT_PUBLIC_KEY_PATH"] = str(_RUTA)
 os.environ["URL_AGENTE"] = "http://agente-de-prueba:8000"
 os.environ["AGENTE_TIMEOUT"] = "30"
+os.environ["JWT_ISSUER"] = "agroia-usuarios"
 
 
 @pytest.fixture
@@ -42,19 +50,19 @@ def cliente_http():
 
 @pytest.fixture
 def como_cliente() -> dict[str, str]:
-    return encabezado(firmar_token(10, "cliente"))
+    return encabezado(firmar_token(CLIENTE_ID, "cliente"))
 
 
 @pytest.fixture
 def como_otro_cliente() -> dict[str, str]:
-    return encabezado(firmar_token(11, "cliente"))
+    return encabezado(firmar_token(OTRO_CLIENTE_ID, "cliente"))
 
 
 @pytest.fixture
 def como_admin() -> dict[str, str]:
-    return encabezado(firmar_token(1, "administrador"))
+    return encabezado(firmar_token(ADMIN_ID, "administrador"))
 
 
 @pytest.fixture
 def sin_rol() -> dict[str, str]:
-    return encabezado(firmar_token(10, None))
+    return encabezado(firmar_token(CLIENTE_ID, None))

@@ -45,7 +45,7 @@ CODIGO_POR_ESTADO = {
     "403": "sin_permiso",
     "404": "no_encontrado",
     "405": "metodo_no_permitido",
-    "429": "demasiadas_peticiones",
+    "429": "demasiados_intentos",
 }
 # Para un 409 sin código en la descripción no hay un código genérico; se usa este texto.
 DETALLE_GENERICO = "No se pudo completar la acción."
@@ -59,7 +59,18 @@ DETALLES = {
     "sin_permiso": "No tienes permiso para realizar esta acción.",
     "no_encontrado": "No se encontró el recurso solicitado.",
     "metodo_no_permitido": "Método no permitido en esta ruta.",
-    "demasiadas_peticiones": "Demasiadas peticiones; intenta más tarde.",
+    "demasiados_intentos": "Demasiados intentos. Intenta de nuevo en 60 segundos.",
+    "email_no_verificado": "Verifica tu correo para poder hacer esta acción.",
+    "credenciales_invalidas": "Correo o contraseña incorrectos.",
+    "refresh_invalido": "La sesión no es válida o ya venció. Inicia sesión de nuevo.",
+    "cuenta_bloqueada_temporalmente": (
+        "Demasiados intentos fallidos. Intenta de nuevo en 15 minutos o restablece tu contraseña."
+    ),
+    "token_expirado": "El enlace de verificación ya venció. Pide uno nuevo.",
+    "enlace_invalido": "El enlace no es válido o ya expiró. Solicita uno nuevo.",
+    "password_actual_incorrecta": "La contraseña actual no es correcta.",
+    "password_repetida": "La nueva contraseña debe ser distinta de la actual.",
+    "auto_degradacion": "No puedes quitarte tu propio rol de administrador.",
     "carrito_vacio": "Tu carrito está vacío.",
     "stock_insuficiente": (
         "No hay suficiente stock de «Oxicloruro de cobre 50% PH 1 kg»: pediste 40 y quedan 30."

@@ -1,6 +1,6 @@
 # AgroIA-Web · Definición técnica
 
-Aprobada el 22 de octubre de 2026 · actualizada el 18 de noviembre de 2026 (revisión de calidad de la Entrega 2)
+Aprobada el 22 de octubre de 2026 · actualizada el 19 de noviembre de 2026 (Entrega 3: identidad en svc-usuarios)
 
 ## Stack decidido
 
@@ -155,8 +155,17 @@ Los servicios Django exponen `/api/v1/...` (svc-ia es la excepción: sus rutas n
 | `validacion` | 400 | Datos inválidos; trae `campos`. En el registro, los casos propios llegan como mensaje del campo: `email` → `email_registrado`, `password_confirmacion` → `password_no_coincide`, `acepto_privacidad` → `privacidad_no_aceptada` |
 | `json_invalido` | 400 | El cuerpo no es JSON válido |
 | `no_autenticado` | 401 | Falta el token |
-| `token_invalido` | 401 | Token con firma, emisor o tipo incorrectos, o vencido |
-| `sin_permiso` | 403 | Rol equivocado o correo sin verificar |
+| `token_invalido` | 401 | Token con firma, emisor o tipo incorrectos, vencido o con un `user_id` que no es UUID |
+| `credenciales_invalidas` | 401 | Login con correo inexistente, contraseña incorrecta o cuenta desactivada (mismo mensaje) |
+| `refresh_invalido` | 401 | Renovar con un refresh vencido, alterado, en blacklist o de una sesión cerrada (400 si el logout recibe algo que no es un refresh) |
+| `sin_permiso` | 403 | Rol equivocado |
+| `email_no_verificado` | 403 | Acción que exige correo verificado (crear un pedido) |
+| `cuenta_bloqueada_temporalmente` | 403 | 5 logins fallidos con el mismo correo desde la misma IP; 15 minutos |
+| `token_expirado`, `enlace_invalido` | 400 | Enlace de verificación vencido (`token_invalido` si se alteró); enlace de recuperación inválido, usado o vencido |
+| `password_actual_incorrecta`, `password_repetida` | 400 | Cambio de contraseña |
+| `auto_degradacion` | 409 | Un administrador intenta quitarse su propio rol |
+| `demasiados_intentos` | 429 | Se rebasó el límite de intentos; trae `Retry-After` |
+| `2fa_no_disponible` | 501 | La cuenta tiene 2FA, que todavía no se implementa |
 | `no_encontrado` | 404 | No existe, o no es del usuario (no se revela que existe) |
 | `metodo_no_permitido` | 405 | Método HTTP no soportado en esa ruta |
 | `carrito_vacio` | 400 | Se intenta crear un pedido sin productos en el carrito |
@@ -169,19 +178,20 @@ Los servicios Django exponen `/api/v1/...` (svc-ia es la excepción: sus rutas n
 
 Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNegocio` desde `servicios.py`; svc-ia, que no usa `comun`, produce los suyos con el mismo formato. Un ObjectId mal formado en svc-contenido responde `no_encontrado` (404), igual que uno inexistente o ajeno.
 
-**`svc-usuarios`** — detalle completo en el documento de requerimientos de autenticación.
+**`svc-usuarios`** — detalle completo en el documento de requerimientos de autenticación y en su [README](../svc-usuarios/README.md#endpoints--rol); el contrato de los tokens está en [`contrato-identidad.md`](contrato-identidad.md).
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| POST | `/auth/registro/` | público. Responde `{"id", "email", "mensaje"}`, sin tokens. **Entrega 2** |
-| POST | `/auth/login/`, `/auth/token/renovar/` | público (Entrega 3) |
-| POST | `/auth/verificar-correo/`, `/auth/reenviar-verificacion/` | público (Entrega 3) |
-| POST | `/auth/recuperar/`, `/auth/restablecer/` | público (Entrega 3) |
-| POST | `/auth/logout/`, `/auth/cambiar-password/` | autenticado (Entrega 3) |
+| POST | `/auth/registro/` | público. Responde `{"id", "email", "mensaje"}`, sin tokens, y envía el correo de verificación. 5 por hora por IP |
+| POST | `/auth/login/` | público. `{"access", "refresh", "usuario": {"id", "nombre", "rol", "email_verificado"}}`. 10 por minuto por IP y bloqueo por correo + IP |
+| POST | `/auth/token/renovar/` | público. `{"access", "refresh"}`; rota el refresh |
+| POST | `/auth/verificar-correo/`, `/auth/reenviar-verificacion/` | público. El reenvío: 3 por hora por IP y por correo |
+| POST | `/auth/recuperar/`, `/auth/restablecer/` | público. Recuperar: 3 por hora por IP y por correo |
+| POST | `/auth/logout/`, `/auth/logout-todo/`, `/auth/cambiar-password/` | autenticado. Cambiar contraseña: 5 por hora por usuario |
 | GET, PATCH | `/usuarios/yo/` | autenticado. Solo se editan `nombre`, `apellidos` y `telefono`. **Entrega 2** |
 | CRUD | `/usuarios/yo/direcciones/` | autenticado, solo las propias (también el administrador). Una sola predeterminada. **Entrega 2** |
 | GET | `/usuarios/` | administrador. Filtros `rol` y `q`. **Entrega 2** |
-| PATCH | `/usuarios/<id>/rol/` | administrador (Entrega 3; en la Entrega 2 se usa el comando `asignar_admin <email>`) |
+| PATCH | `/usuarios/<id>/rol/` | administrador. No puede quitarse su propio rol; cada cambio queda en `CambioRol` |
 
 **`svc-tienda`**
 
@@ -225,13 +235,13 @@ En la Entrega 2, svc-ia y svc-contenido no se llaman entre sí: `web` llama a `s
 
 ## Modelo de datos
 
-PostgreSQL guarda lo que necesita integridad y transacciones (usuarios, stock, pedidos). MongoDB guarda lo que crece y cambia de forma (mensajes, resultados de IA, bitácora). Entre servicios no hay llaves foráneas: se guarda el `usuario_id` como entero.
+PostgreSQL guarda lo que necesita integridad y transacciones (usuarios, stock, pedidos). MongoDB guarda lo que crece y cambia de forma (mensajes, resultados de IA, bitácora). Entre servicios no hay llaves foráneas: se guarda el `usuario_id` como UUID (en MongoDB, como texto). Desde la Entrega 3 el `id` del usuario es UUID, igual que en ms-usuarios.
 
 **PostgreSQL · `usuarios_db`**
 
 | Tabla | Campos principales |
 | --- | --- |
-| `Usuario` | `AbstractUser` sin `username`; `email` (único, es el login), `nombre`, `apellidos`, `telefono`, `rol`, `email_verificado`, `token_version`, `acepto_privacidad_en`, `version_privacidad`, `tiene_2fa`. `AUTH_USER_MODEL = "usuarios.Usuario"`; su `id` es el `user_id` del JWT |
+| `Usuario` | `AbstractUser` sin `username`; `id` (UUID), `email` (único, es el login), `nombre`, `apellidos`, `telefono`, `rol`, `email_verificado`, `token_version`, `acepto_privacidad_en`, `version_privacidad`, `tiene_2fa`. `AUTH_USER_MODEL = "usuarios.Usuario"`; su `id` es el `user_id` del JWT |
 | `Direccion` | `usuario` FK, `alias`, `calle`, `numero`, `colonia`, `municipio`, `estado`, `codigo_postal`, `referencias`, `predeterminada` (una sola por usuario, con `UniqueConstraint` condicional), `creada_en` |
 | `Dispositivo2FA`, `CodigoRespaldo` | Ver sección 12 del documento de autenticación |
 
@@ -252,19 +262,19 @@ Los pedidos copian el nombre, el precio y la dirección: si después cambian, el
 
 ```json
 // conversaciones
-{ "_id": ObjectId, "usuario_id": 12, "titulo": "Manchas en hojas",
+{ "_id": ObjectId, "usuario_id": "8d3f6c2a-…", "titulo": "Manchas en hojas",
   "creada_en": ISODate, "actualizada_en": ISODate,
   "mensajes": [ { "rol": "usuario", "texto": "...", "fecha": ISODate },
                 { "rol": "agente", "texto": "...", "fuentes": ["..."], "fecha": ISODate } ] }
 
 // diagnosticos
-{ "_id": ObjectId, "usuario_id": 12, "imagen": "diagnosticos/<uuid>.png",
+{ "_id": ObjectId, "usuario_id": "8d3f6c2a-…", "imagen": "diagnosticos/<uuid>.png",
   "clase": "antracnosis", "confianza": 0.91,
   "probabilidades": { "sano": 0.03, "rona": 0.06, "antracnosis": 0.91 },
   "modelo_version": "v1", "creado_en": ISODate }
 
 // bitacora
-{ "_id": ObjectId, "tipo": "pedido_creado", "usuario_id": 12,
+{ "_id": ObjectId, "tipo": "pedido_creado", "usuario_id": "8d3f6c2a-…",
   "servicio": "svc-tienda", "datos": { ... }, "fecha": ISODate }
 ```
 
@@ -312,10 +322,11 @@ La implementa el equipo en `svc-usuarios` desde ahora; después se adaptará al 
 1. El usuario inicia sesión en `web`. El gateway llama a `svc-usuarios`, recibe access y refresh, y los guarda en su sesión de servidor.
 2. El navegador solo recibe la cookie de sesión de Django (`HttpOnly`).
 3. En cada petición, el gateway reenvía `Authorization: Bearer <access>` al servicio que corresponda.
-4. Cada servicio valida la firma RS256 con la llave pública, sin consultar `svc-usuarios`, y lee `user_id`, `rol` y `email_verificado` del token.
+4. Cada servicio valida la firma RS256 con la llave pública y el emisor (`JWT_ISSUER`), sin consultar `svc-usuarios`, y lee `user_id` (UUID), `rol` y `email_verificado` del token. Claims, duraciones y límites en [`contrato-identidad.md`](contrato-identidad.md).
 5. Si el access venció, el gateway renueva con el refresh y repite la petición.
+6. Al reenviar cada petición, el gateway debe poner en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenviar el `X-Forwarded-For` que mande el cliente.
 
-**Adaptación para que no estorbe en la Entrega 2:** las clases de autenticación y permisos se escriben una vez en `comun/` (implementadas en la fase 2) y se controlan con la variable `AUTH_ACTIVA`. Con `True`, aplican JWT y roles. Con `False` se apagan solo las revisiones de rol: un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario (carrito, pedidos) responden 401 sin token. Para desarrollo, los tokens se generan con `infra/emitir_token.py`. Su valor por defecto en el código es `True`; solo el `.env` local puede apagarla, y solo junto con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Para la entrega debe estar en `True`.
+**Adaptación para que no estorbe en la Entrega 2:** las clases de autenticación y permisos se escriben una vez en `comun/` (implementadas en la fase 2) y se controlan con la variable `AUTH_ACTIVA`. Con `True`, aplican JWT y roles. Con `False` se apagan solo las revisiones de rol: un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario (carrito, pedidos) responden 401 sin token. Desde la Entrega 3 los tokens salen del login de `svc-usuarios`; `infra/emitir_token.py` queda solo para pruebas. Su valor por defecto en el código es `True`; solo el `.env` local puede apagarla, y solo junto con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Para la entrega debe estar en `True`.
 
 Antes de cerrar la parte de autenticación, revisarla con las skills `insecure-defaults` y `static-analysis` de Claude Code.
 
@@ -347,6 +358,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `MONGO_URL` | `mongodb://mongo:27017/contenido` | svc-contenido |
 | `REDIS_URL` | `redis://redis:6379/0` | usuarios, web |
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` / `/run/secrets/jwt_publica.pem` | usuarios / todos |
+| `JWT_ISSUER` | `agroia-usuarios` (emisor de los tokens; ver `contrato-identidad.md`) | todos menos web |
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
@@ -434,12 +446,13 @@ Un `CLAUDE.md` en la raíz resume este documento en reglas que Claude Code lee a
 La fase 0 la hace una sola persona porque todo depende de ella. Después, las fases 1, 2 y 3 pueden ir en paralelo, una por integrante. Jira se documenta al final, como acordó el equipo.
 
 1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
-2. **Fase 1 · Usuarios y entrada.** Hecha en su versión básica para la Entrega 2: modelos `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`. En `web`: Tailwind + daisyUI, tema `agroia` y `base.html`. Pasan a la Entrega 3: envío de correos, verificación, login, renovación, logout y las pantallas de registro, login y perfil.
+2. **Fase 1 · Usuarios y entrada.** Hecha en su versión básica para la Entrega 2: modelos `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`. En `web`: Tailwind + daisyUI, tema `agroia` y `base.html`. En la Entrega 3 (19 de noviembre de 2026, [avance](avances/e3-identidad.md)) se completaron envío de correos, verificación, login, renovación con rotación y blacklist, logout y el cambio de `id` a UUID. Las pantallas de registro, login y perfil pasan a la fase del gateway.
 3. **Fase 2 · Tienda.** Hecha: modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas hechas: catálogo y detalle; carrito, checkout, mis pedidos y panel de administrador pasan a la Entrega 3.
 4. **Fase 3 · IA y contenido.** Hecha: `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`, con su base de conocimiento) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Las pantallas de chat y de diagnóstico pasan a la Entrega 3.
-5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en el resto de los servicios (la validación RS256 de `comun/` ya existe desde la fase 2), revisión de `token_version`, límite de intentos, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
-6. **Fase 5 · Calidad y entrega.** Hecha para la Entrega 2 el 18 de noviembre de 2026: pruebas, Swagger con ejemplos y errores documentados, colección de Postman en verde, READMEs revisados y [documento de la entrega](entregable-2.md). La revisión con `insecure-defaults` y `static-analysis` se hace al cerrar la autenticación (Entrega 3).
+5. **Fase 4 · Seguridad completa.** Primera parte hecha el 19 de noviembre de 2026 ([avance](avances/e3-identidad.md)): recuperación y cambio de contraseña, cambio de rol con registro, revisión de `token_version` al renovar, límite de intentos (DRF + Redis y django-axes), log de seguridad en todos los servicios y contrato de identidad compatible con ms-usuarios. Falta la fase del gateway: sesión, enrutamiento, CORS y pantallas de login, registro y perfil. **Condición de seguridad para esa fase:** el gateway debe poner en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenviar el `X-Forwarded-For` que mande el cliente; los servicios confían en el último valor de ese encabezado para el límite de intentos, el bloqueo de axes y el log de seguridad (ver [`contrato-identidad.md`](contrato-identidad.md#ip-del-cliente-y-puertos-publicados)). 2FA y los opcionales solo si sobra tiempo.
+6. **Fase 5 · Calidad y entrega.** Hecha para la Entrega 2 el 18 de noviembre de 2026: pruebas, Swagger con ejemplos y errores documentados, colección de Postman en verde, READMEs revisados y [documento de la entrega](entregable-2.md). La revisión con `insecure-defaults` y `static-analysis` de la autenticación se hizo el 19 de noviembre de 2026 (Semgrep, CodeQL y `check --deploy`; ver la [revisión de seguridad](avances/e3-identidad.md#revisión-de-seguridad)).
 7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
+8. **Entrega 5 · Despliegue.** Además de Cloud Storage para las imágenes, quedan pendientes de la revisión de seguridad de la Entrega 3: contenedores que no corran como root; gunicorn (Django) y uvicorn sin `--reload` (svc-ia) en lugar de los servidores de desarrollo; contraseña y TLS en Redis y MongoDB; opciones de HTTPS y cookies seguras (`SECURE_HSTS_SECONDS`, `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, que hoy reporta `check --deploy`), y SMTP real para los correos (con `DJANGO_DEBUG=False` svc-usuarios ya no arranca con el backend de consola).
 
 ## Decisiones tomadas
 

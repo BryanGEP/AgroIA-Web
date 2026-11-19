@@ -25,6 +25,10 @@ class Settings:
     auth_activa: bool = field(default_factory=lambda: _booleano(os.getenv("AUTH_ACTIVA", "True")))
     # Llave pública para validar el JWT con PyJWT.
     jwt_public_key_path: str = field(default_factory=lambda: os.getenv("JWT_PUBLIC_KEY_PATH", ""))
+    # Emisor esperado en el claim `iss` (igual que JWT_ISSUER en los servicios Django).
+    jwt_issuer: str = field(
+        default_factory=lambda: os.getenv("JWT_ISSUER", "") or "agroia-usuarios"
+    )
     # Contenedor del agente (red interna de Docker).
     url_agente: str = field(default_factory=lambda: os.getenv("URL_AGENTE", "http://agente:8000"))
     agente_timeout: float = field(default_factory=lambda: float(os.getenv("AGENTE_TIMEOUT", "30")))
@@ -37,5 +41,7 @@ def validar(config: Settings) -> None:
     """Impide arrancar con la autenticación apagada fuera del desarrollo local."""
     if not config.auth_activa and not config.debug:
         raise RuntimeError("AUTH_ACTIVA=False solo se permite con DEBUG=True (desarrollo local).")
+    if not config.jwt_issuer.strip():
+        raise RuntimeError("JWT_ISSUER no puede estar vacío.")
     if config.agente_timeout <= 0:
         raise RuntimeError("AGENTE_TIMEOUT debe ser mayor que 0.")

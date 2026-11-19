@@ -19,7 +19,7 @@ _RUTA_LLAVE_PUBLICA = Path(tempfile.mkdtemp(prefix="agroia-pruebas-")) / "public
 _RUTA_LLAVE_PUBLICA.write_text(_LLAVE_PUBLICA_PRUEBAS, encoding="utf-8")
 
 _VALORES_DE_PRUEBA = {
-    "DJANGO_SECRET_KEY": "clave-solo-para-pruebas-no-es-secreta",
+    "DJANGO_SECRET_KEY": "clave-solo-para-pruebas-no-es-secreta-ni-sirve-fuera-de-pytest-7Qx",
     "MONGO_URL": "mongodb://localhost:27017/contenido",
 }
 

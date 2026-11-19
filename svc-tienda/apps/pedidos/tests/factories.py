@@ -1,17 +1,18 @@
+import uuid
 from decimal import Decimal
 
 import factory
 
 from apps.catalogo.tests.factories import ProductoFactory
 from apps.pedidos.models import Carrito, ItemCarrito, ItemPedido, Pedido
-from tests.datos import DIRECCION
+from tests.datos import CLIENTE_ID, DIRECCION
 
 
 class CarritoFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Carrito
 
-    usuario_id = factory.Sequence(lambda n: 1000 + n)
+    usuario_id = factory.LazyFunction(uuid.uuid4)
 
 
 class ItemCarritoFactory(factory.django.DjangoModelFactory):
@@ -27,7 +28,7 @@ class PedidoFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Pedido
 
-    usuario_id = 10
+    usuario_id = CLIENTE_ID
     estado = Pedido.Estado.PENDIENTE
     direccion_envio = factory.LazyFunction(lambda: dict(DIRECCION))
     subtotal = Decimal("200.00")

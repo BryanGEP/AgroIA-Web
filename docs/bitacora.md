@@ -43,3 +43,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** revisión final de calidad de la Entrega 2: base de conocimiento del agente en un contenedor propio (agente-db con pgvector) e ingesta repetible; svc-ia manda el historial al agente y devuelve sus fuentes; Swagger con ejemplos y errores documentados en todos los servicios; colección de Postman completa en verde (95 de 95 aserciones, dos corridas); documentación corregida y documento del Entregable 2 con capturas. 418 pruebas en verde.
 - **Qué sigue:** documentar los sprints de la Entrega 2 en Jira y fusionar develop en main.
 - **Bloqueos:** Ninguno.
+
+
+## 2026-11-19 · Sprint 3
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** Entrega 3, identidad en svc-usuarios: login con JWT RS256 (access 15 min, refresh 7 días), renovación con rotación y blacklist, logout y logout-todo; correos con plantillas, verificación de correo, recuperación y cambio de contraseña; cambio de rol con registro; límite de intentos con DRF + Redis y bloqueo con django-axes; log de seguridad y registro de 401/403 en todos los servicios. Id de usuario como UUID en todos los servicios, JWT_ISSUER configurable y contrato de identidad con las diferencias con ms-usuarios. Revisión de seguridad con Semgrep, CodeQL y check --deploy, sin hallazgos de gravedad alta; se corrigieron los medios y bajos aplicables. Postman con login automático y carpeta de seguridad. 534 pruebas en verde.
+- **Qué sigue:** fase del gateway (sesión, enrutamiento, CORS y pantallas de login, registro y perfil).
+- **Bloqueos:** Ninguno.

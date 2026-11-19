@@ -1,5 +1,6 @@
 """Endpoints de carrito y pedidos: caso correcto, validación, 401 y 403."""
 
+import uuid
 from decimal import Decimal
 
 import pytest
@@ -17,7 +18,7 @@ ITEMS = "/api/v1/carrito/items/"
 PEDIDOS = "/api/v1/pedidos/"
 
 
-def item_de(usuario_id: int, **datos) -> ItemCarrito:
+def item_de(usuario_id: uuid.UUID, **datos) -> ItemCarrito:
     from apps.pedidos.servicios import obtener_carrito
 
     return ItemCarritoFactory(carrito=obtener_carrito(usuario_id), **datos)
@@ -256,7 +257,10 @@ def test_crear_pedido_sin_correo_verificado_403(sin_verificar, direccion):
     respuesta = sin_verificar.post(PEDIDOS, datos, format="json")
 
     assert respuesta.status_code == 403
-    assert "verific" in respuesta.json()["detalle"].lower()
+    assert respuesta.json() == {
+        "error": "email_no_verificado",
+        "detalle": "Verifica tu correo para poder hacer esta acción.",
+    }
 
 
 # --- Pagar --------------------------------------------------------------------

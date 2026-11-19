@@ -6,3 +6,5 @@ pytest-django==4.14.0
 factory-boy==3.3.3
 responses==0.26.3
 ruff==0.17.2
+# Simula el paso del tiempo en las pruebas de vencimiento (tokens, enlaces, bloqueo).
+freezegun==1.5.5

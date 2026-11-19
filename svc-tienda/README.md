@@ -4,7 +4,7 @@ Categorías, productos, stock, carrito y pedidos (pago simulado).
 
 - **Puerto local:** 8002 (dentro de Docker escucha en el 8000 y se llama `http://svc-tienda:8000`).
 - **Datos:** PostgreSQL, base `tienda_db` con el usuario `tienda` (creados por `infra/postgres/init.sql`).
-- **Documentación de la API:** http://localhost:8002/api/docs/ (botón **Authorize** para pegar un token)
+- **Documentación de la API:** http://localhost:8002/api/docs/ (botón **Authorize** para pegar el `access` del login de svc-usuarios)
 - **Salud:** `GET http://localhost:8002/salud/` → `{"estado": "ok"}`
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
@@ -47,23 +47,17 @@ Un cliente que pide el pedido o el item de carrito de otro recibe **404**, para 
 
 Filtros de `/productos/`: `categoria` (slug), `precio_min`, `precio_max`, `disponible` (`true`/`false`), `q` (busca en nombre y descripción) y, para administradores, `activo`. Orden con `ordering`: `precio`, `nombre`, `creado_en` (`-precio` para descendente). Paginación con `?page=`, 20 por página.
 
-## Autenticación y tokens de desarrollo
+## Autenticación
 
-svc-tienda valida el JWT con la llave pública, sin consultar svc-usuarios (ver [`comun/README.md`](../comun/README.md)). Mientras svc-usuarios no emite tokens (Entrega 3), se generan con **`infra/emitir_token.py`, que es solo para desarrollo y pruebas**. Firma con la llave privada de `infra/llaves/` y los mismos claims que emitirá svc-usuarios.
+svc-tienda valida el JWT con la llave pública, sin consultar svc-usuarios (ver [`comun/README.md`](../comun/README.md) y [`docs/contrato-identidad.md`](../docs/contrato-identidad.md)). El token sale de `POST http://localhost:8001/api/v1/auth/login/`; para desarrollo, `cargar_usuarios_demo` crea un cliente verificado, uno sin verificar y un administrador (ver el [README raíz](../README.md#iniciar-sesión-y-tokens)).
 
-Desde la raíz, con el venv de la raíz activo:
-
-```powershell
-python infra/emitir_token.py --usuario-id 10 --rol cliente                  # cliente verificado
-python infra/emitir_token.py --usuario-id 12 --rol cliente --sin-verificar  # no puede comprar
-python infra/emitir_token.py --usuario-id 1 --rol administrador --minutos 480
-```
-
-Opciones: `--usuario-id` (obligatorio), `--rol` (`cliente` o `administrador`), `--sin-verificar` y `--minutos` (vigencia, 60 por defecto). Pega el token en **Authorize** de `/api/docs/` o como `Authorization: Bearer <token>`.
+- `Carrito.usuario_id` y `Pedido.usuario_id` son el UUID del usuario (`user_id` del token), sin ForeignKey.
+- Comprar sin correo verificado responde **403** `email_no_verificado`.
+- `infra/emitir_token.py` queda solo para pruebas (por ejemplo, `--vencido`).
 
 ### `AUTH_ACTIVA=False`
 
-Solo en el `.env` local y solo con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Apaga las revisiones de rol: por ejemplo, el CRUD de categorías y productos acepta peticiones sin token. **Carrito y pedidos siguen respondiendo 401 sin token**, porque necesitan saber quién es el usuario; no hay usuario de desarrollo, usa `emitir_token.py`.
+Solo en el `.env` local y solo con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Apaga las revisiones de rol: por ejemplo, el CRUD de categorías y productos acepta peticiones sin token. **Carrito y pedidos siguen respondiendo 401 sin token**, porque necesitan saber quién es el usuario; no hay usuario de desarrollo: inicia sesión con una cuenta de demostración.
 
 ## Datos de demostración
 
@@ -82,6 +76,7 @@ Salen del `.env` de la raíz (ver [`.env.example`](../.env.example)).
 | `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS` | Django |
 | `AUTH_ACTIVA` | Revisión de roles (`True` por defecto) |
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar los JWT |
+| `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `POSTGRES_HOST`, `POSTGRES_PORT` | Servidor de PostgreSQL (`postgres`, `5432`) |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `tienda_db`, `tienda` y la contraseña de `.env`; docker-compose.yml los asigna |
 | `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | Costo de envío y monto a partir del cual es gratis (`150.00`, `1500.00`) |

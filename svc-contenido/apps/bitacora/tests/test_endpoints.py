@@ -10,7 +10,13 @@ URL = "/api/v1/bitacora/"
 def registrar(tipo: str, fecha: datetime, mongo_simulado) -> None:
     """Inserta un evento con una fecha fija (la API siempre usa la fecha actual)."""
     mongo_simulado["bitacora"].insert_one(
-        {"tipo": tipo, "usuario_id": 10, "servicio": "svc-tienda", "datos": {}, "fecha": fecha}
+        {
+            "tipo": tipo,
+            "usuario_id": "c1e2a3b4-0000-4000-8000-000000000010",
+            "servicio": "svc-tienda",
+            "datos": {},
+            "fecha": fecha,
+        }
     )
 
 
@@ -19,7 +25,7 @@ def test_registrar_evento(admin):
         URL,
         {
             "tipo": "pedido_creado",
-            "usuario_id": 10,
+            "usuario_id": "c1e2a3b4-0000-4000-8000-000000000010",
             "servicio": "svc-tienda",
             "datos": {"pedido_id": 7},
         },
@@ -31,6 +37,15 @@ def test_registrar_evento(admin):
     assert cuerpo["tipo"] == "pedido_creado"
     assert cuerpo["datos"] == {"pedido_id": 7}
     assert "fecha" in cuerpo
+
+
+def test_usuario_id_que_no_es_uuid_400(admin):
+    datos = {"tipo": "pedido_creado", "usuario_id": "diez", "servicio": "svc-tienda"}
+
+    respuesta = admin.post(URL, datos, format="json")
+
+    assert respuesta.status_code == 400
+    assert "usuario_id" in respuesta.json()["campos"]
 
 
 def test_evento_sin_usuario(admin):

@@ -8,7 +8,7 @@ se respetan. Estos valores no son secretos ni sirven fuera de las pruebas.
 import os
 
 _VALORES_DE_PRUEBA = {
-    "DJANGO_SECRET_KEY": "clave-solo-para-pruebas-no-es-secreta",
+    "DJANGO_SECRET_KEY": "clave-solo-para-pruebas-no-es-secreta-ni-sirve-fuera-de-pytest-7Qx",
     "POSTGRES_DB": "web_db",
     "POSTGRES_USER": "web",
     "POSTGRES_PASSWORD": "solo-para-pruebas",

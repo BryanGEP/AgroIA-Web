@@ -1,11 +1,14 @@
 """Validación del JWT RS256 con PyJWT y la llave pública (svc-ia no usa comun, que es de DRF).
 
-Mismas reglas que agroia_comun: emisor `agroia-usuarios`, vencimiento obligatorio,
-`token_type: "access"` y `user_id`. Sin token o token inválido: 401. Token sin un rol
-válido: 403, salvo con AUTH_ACTIVA=False, que solo apaga la revisión de rol: el token
-sigue siendo obligatorio porque las solicitudes son por usuario.
+Mismas reglas que agroia_comun (docs/contrato-identidad.md): emisor JWT_ISSUER
+(`agroia-usuarios` por defecto), vencimiento obligatorio, `token_type: "access"` y
+`user_id` que sea un UUID. Sin token o token inválido: 401. Token sin un rol válido: 403,
+salvo con AUTH_ACTIVA=False, que solo apaga la revisión de rol: el token sigue siendo
+obligatorio porque las solicitudes son por usuario. Los 401 y 403 se registran en el log
+de seguridad (app/errores.py).
 """
 
+import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -17,7 +20,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config import settings
 from app.errores import ErrorApi
 
-ISSUER = "agroia-usuarios"
 ROLES = ("cliente", "administrador")
 _ENCABEZADO = {"WWW-Authenticate": 'Bearer realm="api"'}
 
@@ -25,15 +27,15 @@ esquema_bearer = HTTPBearer(
     auto_error=False,
     scheme_name="jwtAuth",
     description=(
-        "Token de acceso RS256 emitido por svc-usuarios. En desarrollo: "
-        "`python infra/emitir_token.py --usuario-id 10 --rol cliente`."
+        "Token de acceso RS256: inicia sesión con POST /api/v1/auth/login/ de svc-usuarios "
+        "y pega aquí el `access`."
     ),
 )
 
 
 @dataclass(frozen=True)
 class Usuario:
-    id: int
+    id: str  # UUID en texto, como viene en el claim `user_id`
     rol: str | None
     email_verificado: bool
 
@@ -74,12 +76,12 @@ def usuario_autenticado(
             credenciales.credentials,
             llave,
             algorithms=["RS256"],
-            issuer=ISSUER,
+            issuer=settings.jwt_issuer,
             options={"require": ["exp", "iss", "jti"]},
         )
     except jwt.PyJWTError as error:
         raise _token_invalido() from error
-    if claims.get("token_type") != "access" or not isinstance(claims.get("user_id"), int):
+    if claims.get("token_type") != "access" or not _es_uuid(claims.get("user_id")):
         raise _token_invalido()
     return Usuario(
         id=claims["user_id"],
@@ -88,8 +90,20 @@ def usuario_autenticado(
     )
 
 
+def _es_uuid(valor) -> bool:
+    if not isinstance(valor, str):
+        return False
+    try:
+        uuid.UUID(valor)
+    except ValueError:
+        return False
+    return True
+
+
 def usuario_con_rol(usuario: Usuario = Depends(usuario_autenticado)) -> Usuario:
     """Pide un rol válido (cliente o administrador), como EsDuenoOAdmin en comun."""
     if settings.auth_activa and usuario.rol not in ROLES:
-        raise ErrorApi(403, "sin_permiso", "No tienes permiso para hacer esta acción.")
+        raise ErrorApi(
+            403, "sin_permiso", "No tienes permiso para hacer esta acción.", usuario_id=usuario.id
+        )
     return usuario

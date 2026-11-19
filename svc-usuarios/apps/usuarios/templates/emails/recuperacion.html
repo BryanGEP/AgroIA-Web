@@ -1,0 +1,8 @@
+{% extends "emails/base.html" %}
+{% block contenido %}
+<p>Hola, {{ nombre }}:</p>
+<p>Recibimos una solicitud para restablecer la contraseña de tu cuenta de AgroIA.</p>
+{% include "emails/_boton.html" with texto_boton="Restablecer mi contraseña" %}
+<p><strong>El enlace vence en 1 hora y solo se puede usar una vez.</strong></p>
+<p>Si no pediste este cambio, ignora este correo: tu contraseña no cambiará.</p>
+{% endblock %}

@@ -1,9 +1,12 @@
 """Permisos de DRF por rol, leídos del token (no de la base).
 
 Roles: `cliente` y `administrador`. Sin token, DRF responde 401; con token pero sin
-permiso, 403. Con AUTH_ACTIVA=False estas clases no revisan el rol, pero `IsAuthenticated`
-sigue pidiendo token donde el endpoint necesita saber quién es el usuario.
+permiso, 403 (`sin_permiso`, o el `code` propio de la clase, como `email_no_verificado`).
+Con AUTH_ACTIVA=False estas clases no revisan el rol, pero `IsAuthenticated` sigue
+pidiendo token donde el endpoint necesita saber quién es el usuario.
 """
+
+import uuid
 
 from django.conf import settings
 from rest_framework.permissions import BasePermission
@@ -23,9 +26,10 @@ def esta_autenticado(request: Request) -> bool:
     return bool(request.user and request.user.is_authenticated)
 
 
-def usuario_id(request: Request) -> int:
-    """Id del usuario del token (svc-usuarios). Solo llamar con el usuario autenticado."""
-    return int(request.user.id)
+def usuario_id(request: Request) -> uuid.UUID:
+    """Id (UUID) del usuario del token. Solo llamar con el usuario autenticado; la clase
+    de autenticación ya rechazó los tokens cuyo `user_id` no es un UUID."""
+    return uuid.UUID(str(request.user.id))
 
 
 def rol_de(request: Request) -> str | None:
@@ -70,6 +74,7 @@ class EsCliente(_PermisoPorRol):
 
 class CorreoVerificado(_PermisoPorRol):
     message = "Verifica tu correo para poder hacer esta acción."
+    code = "email_no_verificado"
 
     def cumple(self, request):
         return correo_verificado(request)
@@ -86,4 +91,4 @@ class EsDuenoOAdmin(_PermisoPorRol):
     def has_object_permission(self, request, view, obj) -> bool:
         if not _auth_activa():
             return True
-        return rol_de(request) == ADMINISTRADOR or obj.usuario_id == usuario_id(request)
+        return rol_de(request) == ADMINISTRADOR or str(obj.usuario_id) == str(usuario_id(request))

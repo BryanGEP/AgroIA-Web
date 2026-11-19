@@ -48,7 +48,7 @@ class MensajeSerializer(serializers.Serializer):
 
 RESUMEN = {
     "id": "6afe7fe1ae4b683f2b9e996f",
-    "usuario_id": 10,
+    "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
     "titulo": "Manchas en hojas",
     "creada_en": "2026-11-18T22:49:37-06:00",
     "actualizada_en": "2026-11-18T22:50:02-06:00",
@@ -60,7 +60,7 @@ RESUMEN = {
 )
 class ConversacionResumenSerializer(serializers.Serializer):
     id = serializers.CharField(source="_id", read_only=True)
-    usuario_id = serializers.IntegerField(read_only=True)
+    usuario_id = serializers.UUIDField(read_only=True)
     titulo = serializers.CharField(read_only=True)
     creada_en = serializers.DateTimeField(read_only=True)
     actualizada_en = serializers.DateTimeField(read_only=True)

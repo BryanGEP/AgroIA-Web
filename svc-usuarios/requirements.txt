@@ -10,3 +10,8 @@ psycopg[binary]==3.3.6
 djangorestframework-simplejwt==5.5.1
 PyJWT==2.15.1
 cryptography==50.0.2
+
+# Entrega 3: bloqueo por intentos fallidos (correo + IP) y caché en Redis para el
+# límite de intentos de DRF (django.core.cache.backends.redis.RedisCache).
+django-axes==8.3.1
+redis==8.1.0
