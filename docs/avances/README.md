@@ -9,3 +9,4 @@ Un documento por fase o avance grande: qué se construyó, decisiones, verificac
 | 2 · API de la tienda | 2026-10-22 | [fase-2-tienda.md](fase-2-tienda.md) | Entrega 2 |
 | 3 · API de contenido e IA | 2026-10-22 | [fase-3-contenido-ia.md](fase-3-contenido-ia.md) | Entrega 2 |
 | Web · Base del gateway y catálogo público | 2026-10-22 | [web-base-catalogo.md](web-base-catalogo.md) | Entrega 2 |
+| Calidad · Revisión final y documento de la entrega | 2026-11-18 | [entregable-2.md](../entregable-2.md) | Entrega 2 |
