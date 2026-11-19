@@ -1,13 +1,16 @@
 """Formato común de errores, igual que en los servicios Django (agroia_comun.errores).
 
 `{"error": "codigo_corto", "detalle": "mensaje"}`; los errores de validación agregan
-`"campos"` y responden 400 (FastAPI usaría 422).
+`"campos"` y responden 400 (FastAPI usaría 422). Los 401 y 403 se registran como
+`acceso_denegado` en el log de seguridad (app/eventos.py).
 """
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.eventos import registrar_evento
 
 
 class ErrorApi(Exception):
@@ -18,8 +21,10 @@ class ErrorApi(Exception):
         detalle: str,
         headers: dict[str, str] | None = None,
         campos: dict[str, list[str]] | None = None,
+        usuario_id: str | None = None,
     ):
         super().__init__(detalle)
+        self.usuario_id = usuario_id
         self.status = status
         self.codigo = codigo
         self.detalle = detalle
@@ -41,6 +46,14 @@ def _campos(error: RequestValidationError) -> dict[str, list[str]]:
 def registrar_manejadores(app: FastAPI) -> None:
     @app.exception_handler(ErrorApi)
     async def error_api(request: Request, exc: ErrorApi) -> JSONResponse:
+        if exc.status in (401, 403):
+            registrar_evento(
+                "acceso_denegado",
+                request,
+                usuario_id=exc.usuario_id,
+                estado=exc.status,
+                error=exc.codigo,
+            )
         cuerpo = {"error": exc.codigo, "detalle": exc.detalle}
         if exc.campos:
             cuerpo["campos"] = exc.campos

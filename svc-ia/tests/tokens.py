@@ -1,4 +1,4 @@
-"""Llaves y tokens para las pruebas de svc-ia (mismos claims que emitirá svc-usuarios)."""
+"""Llaves y tokens para las pruebas de svc-ia (mismos claims que emite svc-usuarios)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -25,9 +25,13 @@ def generar_par_de_llaves() -> tuple[str, str]:
 
 LLAVE_PRIVADA, LLAVE_PUBLICA = generar_par_de_llaves()
 
+CLIENTE_ID = "c1e2a3b4-0000-4000-8000-000000000010"
+OTRO_CLIENTE_ID = "c1e2a3b4-0000-4000-8000-000000000011"
+ADMIN_ID = "a0d1e2f3-0000-4000-8000-000000000001"
+
 
 def firmar_token(
-    usuario_id: int = 10,
+    usuario_id: str = CLIENTE_ID,
     rol: str | None = "cliente",
     minutos: int = 15,
     llave: str = LLAVE_PRIVADA,
