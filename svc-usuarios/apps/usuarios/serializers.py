@@ -73,6 +73,19 @@ class RegistroSerializer(serializers.Serializer):
         return datos
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Cuenta creada",
+            value={
+                "id": 8,
+                "email": "maria.lopez@example.com",
+                "mensaje": "Cuenta creada. Revisa tu correo para verificar tu cuenta.",
+            },
+            response_only=True,
+        )
+    ]
+)
 class RegistroRespuestaSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     email = serializers.EmailField()
@@ -85,7 +98,24 @@ class RegistroRespuestaSerializer(serializers.Serializer):
             "Editar perfil",
             value={"nombre": "María", "apellidos": "López Ramírez", "telefono": "3531234567"},
             request_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Perfil",
+            value={
+                "id": 8,
+                "email": "maria.lopez@example.com",
+                "nombre": "María",
+                "apellidos": "López Ramírez",
+                "telefono": "3531234567",
+                "rol": "cliente",
+                "email_verificado": False,
+                "tiene_2fa": False,
+                "acepto_privacidad_en": "2026-11-18T22:50:07-06:00",
+                "version_privacidad": "2026-10",
+                "date_joined": "2026-11-18T22:50:07-06:00",
+            },
+            response_only=True,
+        ),
     ]
 )
 class PerfilSerializer(serializers.ModelSerializer):
@@ -134,7 +164,24 @@ class PerfilSerializer(serializers.ModelSerializer):
                 "predeterminada": True,
             },
             request_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Dirección guardada",
+            value={
+                "id": 10,
+                "alias": "Huerta",
+                "calle": "Camino a La Palma",
+                "numero": "km 3",
+                "colonia": "La Palma",
+                "municipio": "Jiquilpan",
+                "estado": "Michoacán",
+                "codigo_postal": "59510",
+                "referencias": "Portón verde",
+                "predeterminada": True,
+                "creada_en": "2026-11-18T22:50:10-06:00",
+            },
+            response_only=True,
+        ),
     ]
 )
 class DireccionSerializer(serializers.ModelSerializer):
@@ -156,6 +203,25 @@ class DireccionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "creada_en"]
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Usuario",
+            value={
+                "id": 8,
+                "email": "maria.lopez@example.com",
+                "nombre": "María",
+                "apellidos": "López Ramírez",
+                "telefono": "3531234567",
+                "rol": "cliente",
+                "email_verificado": False,
+                "is_active": True,
+                "date_joined": "2026-11-18T22:50:07-06:00",
+            },
+            response_only=True,
+        )
+    ]
+)
 class UsuarioAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario

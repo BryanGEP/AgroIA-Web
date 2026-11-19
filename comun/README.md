@@ -8,6 +8,7 @@ Código que comparten los servicios Django (`web`, `svc-usuarios`, `svc-tienda` 
 | `autenticacion.py` | `AutenticacionJWT`: valida el JWT RS256 con la llave pública, sin consultar svc-usuarios. Registra el esquema Bearer en Swagger |
 | `permisos.py` | `EsAdministrador`, `EsCliente`, `CorreoVerificado`, `EsDuenoOAdmin` y los helpers `usuario_id`, `rol_de`, `es_administrador` |
 | `errores.py` | Manejador de excepciones con el formato común y `ErrorDeNegocio` para las reglas de negocio |
+| `openapi.py` | Hook de drf-spectacular `documentar_errores`: agrega a cada respuesta de error de Swagger el esquema común y un ejemplo por código |
 | `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` |
 
 ## Cómo se usa en un servicio
@@ -26,7 +27,17 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "agroia_comun.errores.manejador_de_excepciones",
     ...
 }
+
+SPECTACULAR_SETTINGS = {
+    ...,
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "agroia_comun.openapi.documentar_errores",
+    ],
+}
 ```
+
+En Swagger, cada vista declara sus errores solo con una descripción, por ejemplo `409: OpenApiResponse(description="`stock_insuficiente` o `producto_no_disponible`.")`. El hook agrega el esquema `Error` y un ejemplo por cada código conocido que aparezca entre comillas invertidas (o el código por omisión del estado HTTP). Para un código de negocio nuevo, agrega su mensaje de ejemplo en `DETALLES`.
 
 En las vistas: `permission_classes = [IsAuthenticated, EsCliente, CorreoVerificado]`, `usuario_id(request)` para el id del usuario y `raise ErrorDeNegocio("stock_insuficiente", "mensaje")` desde `servicios.py`. Los endpoints públicos declaran `AllowAny`.
 
@@ -35,7 +46,7 @@ En las vistas: `permission_classes = [IsAuthenticated, EsCliente, CorreoVerifica
 - El token se firma en svc-usuarios con la llave privada (RS256, emisor `agroia-usuarios`). Cada servicio recibe solo la llave pública (`JWT_PUBLIC_KEY_PATH`, montada en `/run/secrets/jwt_publica.pem`).
 - Se valida la firma, el vencimiento, el emisor y que sea un token de acceso (`token_type: "access"`). Los claims que se leen son `user_id`, `rol` y `email_verificado`.
 - Sin token: **401** (`no_autenticado`). Token inválido o vencido: **401** (`token_invalido`). Rol equivocado, token sin `rol` o correo sin verificar donde se pide: **403** (`sin_permiso`).
-- Todavía no se revisa `token_version` (cerrar sesión en todos los dispositivos): necesita a svc-usuarios y llega en la fase 4.
+- Todavía no se revisa `token_version` (cerrar sesión en todos los dispositivos): necesita a svc-usuarios y llega en la Entrega 3 (fase 4 del plan).
 
 ### `AUTH_ACTIVA`
 

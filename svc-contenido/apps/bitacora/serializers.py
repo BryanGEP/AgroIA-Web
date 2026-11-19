@@ -16,7 +16,19 @@ from rest_framework import serializers
                 "datos": {"pedido_id": 7, "total": "840.50"},
             },
             request_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Evento guardado",
+            value={
+                "id": "6afe8007ae4b683f2b9e9973",
+                "tipo": "pedido_creado",
+                "usuario_id": 10,
+                "servicio": "svc-tienda",
+                "datos": {"pedido_id": 7, "total": "840.50"},
+                "fecha": "2026-11-18T22:50:15-06:00",
+            },
+            response_only=True,
+        ),
     ]
 )
 class EventoSerializer(serializers.Serializer):

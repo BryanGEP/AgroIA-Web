@@ -15,7 +15,18 @@ from apps.catalogo.models import Categoria, Producto
                 "descripcion": "Control de antracnosis, roña y otras enfermedades.",
             },
             request_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Categoría guardada",
+            value={
+                "id": 1,
+                "nombre": "Fungicidas",
+                "slug": "fungicidas",
+                "descripcion": "Control de antracnosis, roña y otras enfermedades.",
+                "activa": True,
+            },
+            response_only=True,
+        ),
     ]
 )
 class CategoriaSerializer(serializers.ModelSerializer):
@@ -55,7 +66,29 @@ class CategoriaSerializer(serializers.ModelSerializer):
                 },
             },
             request_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Producto guardado",
+            value={
+                "id": 1,
+                "nombre": "Oxicloruro de cobre 50% PH 1 kg",
+                "slug": "oxicloruro-de-cobre-50-ph-1-kg",
+                "categoria": "fungicidas",
+                "descripcion": "Fungicida preventivo de contacto para antracnosis y roña.",
+                "precio": "245.00",
+                "stock": 30,
+                "unidad": "kg",
+                "imagen": None,
+                "ficha_tecnica": {
+                    "ingrediente_activo": "Oxicloruro de cobre 50%",
+                    "presentacion": "Bolsa de 1 kg",
+                },
+                "activo": True,
+                "disponible": True,
+                "creado_en": "2026-10-22T16:08:35-06:00",
+            },
+            response_only=True,
+        ),
     ]
 )
 class ProductoSerializer(serializers.ModelSerializer):
