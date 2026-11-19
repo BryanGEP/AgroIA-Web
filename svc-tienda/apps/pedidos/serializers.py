@@ -41,6 +41,36 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
         return f"{item.producto.precio * item.cantidad:.2f}"
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Carrito",
+            value={
+                "id": 1,
+                "items": [
+                    {
+                        "id": 4,
+                        "producto": {
+                            "slug": "oxicloruro-de-cobre-50-ph-1-kg",
+                            "nombre": "Oxicloruro de cobre 50% PH 1 kg",
+                            "precio": "245.00",
+                            "unidad": "kg",
+                            "imagen": None,
+                            "stock": 30,
+                        },
+                        "cantidad": 3,
+                        "importe": "735.00",
+                    }
+                ],
+                "subtotal": "735.00",
+                "envio": "150.00",
+                "total": "885.00",
+                "actualizado_en": "2026-11-18T22:50:12-06:00",
+            },
+            response_only=True,
+        )
+    ]
+)
 class CarritoSerializer(serializers.ModelSerializer):
     """Carrito con totales estimados con los precios actuales."""
 
@@ -130,6 +160,36 @@ class ItemPedidoSerializer(serializers.ModelSerializer):
         fields = ["id", "producto", "nombre_producto", "precio_unitario", "cantidad", "importe"]
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Pedido",
+            value={
+                "id": 12,
+                "usuario_id": 10,
+                "estado": "pendiente",
+                "direccion_envio": EJEMPLO_DIRECCION,
+                "items": [
+                    {
+                        "id": 13,
+                        "producto": "oxicloruro-de-cobre-50-ph-1-kg",
+                        "nombre_producto": "Oxicloruro de cobre 50% PH 1 kg",
+                        "precio_unitario": "245.00",
+                        "cantidad": 3,
+                        "importe": "735.00",
+                    }
+                ],
+                "subtotal": "735.00",
+                "envio": "150.00",
+                "total": "885.00",
+                "metodo_pago": "tarjeta",
+                "pago_simulado": True,
+                "creado_en": "2026-11-18T22:50:13-06:00",
+            },
+            response_only=True,
+        )
+    ]
+)
 class PedidoSerializer(serializers.ModelSerializer):
     items = ItemPedidoSerializer(many=True, read_only=True)
     pago_simulado = serializers.SerializerMethodField(

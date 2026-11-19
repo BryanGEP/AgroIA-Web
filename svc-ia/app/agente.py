@@ -3,21 +3,16 @@
 Traduce el contrato de AgroIA-Web a la API real del agente:
 
     AgroIA-Web  POST /agente/preguntar/  {"pregunta", "historial": [{"rol", "texto"}]}
-    agente      POST /chat               {"message", "session_id"} -> {"response", "session_id"}
+    agente      POST /chat               {"message", "history": [{"role", "content"}]}
+                                         -> {"response", "session_id", "fuentes"}
 
-El agente guarda memoria propia por `session_id` y no recibe historial. Como las
-conversaciones las guarda svc-contenido y svc-ia no guarda nada, cada petición usa un
-`session_id` nuevo y las últimas entradas del historial viajan como un bloque de
-contexto dentro del mensaje. Cuando el agente acepte historial, solo cambia
-`construir_mensaje`.
-
-Pendiente en el repo AgroIA (antes de la Entrega 5): el agente nunca borra las sesiones
-de su memoria, así que con un `session_id` por petición esa memoria crece sin límite
-mientras el contenedor siga vivo.
+El agente es sin estado cuando recibe `history`: responde con ese contexto y no guarda
+nada. Por eso svc-ia siempre manda `history` (aunque sea vacío) y no usa `session_id`:
+las conversaciones las guarda svc-contenido. `fuentes` son las referencias de la base de
+conocimiento del agente (RAG) que usó para responder; puede venir vacía.
 """
 
 import logging
-import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -28,7 +23,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 MAX_HISTORIAL = 10
-ETIQUETAS = {"usuario": "Productor", "agente": "AgroIA"}
+ROLES = {"usuario": "user", "agente": "assistant"}
 
 
 class AgenteNoDisponible(Exception):
@@ -41,17 +36,21 @@ class RespuestaDelAgente:
     fuentes: list[str] = field(default_factory=list)
 
 
-def construir_mensaje(pregunta: str, historial: list[dict]) -> str:
-    """Mensaje para el agente: la pregunta, precedida del contexto reciente si lo hay."""
+def construir_cuerpo(pregunta: str, historial: list[dict]) -> dict:
+    """Cuerpo para `POST /chat`: la pregunta y las últimas entradas del historial."""
     recientes = historial[-MAX_HISTORIAL:]
-    if not recientes:
-        return pregunta
-    lineas = [f"{ETIQUETAS[m['rol']]}: {m['texto']}" for m in recientes]
-    return (
-        "Contexto de la conversación anterior:\n"
-        + "\n".join(lineas)
-        + f"\n\nPregunta actual: {pregunta}"
-    )
+    return {
+        "message": pregunta,
+        "history": [{"role": ROLES[m["rol"]], "content": m["texto"]} for m in recientes],
+    }
+
+
+def leer_fuentes(datos: dict) -> list[str]:
+    """Las fuentes del agente, solo si son una lista de textos; si no, se ignoran."""
+    fuentes = datos.get("fuentes")
+    if not isinstance(fuentes, list):
+        return []
+    return [f for f in fuentes if isinstance(f, str) and f.strip()]
 
 
 class ClienteAgente:
@@ -59,9 +58,8 @@ class ClienteAgente:
         self.http = cliente_http
 
     def preguntar(self, pregunta: str, historial: list[dict]) -> RespuestaDelAgente:
-        cuerpo = {"message": construir_mensaje(pregunta, historial), "session_id": uuid.uuid4().hex}
         try:
-            respuesta = self.http.post("/chat", json=cuerpo)
+            respuesta = self.http.post("/chat", json=construir_cuerpo(pregunta, historial))
         except httpx.TimeoutException as error:
             logger.warning("El agente tardó más de %s s", settings.agente_timeout)
             raise AgenteNoDisponible("tiempo_agotado") from error
@@ -73,13 +71,13 @@ class ClienteAgente:
             logger.warning("El agente respondió %s", respuesta.status_code)
             raise AgenteNoDisponible("error_del_agente")
         try:
-            texto = respuesta.json().get("response")
+            datos = respuesta.json()
         except ValueError as error:
             raise AgenteNoDisponible("respuesta_invalida") from error
+        texto = datos.get("response") if isinstance(datos, dict) else None
         if not isinstance(texto, str) or not texto.strip():
             raise AgenteNoDisponible("respuesta_vacia")
-        # El agente todavía no tiene RAG: no devuelve fuentes.
-        return RespuestaDelAgente(respuesta=texto, fuentes=[])
+        return RespuestaDelAgente(respuesta=texto, fuentes=leer_fuentes(datos))
 
 
 def obtener_agente() -> Iterator[ClienteAgente]:

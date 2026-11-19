@@ -14,10 +14,10 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
 | `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
 | `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django. | — | — | [README](comun/README.md) |
-| `infra/` | `postgres/init.sql` (bases y usuarios) y `generar_llaves.py` (llaves JWT). | — | — | — |
+| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT) y `emitir_token.py` (tokens de desarrollo). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
-Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), y el contenedor **`agente`**: el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA), que Docker Compose construye directamente desde GitHub (carpeta `svc-agente`, rama `main`). Solo está en la red interna; se publica en `127.0.0.1:8005` para pruebas.
+Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), y **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector). En total, diez contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
 
 ## Requisitos
 
@@ -30,8 +30,8 @@ Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7
 Desde la raíz del repo, en PowerShell:
 
 ```powershell
-# 1. Variables de entorno: copia el ejemplo y cambia las contraseñas y la DJANGO_SECRET_KEY.
-#    Pon tu propia GROQ_API_KEY (ver "Llave de Groq").
+# 1. Variables de entorno: copia el ejemplo y cambia las contraseñas (también
+#    AGENTE_DB_PASSWORD) y la DJANGO_SECRET_KEY. Pon tu propia GROQ_API_KEY (ver "Llave de Groq").
 Copy-Item .env.example .env
 
 # 2. Llaves JWT (se crean en infra/llaves/, que nunca se sube al repo).
@@ -41,8 +41,23 @@ python infra/generar_llaves.py
 docker run --rm -v "${PWD}:/repo" -w /repo python:3.12-slim sh -c "pip install -q cryptography==50.0.2 && python infra/generar_llaves.py"
 
 # 3. Construir y levantar todo (la primera vez descarga el agente desde GitHub).
-docker compose up --build
+docker compose up --build -d
+
+# 4. Cargar la base de conocimiento del agente (una vez; ver abajo).
+docker compose run --rm agente python -m ingesta.cargar
+
+# 5. Opcional: productos de demostración para la tienda.
+docker compose exec svc-tienda python manage.py cargar_datos_demo
 ```
+
+### Base de conocimiento del agente
+
+El agente responde las preguntas técnicas buscando en su base de conocimiento (11 documentos sobre enfermedades, riego, suelo y manejo del aguacate, que vienen dentro de su imagen) y devuelve las fuentes que usó. Esa base vive en el contenedor `agente-db` (PostgreSQL con pgvector) y se llena con el paso 4:
+
+- **La primera vez descarga unos 471 MB**: el modelo de embeddings `intfloat/multilingual-e5-small` (Hugging Face, sin llave). Queda en el volumen `modelos_hf` y no se vuelve a bajar. En nuestra máquina la primera ingesta tardó **unos 40 s** con la descarga y las siguientes **unos 11 s**.
+- **Se puede repetir sin duplicar**: cada corrida recrea la colección (71 fragmentos). Córrela otra vez cuando cambie la base de conocimiento en el repo AgroIA, después de `docker compose build --no-cache agente`.
+- **Sin ingesta el sistema funciona igual**: el agente responde, pero avisa que no pudo consultar su base y `fuentes` llega vacía.
+- `AGENTE_DB_PASSWORD` solo se usa la primera vez que se crea el volumen `agente_db_datos`. Si la cambias después, bórralo con `docker volume rm agroia-web_agente_db_datos` y repite el paso 4.
 
 ### Llave de Groq
 
@@ -66,7 +81,7 @@ Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /sal
 | svc-ia | http://localhost:8004/salud/ | http://localhost:8004/api/docs/ |
 | agente (solo pruebas) | http://localhost:8005/health | — (chat propio en http://localhost:8005/) |
 
-Los puertos (también 5432, 27017 y 6379 de las bases) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`.
+Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`.
 
 ### Bases de datos
 
@@ -85,8 +100,6 @@ Los puertos (también 5432, 27017 y 6379 de las bases) solo se publican en `127.
 Mientras svc-usuarios no emite tokens (Entrega 3), los endpoints protegidos se prueban con tokens firmados por `infra/emitir_token.py`. **Es solo para desarrollo y pruebas**: firma con la llave privada local y los mismos claims que emitirá svc-usuarios.
 
 Para probar con un usuario real, regístralo con `POST http://localhost:8001/api/v1/auth/registro/` y usa el `id` que devuelve como `--usuario-id` (ver el [README de svc-usuarios](svc-usuarios/README.md#probar-con-un-usuario-real)). Los servicios que no consultan a svc-usuarios (tienda, contenido, IA) aceptan cualquier id.
-
-> **Al bajar la fase 1 de usuarios**, cada integrante debe reiniciar una vez `usuarios_db` (ver el [README de svc-usuarios](svc-usuarios/README.md)), sin `docker compose down -v`.
 
 ```powershell
 python infra/emitir_token.py --usuario-id 10 --rol cliente
@@ -137,11 +150,14 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - [Bitácora diaria](docs/bitacora.md): qué hizo cada integrante por sesión; evidencia de los dailies para Jira.
 - [CLAUDE.md](CLAUDE.md): reglas que siempre se respetan (resumen para Claude Code y para el equipo).
 - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
+- [Documento del Entregable 2](docs/entregable-2.md)
 
 ## Entregas
 
 - **Entrega 1:** fundamentos y planeación del proyecto (equipo y roles Scrum, definición del proyecto, arquitectura, configuración de Jira y estándares de trabajo).
   - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
+- **Entrega 2:** microservicios con Django/DRF y FastAPI, PostgreSQL y MongoDB, integración con el agente de IA, pruebas, Swagger, Postman y Docker Compose.
+  - [Documento del Entregable 2](docs/entregable-2.md)
 
 ## Cómo contribuir
 

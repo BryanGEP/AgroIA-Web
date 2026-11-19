@@ -113,6 +113,7 @@ class PerfilView(APIView):
     ),
     retrieve=extend_schema(
         summary="Ver una dirección",
+        description="Solo una dirección propia; la de otro usuario responde 404.",
         responses={200: DireccionSerializer, **SIN_TOKEN, **SIN_ROL, **NO_ENCONTRADO},
     ),
     create=extend_schema(

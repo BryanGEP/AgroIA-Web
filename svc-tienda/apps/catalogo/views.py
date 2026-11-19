@@ -14,6 +14,8 @@ ERRORES_ADMIN = {
     403: OpenApiResponse(description="El usuario no es administrador."),
 }
 NO_ENCONTRADO = {404: OpenApiResponse(description="No existe o no está activo.")}
+PAGINA_INEXISTENTE = {404: OpenApiResponse(description="La página pedida no existe.")}
+FILTRO_INVALIDO = {400: OpenApiResponse(description="Filtro con un valor inválido (`validacion`).")}
 
 
 class _SoloAdminEscribe:
@@ -32,6 +34,7 @@ class _SoloAdminEscribe:
         summary="Listar categorías",
         description="Público. Solo categorías activas; el administrador ve también las inactivas.",
         auth=[],
+        responses={200: CategoriaSerializer(many=True), **PAGINA_INEXISTENTE},
     ),
     retrieve=extend_schema(
         summary="Ver una categoría", auth=[], responses={200: CategoriaSerializer, **NO_ENCONTRADO}
@@ -82,6 +85,7 @@ class CategoriaViewSet(_SoloAdminEscribe, viewsets.ModelViewSet):
             "El público solo ve productos activos de categorías activas."
         ),
         auth=[],
+        responses={200: ProductoSerializer(many=True), **FILTRO_INVALIDO, **PAGINA_INEXISTENTE},
     ),
     retrieve=extend_schema(
         summary="Ver un producto por slug",

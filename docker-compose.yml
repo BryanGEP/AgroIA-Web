@@ -1,4 +1,5 @@
-# Entorno local de AgroIA-Web: cinco servicios propios y tres de infraestructura.
+# Entorno local de AgroIA-Web: cinco servicios propios, el agente (repo AgroIA) con su
+# base de conocimiento (agente-db) y tres de infraestructura: diez contenedores.
 #
 #   docker compose up --build
 #
@@ -176,6 +177,20 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-groq}
       LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      # Base de conocimiento del agente (RAG): su propia base en agente-db.
+      POSTGRES_HOST: agente-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: conocimiento
+      POSTGRES_USER: agroia
+      POSTGRES_PASSWORD: ${AGENTE_DB_PASSWORD:?Falta AGENTE_DB_PASSWORD en .env}
+      DATABASE_URL: ""
+      # El modelo de embeddings (~471 MB) se descarga una vez y queda en el volumen.
+      HF_HOME: /cache/huggingface
+    volumes:
+      - modelos_hf:/cache/huggingface
+    depends_on:
+      agente-db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8005:8000"
     healthcheck:
@@ -219,6 +234,25 @@ services:
       start_period: 10s
     networks: [agroia]
 
+  # Base de conocimiento del agente: PostgreSQL con pgvector. Es del agente, separada del
+  # contenedor postgres de los servicios; solo en la red interna (para depurar:
+  # docker compose exec agente-db psql -U agroia -d conocimiento). Se llena una vez con
+  #   docker compose run --rm agente python -m ingesta.cargar
+  agente-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: conocimiento
+      POSTGRES_USER: agroia
+      POSTGRES_PASSWORD: ${AGENTE_DB_PASSWORD:?Falta AGENTE_DB_PASSWORD en .env}
+    volumes:
+      - agente_db_datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agroia -d conocimiento"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [agroia]
+
   mongo:
     image: mongo:7
     volumes:
@@ -254,6 +288,8 @@ secrets:
 volumes:
   postgres_datos:
   mongo_datos:
+  agente_db_datos:
+  modelos_hf:
 
 networks:
   agroia:

@@ -2,7 +2,7 @@ import json
 import math
 
 from django.core.files.storage import default_storage
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import OpenApiExample, extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 CLASES = ["sano", "rona", "antracnosis"]
@@ -57,6 +57,24 @@ class CrearDiagnosticoSerializer(serializers.Serializer):
         return datos
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Diagnóstico",
+            value={
+                "id": "6adad34bdf98ab47ebafa190",
+                "usuario_id": 10,
+                "imagen_url": "http://127.0.0.1:8003/media/diagnosticos/449afb67798e4a89af85ed31976fbf04.png",
+                "clase": "antracnosis",
+                "confianza": 0.91,
+                "probabilidades": {"sano": 0.03, "rona": 0.06, "antracnosis": 0.91},
+                "modelo_version": "v1",
+                "creado_en": "2026-10-22T21:23:55-06:00",
+            },
+            response_only=True,
+        )
+    ]
+)
 class DiagnosticoSerializer(serializers.Serializer):
     id = serializers.CharField(source="_id", read_only=True)
     usuario_id = serializers.IntegerField(read_only=True)

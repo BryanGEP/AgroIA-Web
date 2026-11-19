@@ -143,4 +143,9 @@ SPECTACULAR_SETTINGS = {
     # Esquemas separados de entrada y salida (necesario para subir la imagen con multipart).
     "COMPONENT_SPLIT_REQUEST": True,
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
+    # Esquema y ejemplos comunes en las respuestas de error (ver agroia_comun/openapi.py).
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "agroia_comun.openapi.documentar_errores",
+    ],
 }
