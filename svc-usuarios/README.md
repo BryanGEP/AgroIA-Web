@@ -10,9 +10,9 @@ Registro, perfil, direcciones y roles de los usuarios. En la Entrega 2 es la ver
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md); detalle de cada tarea de autenticación en [`docs/requerimientos-autenticacion.md`](../docs/requerimientos-autenticacion.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
 
-## ⚠️ Una vez al bajar esta rama: reiniciar `usuarios_db`
+## Solo si tu `usuarios_db` es de antes de la fase 1: reiniciarla
 
-En la fase 0, svc-usuarios migró `usuarios_db` con el usuario estándar de Django. Ahora usa su propio modelo (`AUTH_USER_MODEL = "usuarios.Usuario"`), y Django no permite cambiarlo sobre una base ya migrada. **Cada integrante debe hacer este reinicio una sola vez** al bajar la rama `feat/fase-1-usuarios-basico` (o `develop` después de fusionarla). Solo vacía `usuarios_db`; `tienda_db`, `web_db` y MongoDB no se tocan.
+Quien clona el repo ahora no necesita esto. En la fase 0 (octubre de 2026), svc-usuarios migró `usuarios_db` con el usuario estándar de Django; desde la fase 1 usa su propio modelo (`AUTH_USER_MODEL = "usuarios.Usuario"`), y Django no permite cambiarlo sobre una base ya migrada. Si tu volumen de PostgreSQL viene de antes, haz este reinicio una sola vez. Solo vacía `usuarios_db`; `tienda_db`, `web_db` y MongoDB no se tocan.
 
 ```powershell
 # 1. Detener solo svc-usuarios
@@ -21,11 +21,11 @@ docker compose stop svc-usuarios
 # 2. Vaciar usuarios_db como su dueño
 docker compose exec postgres psql -U usuarios -d usuarios_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION pg_database_owner; GRANT USAGE ON SCHEMA public TO PUBLIC;"
 
-# 4. Arrancar: el contenedor aplica las migraciones nuevas
+# 3. Arrancar: el contenedor aplica las migraciones nuevas
 docker compose up -d --build svc-usuarios
 ```
 
-El paso 3 (`makemigrations`) solo lo hizo quien implementó la fase: la migración ya viene en el repo. **No uses `docker compose down -v`**: borra también los datos de la tienda y de MongoDB.
+La migración ya viene en el repo. **No uses `docker compose down -v`**: borra también los datos de la tienda y de MongoDB.
 
 Si al arrancar ves `InconsistentMigrationHistory` o `relation "usuarios_usuario" does not exist`, es que falta este reinicio.
 

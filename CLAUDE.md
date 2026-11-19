@@ -31,6 +31,8 @@ Si algo de este archivo contradice esos documentos, gana este archivo; avisa de 
 
 Dentro de Docker cada servicio escucha en el puerto 8000 y se llama por su nombre (`http://svc-tienda:8000`).
 
+Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), más `postgres`, `mongo` y `redis`: diez contenedores.
+
 ## Estructura
 
 ```text
@@ -67,7 +69,7 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 
 ## Convenciones de API
 
-- Rutas bajo `/api/v1/`, documentación en `/api/docs/`, salud en `GET /salud/` → `{"estado": "ok"}`.
+- Rutas bajo `/api/v1/`, documentación en `/api/docs/`, salud en `GET /salud/` → `{"estado": "ok"}`. Excepción: `svc-ia` (FastAPI) expone sus rutas sin prefijo (`/agente/preguntar/`, `/diagnostico/`, `/solicitudes/<id>/`), como dice su contrato en la definición técnica; no las cambies.
 - Errores: `{"error": "codigo_corto", "detalle": "mensaje para el usuario"}`.
 - Listados paginados con `?page=` (20 por página), filtros con django-filter.
 - `ViewSet` + router para CRUD; `APIView` solo para acciones que no son CRUD.

@@ -1,6 +1,6 @@
 # AgroIA-Web · Definición técnica
 
-Oct 22, 2026 · @bry
+Aprobada el 22 de octubre de 2026 · actualizada el 18 de noviembre de 2026 (revisión de calidad de la Entrega 2)
 
 ## Stack decidido
 
@@ -31,13 +31,35 @@ Fuentes: [ciclo de soporte de Django](https://versionlog.com/django/), [django-t
 
 ## Arquitectura
 
-&#91;embedded content: arquitectura de AgroIA-Web · gateway, 4 servicios y sus datos\]
+```mermaid
+flowchart LR
+    nav([Navegador]) --> web
+    subgraph red["Red interna de Docker"]
+        web["web · gateway<br/>Django + plantillas"]
+        usu["svc-usuarios<br/>Django"]
+        tie["svc-tienda<br/>Django"]
+        con["svc-contenido<br/>Django"]
+        ia["svc-ia<br/>FastAPI"]
+        age["agente<br/>repo AgroIA"]
+        adb[("agente-db<br/>pgvector · conocimiento")]
+        pg[("postgres<br/>usuarios_db · tienda_db · web_db")]
+        mo[("mongo<br/>contenido")]
+        re[("redis")]
+        web -->|HTTP + JWT| usu & tie & con & ia
+        ia -->|POST /chat| age
+        age -->|RAG| adb
+        usu & tie & web --> pg
+        con --> mo
+        usu & web -.-> re
+    end
+    age -->|LLM| groq([Groq])
+```
 
 El gateway es el único punto de entrada: recibe al navegador y reparte cada petición al servicio que corresponde con el JWT del usuario. Ningún servicio lee la base de otro.
 
 ## Servicios
 
-Son cinco servicios propios, el contenedor `agente` (construido desde el repo AgroIA) y tres de infraestructura. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
+Son cinco servicios propios, el contenedor `agente` (construido desde el repo AgroIA) con su base de conocimiento `agente-db`, y tres de infraestructura: diez contenedores. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
 
 | Servicio | Responsabilidad | Base de datos | Puerto local | Pieza del maestro |
 | --- | --- | --- | --- | --- |
@@ -46,7 +68,8 @@ Son cinco servicios propios, el contenedor `agente` (construido desde el repo Ag
 | `svc-tienda` | Categorías, productos, stock, carrito y pedidos | PostgreSQL `tienda_db` | 8002 | Negocio principal |
 | `svc-contenido` | Conversaciones con el agente, historial de diagnósticos y bitácora de actividad | MongoDB `contenido` | 8003 | Datos no estructurados |
 | `svc-ia` | Adaptador: traduce el contrato al agente y clasifica imágenes de aguacate (modelo pendiente) | ninguna | 8004 | Integración de IA |
-| `agente` | Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (`main:svc-agente`). Solo red interna | ninguna | 8005 (solo pruebas) | — |
+| `agente` | Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (`main:svc-agente`): LangChain + Groq con herramientas (RAG, reglas y Bayes). Solo red interna | PostgreSQL + pgvector `conocimiento` (en `agente-db`) | 8005 (solo pruebas) | — |
+| `agente-db` | Base de conocimiento del agente (`pgvector/pgvector:pg16`). Separada de `postgres`: es del agente. Se llena con `docker compose run --rm agente python -m ingesta.cargar` | — | no se publica | — |
 | `postgres` | Un contenedor con una base por servicio | — | 5432 | — |
 | `mongo` | Base de documentos | — | 27017 | — |
 | `redis` | Caché para throttling; eventos en la Entrega 4 | — | 6379 | — |
@@ -75,9 +98,12 @@ AgroIA-Web/
 ├── comun/                    # paquete compartido: auth JWT, permisos, errores
 │   ├── pyproject.toml
 │   └── agroia_comun/
-│       ├── autenticacion.py
+│       ├── autenticacion.py      # validación del JWT RS256
+│       ├── configuracion.py      # lectura de la llave pública y de AUTH_ACTIVA
 │       ├── permisos.py
-│       └── errores.py
+│       ├── errores.py            # formato común de errores
+│       ├── openapi.py            # esquema y ejemplos de error en Swagger
+│       └── pruebas.py            # llaves y tokens para las pruebas
 ├── web/                      # gateway con plantillas
 ├── svc-usuarios/
 ├── svc-tienda/
@@ -115,7 +141,7 @@ El agente vive en el repo AgroIA y sigue evolucionando ahí; no se copia su cód
 
 ## Contratos de API
 
-Todos los servicios exponen `/api/v1/...`, documentación en `/api/docs/` y un `GET /salud/` que responde `{"estado": "ok"}` para Docker. Los listados usan paginación `?page=` con 20 elementos.
+Los servicios Django exponen `/api/v1/...` (svc-ia es la excepción: sus rutas no llevan prefijo, ver su contrato abajo), documentación en `/api/docs/` y un `GET /salud/` que responde `{"estado": "ok"}` para Docker. Los listados usan paginación `?page=` con 20 elementos.
 
 **Formato de errores** (manejador común en `comun/agroia_comun/errores.py`): `{"error": "codigo_corto", "detalle": "mensaje para el usuario"}`. Los errores de validación agregan `"campos"` con los mensajes por campo:
 
@@ -193,7 +219,7 @@ Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNego
 | POST | `/diagnostico/` | imagen `multipart`, máx. 5 MB, JPG o PNG | `{"id", "estado": "listo", "clase": "sano" \| "rona" \| "antracnosis", "confianza": 0.0–1.0, "probabilidades", "modelo_version"}`. **Entrega 2: 503 `modelo_no_disponible`**, el modelo de visión todavía no existe |
 | GET | `/solicitudes/<id>/` | — | Estado de una solicitud (dueño o administrador); en la Entrega 2 siempre `listo`, guardada en memoria (pasa a Redis en la Entrega 4) |
 
-`historial` es una lista de `{"rol": "usuario" | "agente", "texto"}`; svc-ia envía al agente las últimas 10 entradas como contexto y un `session_id` nuevo por petición. `fuentes` llega vacío hasta que el agente tenga RAG. Si el agente falla: 503 `agente_no_disponible`.
+`historial` es una lista de `{"rol": "usuario" | "agente", "texto"}`; svc-ia envía al agente las últimas 10 entradas en su campo `history` (el agente no guarda nada cuando lo recibe). `fuentes` son las referencias de la base de conocimiento del agente (RAG) que usó para responder; va vacía en saludos o temas no técnicos. Si el agente falla: 503 `agente_no_disponible`.
 
 En la Entrega 2, svc-ia y svc-contenido no se llaman entre sí: `web` llama a `svc-ia` y después guarda el resultado en `svc-contenido`. En la Entrega 4, `svc-ia` responderá `estado: "pendiente"` y publicará el resultado como evento.
 
@@ -273,11 +299,13 @@ El gateway renderiza HTML con plantillas de Django. daisyUI da los componentes, 
 
 **Base visual hecha** (ver `docs/avances/web-base-catalogo.md`): temas `agroia` y `agroia-oscuro`, `base.html`, componentes, inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle y aviso de privacidad.
 
-**Pantallas de la Entrega 2:** inicio, catálogo con filtros, detalle de producto, carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico por imagen con historial, registro, login, recuperar contraseña, perfil con direcciones, y panel de administrador para productos y pedidos.
+**Pantallas hechas en la Entrega 2:** inicio, catálogo con filtros, detalle de producto y aviso de privacidad.
+
+**Pantallas pendientes** (Entrega 3, cuando exista el login): carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico por imagen con historial, registro, login, recuperar contraseña, perfil con direcciones y panel de administrador para productos y pedidos. Sus APIs ya existen y se prueban con Swagger y Postman.
 
 ## Autenticación
 
-La implementa el equipo en `svc-usuarios` desde ahora; después se adaptará al módulo que arma el grupo. El detalle de cada tarea está en [AgroIA-Web · Requerimientos de autenticación](https://claude.ai/code/artifact/27b14141-4c7a-4e47-a6a4-53796b9db979).
+La implementa el equipo en `svc-usuarios` desde ahora; después se adaptará al módulo que arma el grupo. El detalle de cada tarea está en [Requerimientos de autenticación](requerimientos-autenticacion.md).
 
 **Cómo viaja la identidad:**
 
@@ -297,7 +325,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 
 **`docker-compose.yml` debe incluir:**
 
-- Los nueve contenedores de la tabla de servicios (incluido `agente`), en una red interna común.
+- Los diez contenedores de la tabla de servicios (incluidos `agente` y `agente-db`), en una red interna común. El modelo de embeddings del agente (~471 MB) se guarda en el volumen `modelos_hf`.
 - `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db`, `tienda_db` y `web_db` (sesiones del gateway), cada una con su propio usuario (`usuarios`, `tienda`, `web`). Las contraseñas no van en el script: psql las lee del entorno con `\getenv`. Solo corre la primera vez que se crea el volumen; para repetirlo, `docker compose down -v` (borra los datos).
 - Volúmenes con nombre para PostgreSQL y MongoDB, para no perder datos al reiniciar.
 - Puertos publicados solo en `127.0.0.1` (también los de las bases): sirven para probar desde la computadora y no quedan visibles en la red.
@@ -325,6 +353,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `VERSION_AVISO_PRIVACIDAD` | `2026-10` | svc-usuarios (versión del aviso que se guarda al registrarse) |
 | `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
 | `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | llave propia de cada integrante, `groq`, `openai/gpt-oss-120b` | contenedor `agente` |
+| `AGENTE_DB_PASSWORD` | contraseña de desarrollo | `agente` y `agente-db` (base `conocimiento`, usuario `agroia`) |
 | `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `30` | svc-ia |
 
 Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
@@ -365,7 +394,7 @@ El código se escribe en español (modelos, campos, variables, URLs, mensajes) s
 
 **Documentación:**
 
-- `drf-spectacular` genera Swagger en `/api/docs/`; cada serializer y endpoint tiene descripción y ejemplos con `@extend_schema`. `svc-ia` usa el Swagger que trae FastAPI.
+- `drf-spectacular` genera Swagger en `/api/docs/`; cada serializer y endpoint tiene descripción y ejemplos con `@extend_schema`. Las respuestas de error solo llevan su descripción en la vista: el hook `agroia_comun.openapi.documentar_errores` les agrega el esquema común y un ejemplo por código. `svc-ia` usa el Swagger que trae FastAPI.
 - Cada servicio tiene su `README.md`: qué hace, variables que usa, cómo correr pruebas y su matriz de endpoints × rol.
 - Colección de Postman en `docs/postman/AgroIA-Web.postman_collection.json`, con un entorno `local` y una carpeta por servicio. Se actualiza en el mismo PR que agrega un endpoint.
 
@@ -405,11 +434,11 @@ Un `CLAUDE.md` en la raíz resume este documento en reglas que Claude Code lee a
 La fase 0 la hace una sola persona porque todo depende de ella. Después, las fases 1, 2 y 3 pueden ir en paralelo, una por integrante. Jira se documenta al final, como acordó el equipo.
 
 1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
-2. **Fase 1 · Usuarios y entrada.** Para la Entrega 2 se hizo la versión básica: modelo `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`; lo demás pasa a la Entrega 3. En `svc-usuarios`: modelo `Usuario`, envío de correos, registro, verificación, login, renovación, logout, aviso de privacidad, perfil y direcciones. En `web`: Tailwind + daisyUI, tema `agroia`, `base.html` y pantallas de registro, login y perfil.
-3. **Fase 2 · Tienda.** Modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas de catálogo, detalle, carrito, checkout, mis pedidos y panel de administrador.
-4. **Fase 3 · IA y contenido.** `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Pantallas de chat y de diagnóstico con historial.
+2. **Fase 1 · Usuarios y entrada.** Hecha en su versión básica para la Entrega 2: modelos `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`. En `web`: Tailwind + daisyUI, tema `agroia` y `base.html`. Pasan a la Entrega 3: envío de correos, verificación, login, renovación, logout y las pantallas de registro, login y perfil.
+3. **Fase 2 · Tienda.** Hecha: modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas hechas: catálogo y detalle; carrito, checkout, mis pedidos y panel de administrador pasan a la Entrega 3.
+4. **Fase 3 · IA y contenido.** Hecha: `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`, con su base de conocimiento) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Las pantallas de chat y de diagnóstico pasan a la Entrega 3.
 5. **Fase 4 · Seguridad completa.** Recuperación y cambio de contraseña, roles y permisos en el resto de los servicios (la validación RS256 de `comun/` ya existe desde la fase 2), revisión de `token_version`, límite de intentos, sesión del gateway y `AUTH_ACTIVA=True`. 2FA y los opcionales solo si sobra tiempo.
-6. **Fase 5 · Calidad y entrega.** Completar pruebas, Swagger con ejemplos, colección de Postman, READMEs de cada servicio y revisión con `insecure-defaults` y `static-analysis`.
+6. **Fase 5 · Calidad y entrega.** Hecha para la Entrega 2 el 18 de noviembre de 2026: pruebas, Swagger con ejemplos y errores documentados, colección de Postman en verde, READMEs revisados y [documento de la entrega](entregable-2.md). La revisión con `insecure-defaults` y `static-analysis` se hace al cerrar la autenticación (Entrega 3).
 7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
 
 ## Decisiones tomadas

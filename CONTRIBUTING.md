@@ -15,7 +15,7 @@ feat/tu-tarea  ──PR──►  develop  ──PR──►  main
 |---|---|---|
 | `main` | Versión estable: lo que se entrega o se presenta. | Protegida. Solo recibe cambios por PR desde `develop`, al cerrar una entrega o sprint. |
 | `develop` | Rama de trabajo del equipo. Aquí se juntan y prueban las tareas. | Es la rama por defecto. Todas las ramas nuevas salen de aquí y sus PR regresan aquí. |
-| `feat/...`, `fix/...` | Una rama por cada tarea o corrección. | Se crea desde `develop`, se fusiona con un PR y después se borra. |
+| `feat/...`, `fix/...`, etc. | Una rama por cada tarea o corrección (prefijos en [Nombres de ramas y commits](#nombres-de-ramas-y-commits)). | Se crea desde `develop`, se fusiona con un PR y después se borra. |
 
 ### Protección de `main`
 
@@ -106,6 +106,7 @@ git branch -d feat/nombre-de-la-tarea
 | `docs/` | Solo documentación | `docs/guia-instalacion` |
 | `test/` | Agregar o arreglar pruebas | `test/endpoints-catalogo` |
 | `refactor/` | Reorganizar código sin cambiar su funcionamiento | `refactor/estructura-app` |
+| `chore/` | Mantenimiento: revisiones de calidad, configuración, dependencias | `chore/calidad-entrega-2` |
 
 Usa minúsculas y guiones, sin acentos ni espacios. Los mensajes de commit siguen el formato `tipo(área): descripción`, por ejemplo `fix(usuarios): validación de correo duplicado`.
 

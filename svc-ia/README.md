@@ -11,6 +11,7 @@ Todas las respuestas de negocio traen `id` y `estado` (hoy siempre `"listo"`), p
 
 ```
 web ──► svc-ia ──HTTP──► agente (repo AgroIA) ──► Groq (LLM)
+                              └──► agente-db (pgvector: base de conocimiento)
    └──► svc-contenido (guarda conversación o diagnóstico)
 ```
 
@@ -31,17 +32,18 @@ web ──► svc-ia ──HTTP──► agente (repo AgroIA) ──► Groq (LL
  "historial": [{"rol": "usuario", "texto": "Tengo manchas negras en el fruto."},
                {"rol": "agente", "texto": "Parece antracnosis."}]}
 // devuelve
-{"id": "b61761e4…", "estado": "listo", "respuesta": "…", "fuentes": []}
+{"id": "b61761e4…", "estado": "listo", "respuesta": "…",
+ "fuentes": ["Marroquín-Pimentel (1999), Revista Chapingo Serie Horticultura 5", "…"]}
 ```
 
 **Traducción a la API del agente** (`app/agente.py`):
 
 | AgroIA-Web | Agente (`POST /chat`) |
 | --- | --- |
-| `pregunta` + últimas **10** entradas de `historial` | `message`: el historial como bloque de contexto ("Productor: …", "AgroIA: …") seguido de "Pregunta actual: …" |
-| — | `session_id`: uno **nuevo en cada petición**, para que el agente no acumule contexto propio (las conversaciones las guarda svc-contenido) |
+| `pregunta` | `message` |
+| últimas **10** entradas de `historial` | `history`: `{"role": "user" \| "assistant", "content"}`. Con `history` el agente no guarda nada; svc-ia no manda `session_id` (las conversaciones las guarda svc-contenido) |
 | `respuesta` | `response` |
-| `fuentes` | siempre `[]`: el agente todavía no tiene RAG |
+| `fuentes` | `fuentes`: referencias de la base de conocimiento del agente que usó para responder. Vacía en saludos, temas no técnicos o si el agente no pudo consultar su base. Solo se aceptan textos; cualquier otra cosa se descarta |
 
 Si el agente no responde, devuelve un error, una respuesta vacía o tarda más de `AGENTE_TIMEOUT` segundos: **503 `agente_no_disponible`**. Nunca se inventa una respuesta. El error se registra en el log sin el texto de la pregunta.
 
@@ -84,12 +86,10 @@ Las variables del LLM (`GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`) ya no son de
 
 - Se construye desde `https://github.com/BryanGEP/AgroIA.git#main:svc-agente`. Para tomar cambios nuevos del agente: `docker compose build --no-cache agente`.
 - Solo está en la red interna; se publica en `127.0.0.1:8005` para probarlo (`GET /health`, `POST /chat` y su propio chat web en `/`).
-- Su API: `POST /chat` `{"message", "session_id"?}` → `{"response", "session_id"}`; 503 si el LLM falla.
+- Su API: `POST /chat` `{"message", "history"?, "session_id"?}` → `{"response", "session_id", "fuentes"}`; 503 si el LLM falla. Con `history` (máximo 50 mensajes) el agente no guarda nada.
+- El agente responde con herramientas: búsqueda en su base de conocimiento (RAG sobre pgvector), reglas y Teorema de Bayes. Su base vive en el contenedor `agente-db`; ver la ingesta en el [README raíz](../README.md#levantar-el-proyecto-por-primera-vez).
 
-### Pendientes en el repo AgroIA (antes de la Entrega 5)
-
-- **El agente acumula sesiones sin borrarlas.** Guarda memoria por `session_id` en el proceso y nunca la limpia; como svc-ia usa un `session_id` nuevo por petición, esa memoria crece mientras el contenedor siga vivo (reiniciarlo la vacía). Se resolverá en el repo AgroIA, idealmente con un `/chat` que acepte el historial y no guarde sesiones; entonces solo cambia `construir_mensaje` en `app/agente.py`.
-- **Dependencias sin versión fija** (`fastapi>=0.115`, `langchain>=0.3`…): cada construcción puede instalar versiones distintas. El 22/10/2026 se instalaron fastapi 0.161.1, starlette 1.9.0, uvicorn 0.54.0, pydantic 2.14.1, langchain 1.4.7, langchain-core 1.7.0 y langchain-groq 1.1.3.
+Los dos pendientes que había en el repo AgroIA se resolvieron: el agente ya acepta `history` sin guardar sesiones, y sus dependencias están fijadas con versiones exactas.
 
 ## Pruebas y estilo
 
