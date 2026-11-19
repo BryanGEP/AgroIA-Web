@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AgroIA-Web",
-    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. svc-tienda: corre primero `cargar_datos_demo`. En las peticiones con imagen, selecciona el archivo en la pestaña Body. Las carpetas están en orden para correrlas con el Runner.",
+    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`. Los tokens se generan con `python infra/emitir_token.py` (solo desarrollo): `token` = cliente verificado, `token_admin` = administrador, `token_sin_verificar` = cliente sin verificar. svc-tienda: corre primero `cargar_datos_demo`. Las carpetas están en orden para correrlas con el Runner.\n\n**Correr la colección completa:** las peticiones con imagen usan `archivos/imagen-prueba.png`. En Postman, en *Settings → General → Working directory*, elige la carpeta `docs/postman/` (o selecciona el archivo a mano en el cuerpo). Con Newman, desde la raíz del repo: `newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman` más los tokens con `--env-var token=...` (ver el README raíz).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -24,7 +24,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "Sin token. Responde 200 con `{\"estado\": \"ok\"}`.",
             "auth": {
               "type": "noauth"
             }
@@ -135,7 +135,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -184,7 +189,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -423,7 +433,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "Lista paginada de las direcciones propias, la predeterminada primero. Usa `token_usuario`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -467,7 +477,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "Una dirección propia (la guardada en `direccion_id`). La de otro usuario respondería 404.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -515,7 +525,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "Un código postal que no tiene 5 dígitos responde 400 `validacion` con el error en `campos`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -542,7 +552,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -566,7 +581,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "Sin encabezado `Authorization` responde 401 `no_autenticado`.",
             "auth": {
               "type": "noauth"
             }
@@ -577,7 +592,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -600,7 +620,7 @@
                 ""
               ]
             },
-            "description": "",
+            "description": "El listado es solo del administrador: con token de cliente responde 403 `sin_permiso`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -618,7 +638,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
@@ -695,7 +720,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token. Responde 200 con `{\"estado\": \"ok\"}`.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -712,7 +737,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Comprueba que el servicio está arriba: `GET /salud/` responde `{\"estado\": \"ok\"}`. No pide token."
         },
         {
           "name": "Categorías",
@@ -734,7 +760,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token. El público solo ve categorías activas.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -773,7 +799,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Con `token_admin`. El slug se genera del nombre si no se envía; se guarda en `categoria_slug`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -829,7 +855,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Con token de cliente responde 403 `sin_permiso`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -856,7 +882,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -885,7 +916,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Edición parcial de la categoría creada en esta carpeta.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -960,7 +991,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "CRUD de categorías. Listar y ver son públicos; crear, editar y desactivar son solo del administrador (`token_admin`). Desactivar es un borrado lógico (`activa=false`)."
         },
         {
           "name": "Productos",
@@ -982,7 +1014,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token, paginado de 20 en 20 (`?page=`). Solo productos activos de categorías activas.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -1074,7 +1106,7 @@
                     }
                   ]
                 },
-                "description": "",
+                "description": "Búsqueda con `q` en nombre y descripción.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -1109,7 +1141,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Detalle público de un producto, con su ficha técnica.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -1204,7 +1236,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "El precio debe ser mayor que 0: responde 400 `validacion` con el error en `campos`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1231,7 +1263,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1260,7 +1297,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Edición parcial del producto creado en esta carpeta.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1335,7 +1372,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Catálogo. Listar, buscar y ver son públicos, con filtros (`categoria`, `precio_min`, `precio_max`, `disponible`, `q`), orden (`ordering`) y paginación de 20. Crear, editar y desactivar son del administrador."
         },
         {
           "name": "Carrito",
@@ -1357,7 +1395,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Deja el carrito vacío para que la carpeta se pueda repetir. Responde 204.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1398,7 +1436,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token responde 401 `no_autenticado`.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -1409,7 +1447,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1438,7 +1481,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Agrega un producto por slug; si ya estaba, suma la cantidad. Guarda el id del renglón en `item_id`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1495,7 +1538,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Pedir más de lo disponible responde 409 `stock_insuficiente`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1522,7 +1565,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1552,7 +1600,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Cambia la cantidad del renglón `item_id`, validando el stock.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1602,7 +1650,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Carrito con renglones, subtotal, envío y total estimados con los precios actuales.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1626,7 +1674,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Carrito del cliente (`token`). Se vacía al inicio para que la carpeta se pueda repetir. Agregar valida el stock (409 `stock_insuficiente`)."
         },
         {
           "name": "Pedidos",
@@ -1653,7 +1702,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Con `token_sin_verificar` responde 403 `sin_permiso`: comprar exige correo verificado.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1680,7 +1729,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1708,7 +1762,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Solo un cliente puede comprar: el administrador recibe 403.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1735,7 +1789,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1817,7 +1876,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Pago simulado: el pedido pasa de `pendiente` a `pagado` y responde `pago_simulado: true`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1860,7 +1919,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Un pedido ya pagado no se puede pagar de nuevo: 409 `transicion_invalida`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1878,7 +1937,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -1901,7 +1965,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Solo los pedidos propios, paginados.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1943,7 +2007,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Detalle del pedido creado, con las copias de nombre y precio de cada producto.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -1991,7 +2055,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Cambiar el estado es solo del administrador: el cliente recibe 403.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2018,7 +2082,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2048,7 +2117,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Un pedido pagado no puede pasar directo a `entregado`: 409 `transicion_invalida`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2075,7 +2144,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));"
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2105,7 +2179,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "El administrador pasa el pedido de `pagado` a `enviado`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2162,7 +2236,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "El administrador pasa el pedido de `enviado` a `entregado`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2218,7 +2292,7 @@
                     }
                   ]
                 },
-                "description": "",
+                "description": "El administrador ve los pedidos de todos los usuarios; aquí filtrados por `estado`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2242,7 +2316,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Convierte el carrito en pedido, lo paga (pago simulado) y recorre los estados con el administrador. Crear pedido exige un cliente con correo verificado (`token`); el pedido descuenta stock en una transacción."
         }
       ]
     },
@@ -2268,7 +2343,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token. Responde 200 con `{\"estado\": \"ok\"}`.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -2285,7 +2360,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Comprueba que el servicio está arriba: `GET /salud/` responde `{\"estado\": \"ok\"}`. No pide token."
         },
         {
           "name": "Conversaciones",
@@ -2312,7 +2388,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Crea una conversación vacía con un título; guarda su id en `conversacion_id`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2370,7 +2446,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Agrega un mensaje del productor a la conversación.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2484,7 +2560,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Solo los mensajes del agente llevan `fuentes`: responde 400 `validacion`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2511,7 +2587,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2534,7 +2615,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Resumen de las conversaciones propias (sin mensajes), las más recientes primero.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2576,7 +2657,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "La conversación completa con sus mensajes.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2636,7 +2717,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));"
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2660,7 +2746,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Un id que no es un ObjectId válido responde 404 `no_encontrado`, igual que uno inexistente o ajeno.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2678,7 +2764,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));"
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2702,7 +2793,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Borra la conversación creada en esta carpeta. Responde 204.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2726,7 +2817,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Conversaciones con el agente guardadas en MongoDB. Son privadas: solo el dueño las ve (el administrador recibe 404). Máximo 200 mensajes (409 `conversacion_llena`)."
         },
         {
           "name": "Diagnósticos",
@@ -2765,8 +2857,8 @@
                     {
                       "key": "imagen",
                       "type": "file",
-                      "src": [],
-                      "description": "Selecciona una foto de hoja o fruto (JPG, PNG o WebP, máx. 5 MB)."
+                      "src": "archivos/imagen-prueba.png",
+                      "description": "Imagen de prueba en docs/postman/archivos/ (JPG, PNG o WebP, máx. 5 MB)."
                     },
                     {
                       "key": "clase",
@@ -2821,7 +2913,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "La `confianza` debe ser igual a la probabilidad de la clase elegida: responde 400 `validacion`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2838,8 +2930,8 @@
                     {
                       "key": "imagen",
                       "type": "file",
-                      "src": [],
-                      "description": "Selecciona una foto de hoja o fruto (JPG, PNG o WebP, máx. 5 MB)."
+                      "src": "archivos/imagen-prueba.png",
+                      "description": "Imagen de prueba en docs/postman/archivos/ (JPG, PNG o WebP, máx. 5 MB)."
                     },
                     {
                       "key": "clase",
@@ -2870,7 +2962,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -2893,7 +2990,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Historial de diagnósticos propios, los más recientes primero.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2935,7 +3032,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "El diagnóstico guardado en esta carpeta, con `imagen_url`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -2976,7 +3073,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "El administrador lista los diagnósticos de todos los usuarios.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -3000,7 +3097,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Historial de diagnósticos por imagen. Guardar es `multipart` con la imagen y el resultado de svc-ia; usa `archivos/imagen-prueba.png`. El administrador lista todos."
         },
         {
           "name": "Bitácora",
@@ -3027,7 +3125,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Registro manual de un evento; en la Entrega 4 lo harán los servicios con eventos por Redis.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -3087,7 +3185,7 @@
                     }
                   ]
                 },
-                "description": "",
+                "description": "Eventos filtrados por `tipo` y fecha `desde`.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -3128,7 +3226,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "La bitácora es solo del administrador: el cliente recibe 403.",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -3146,13 +3244,19 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
               ]
             }
-          ]
+          ],
+          "description": "Eventos de actividad, solo para el administrador. Filtros `tipo`, `desde` y `hasta` (AAAA-MM-DD)."
         }
       ]
     },
@@ -3178,7 +3282,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token. Responde 200 con `{\"estado\": \"ok\"}`.",
                 "auth": {
                   "type": "noauth"
                 }
@@ -3195,7 +3299,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Comprueba que el servicio está arriba: `GET /salud/` responde `{\"estado\": \"ok\"}`. No pide token."
         },
         {
           "name": "Agente",
@@ -3249,7 +3354,10 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
-                      "pm.environment.set(\"solicitud_id\", pm.response.json().id);"
+                      "pm.environment.set(\"solicitud_id\", pm.response.json().id);",
+                      "pm.test(\"Trae fuentes como lista\", () => {",
+                      "    pm.expect(pm.response.json().fuentes).to.be.an(\"array\");",
+                      "});"
                     ]
                   }
                 }
@@ -3276,7 +3384,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Una pregunta vacía responde 400 `validacion` (svc-ia no usa el 422 de FastAPI).",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -3303,7 +3411,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -3330,7 +3443,7 @@
                     ""
                   ]
                 },
-                "description": "",
+                "description": "Sin token responde 401 `no_autenticado`.",
                 "auth": {
                   "type": "noauth"
                 },
@@ -3350,7 +3463,12 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -3396,7 +3514,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "description": "Preguntas al agente AgroIA a través de svc-ia. Necesita la llave de Groq en el contenedor `agente`; sin ella responde 503 `agente_no_disponible`. La respuesta trae `fuentes` de la base de conocimiento del agente."
         },
         {
           "name": "Diagnóstico",
@@ -3433,8 +3552,8 @@
                     {
                       "key": "imagen",
                       "type": "file",
-                      "src": [],
-                      "description": "Selecciona una foto JPG o PNG, máx. 5 MB."
+                      "src": "archivos/imagen-prueba.png",
+                      "description": "Imagen de prueba en docs/postman/archivos/ (JPG, PNG o WebP, máx. 5 MB)."
                     }
                   ]
                 }
@@ -3445,13 +3564,19 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 503\", () => pm.response.to.have.status(503));"
+                      "pm.test(\"Responde 503\", () => pm.response.to.have.status(503));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
               ]
             }
-          ]
+          ],
+          "description": "Clasificación de imágenes de aguacate. En la Entrega 2 no hay modelo de visión: después de validar la imagen responde 503 `modelo_no_disponible`."
         }
       ]
     }
