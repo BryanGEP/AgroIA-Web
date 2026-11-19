@@ -11,7 +11,14 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from agroia_comun.configuracion import configurar_jwt, leer_llave_publica, validar_modo_auth
+from agroia_comun.configuracion import (
+    ISSUER_POR_DEFECTO,
+    configurar_jwt,
+    configurar_logging,
+    leer_llave_publica,
+    validar_modo_auth,
+    validar_secret_key,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -32,8 +39,11 @@ def lista(nombre: str, defecto: str = "") -> list[str]:
     return [valor.strip() for valor in os.environ.get(nombre, defecto).split(",") if valor.strip()]
 
 
+NOMBRE_SERVICIO = "svc-tienda"
 SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
+# Con DEBUG=False no arranca con la clave de .env.example ni con una débil.
+validar_secret_key(SECRET_KEY, DEBUG)
 ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Autenticación: True por defecto. Solo el .env local puede ponerla en False, y solo
@@ -42,7 +52,9 @@ ALLOWED_HOSTS = lista("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 AUTH_ACTIVA = booleano("AUTH_ACTIVA", True)
 validar_modo_auth(AUTH_ACTIVA, DEBUG)
 JWT_PUBLIC_KEY_PATH = os.environ.get("JWT_PUBLIC_KEY_PATH", "")
-SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA))
+# Emisor esperado en `iss` (el JWT_ISSUER de svc-usuarios). Ver docs/contrato-identidad.md.
+JWT_ISSUER = os.environ.get("JWT_ISSUER", ISSUER_POR_DEFECTO)
+SIMPLE_JWT = configurar_jwt(leer_llave_publica(JWT_PUBLIC_KEY_PATH, AUTH_ACTIVA), issuer=JWT_ISSUER)
 
 # Envío: costo fijo, gratis si el subtotal supera ENVIO_GRATIS_DESDE.
 COSTO_ENVIO = Decimal(variable("COSTO_ENVIO", "150.00"))
@@ -149,3 +161,6 @@ SPECTACULAR_SETTINGS = {
         "agroia_comun.openapi.documentar_errores",
     ],
 }
+
+# Log de seguridad: los 401 y 403 (acceso_denegado) en una línea JSON por evento.
+LOGGING = configurar_logging()

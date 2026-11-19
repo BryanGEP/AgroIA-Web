@@ -1,5 +1,7 @@
 """Fixtures compartidas: clientes de API con tokens de cada tipo de usuario."""
 
+import uuid
+
 import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
@@ -8,7 +10,9 @@ from agroia_comun.pruebas import firmar_token
 from tests.datos import ADMIN_ID, CLIENTE_ID, DIRECCION, OTRO_CLIENTE_ID, SIN_VERIFICAR_ID
 
 
-def token(usuario_id: int, rol: str | None = "cliente", verificado: bool = True, **extra) -> str:
+def token(
+    usuario_id: uuid.UUID, rol: str | None = "cliente", verificado: bool = True, **extra
+) -> str:
     return firmar_token(
         settings.LLAVE_PRIVADA_PRUEBAS,
         usuario_id=usuario_id,

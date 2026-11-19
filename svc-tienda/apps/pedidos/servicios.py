@@ -4,6 +4,7 @@ Toda operación que toca stock o dinero corre en transaction.atomic() y bloquea 
 productos con select_for_update(), siempre ordenados por id para evitar deadlocks.
 """
 
+import uuid
 from decimal import Decimal
 
 from django.conf import settings
@@ -45,13 +46,13 @@ def _validar_stock(producto: Producto, cantidad: int) -> None:
 # --- Carrito ------------------------------------------------------------------
 
 
-def obtener_carrito(usuario_id: int) -> Carrito:
+def obtener_carrito(usuario_id: uuid.UUID) -> Carrito:
     """El carrito del usuario; se crea la primera vez."""
     carrito, _ = Carrito.objects.get_or_create(usuario_id=usuario_id)
     return carrito
 
 
-def agregar_al_carrito(usuario_id: int, producto: Producto, cantidad: int) -> ItemCarrito:
+def agregar_al_carrito(usuario_id: uuid.UUID, producto: Producto, cantidad: int) -> ItemCarrito:
     """Agrega un producto; si ya estaba, suma la cantidad. No aparta stock."""
     _validar_disponible(producto)
     with transaction.atomic():
@@ -83,7 +84,7 @@ def quitar_item(item: ItemCarrito) -> None:
     carrito.save(update_fields=["actualizado_en"])
 
 
-def vaciar_carrito(usuario_id: int) -> None:
+def vaciar_carrito(usuario_id: uuid.UUID) -> None:
     ItemCarrito.objects.filter(carrito__usuario_id=usuario_id).delete()
 
 
@@ -106,7 +107,9 @@ def totales_del_carrito(carrito: Carrito) -> tuple[Decimal, Decimal, Decimal]:
 # --- Pedidos ------------------------------------------------------------------
 
 
-def crear_pedido_desde_carrito(usuario_id: int, direccion_envio: dict, metodo_pago: str) -> Pedido:
+def crear_pedido_desde_carrito(
+    usuario_id: uuid.UUID, direccion_envio: dict, metodo_pago: str
+) -> Pedido:
     """Convierte el carrito en pedido: valida y descuenta stock, copia nombre y precio,
     calcula subtotal, envío y total, y vacía el carrito. Todo o nada.
     """

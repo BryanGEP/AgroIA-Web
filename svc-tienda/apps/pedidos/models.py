@@ -2,11 +2,11 @@ from django.db import models
 
 from apps.catalogo.models import Producto
 
-# usuario_id es el id de svc-usuarios: entero, sin ForeignKey (vive en otra base).
+# usuario_id es el id (UUID) de svc-usuarios, sin ForeignKey: vive en otra base.
 
 
 class Carrito(models.Model):
-    usuario_id = models.PositiveBigIntegerField(unique=True)
+    usuario_id = models.UUIDField(unique=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
@@ -48,7 +48,7 @@ class Pedido(models.Model):
         TRANSFERENCIA = "transferencia", "Transferencia (pago simulado)"
         CONTRA_ENTREGA = "contra_entrega", "Contra entrega (pago simulado)"
 
-    usuario_id = models.PositiveBigIntegerField()
+    usuario_id = models.UUIDField()
     estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.PENDIENTE)
     # Copia de la dirección al momento de comprar.
     direccion_envio = models.JSONField()
