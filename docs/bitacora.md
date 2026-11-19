@@ -36,3 +36,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** base visual del gateway web (Tailwind 4 + daisyUI 5 sin Node, tema agroia claro y oscuro, HTMX y Alpine locales, base.html y componentes) y páginas públicas: inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle con ficha técnica y aviso de privacidad; reenvío de imágenes desde svc-tienda. Revisado en celular, tableta y escritorio. 45 pruebas en web, sin regresiones.
 - **Qué sigue:** revisión final de calidad de la Entrega 2 (Swagger y Postman de todos los servicios) y documentar los sprints en Jira.
 - **Bloqueos:** Ninguno.
+
+
+## 2026-11-18 · Sprint 2
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** revisión final de calidad de la Entrega 2: base de conocimiento del agente en un contenedor propio (agente-db con pgvector) e ingesta repetible; svc-ia manda el historial al agente y devuelve sus fuentes; Swagger con ejemplos y errores documentados en todos los servicios; colección de Postman completa en verde (95 de 95 aserciones, dos corridas); documentación corregida y documento del Entregable 2 con capturas. 418 pruebas en verde.
+- **Qué sigue:** documentar los sprints de la Entrega 2 en Jira y fusionar develop en main.
+- **Bloqueos:** Ninguno.
