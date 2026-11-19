@@ -5,6 +5,7 @@ from django.urls import path
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from agroia_comun.errores import ErrorDeNegocio
@@ -18,13 +19,13 @@ from agroia_comun.permisos import (
 
 
 class Objeto:
-    def __init__(self, dueno: int):
+    def __init__(self, dueno: str):
         self.usuario_id = dueno
 
 
 class Protegida(APIView):
     def get(self, request):
-        return Response({"usuario_id": usuario_id(request)})
+        return Response({"usuario_id": str(usuario_id(request))})
 
 
 class SoloAdmin(APIView):
@@ -44,7 +45,7 @@ class SoloCliente(APIView):
 class DeUnDueno(APIView):
     permission_classes = [IsAuthenticated, EsDuenoOAdmin]
 
-    def get(self, request, dueno: int):
+    def get(self, request, dueno):
         self.check_object_permissions(request, Objeto(dueno))
         return Response({"ok": True})
 
@@ -66,10 +67,25 @@ class ConErrores(APIView):
         return Response({"ok": True})
 
 
+class UnaPorMinuto(AnonRateThrottle):
+    scope = "prueba"
+    rate = "1/min"
+
+
+class Limitada(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [UnaPorMinuto]
+
+    def post(self, request):
+        return Response({"ok": True})
+
+
 urlpatterns = [
     path("protegida/", Protegida.as_view()),
     path("admin/", SoloAdmin.as_view()),
     path("cliente/", SoloCliente.as_view()),
-    path("dueno/<int:dueno>/", DeUnDueno.as_view()),
+    path("dueno/<uuid:dueno>/", DeUnDueno.as_view()),
+    path("limitada/", Limitada.as_view()),
     path("errores/", ConErrores.as_view()),
 ]
