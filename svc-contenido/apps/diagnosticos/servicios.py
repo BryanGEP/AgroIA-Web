@@ -27,7 +27,7 @@ def _coleccion():
 
 
 def crear(
-    usuario_id: int,
+    usuario_id: uuid.UUID | str,
     imagen,
     clase: str,
     confianza: float,
@@ -38,7 +38,7 @@ def crear(
     extension = Path(imagen.name).suffix.lower() or ".jpg"
     nombre = default_storage.save(f"diagnosticos/{uuid.uuid4().hex}{extension}", imagen)
     diagnostico = {
-        "usuario_id": usuario_id,
+        "usuario_id": str(usuario_id),
         "imagen": nombre,
         "clase": clase,
         "confianza": confianza,
@@ -54,17 +54,17 @@ def crear(
     return diagnostico
 
 
-def consulta(usuario_id: int, es_admin: bool) -> ConsultaMongo:
+def consulta(usuario_id: uuid.UUID | str, es_admin: bool) -> ConsultaMongo:
     """El cliente ve los suyos; el administrador, todos. Los más recientes primero."""
-    filtro = {} if es_admin else {"usuario_id": usuario_id}
+    filtro = {} if es_admin else {"usuario_id": str(usuario_id)}
     return ConsultaMongo(_coleccion(), filtro, [("creado_en", DESCENDING), ("_id", DESCENDING)])
 
 
-def obtener(usuario_id: int, es_admin: bool, id_texto: str) -> dict:
+def obtener(usuario_id: uuid.UUID | str, es_admin: bool, id_texto: str) -> dict:
     """Dueño o administrador; para cualquier otro, 404."""
     filtro = {"_id": mongo.object_id_o_404(id_texto)}
     if not es_admin:
-        filtro["usuario_id"] = usuario_id
+        filtro["usuario_id"] = str(usuario_id)
     diagnostico = _coleccion().find_one(filtro)
     if diagnostico is None:
         raise Http404

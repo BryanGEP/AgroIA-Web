@@ -7,6 +7,7 @@ Por ahora la llena un administrador con POST; en la Entrega 4 la llenarán los e
 que publiquen los servicios por Redis.
 """
 
+import uuid
 from datetime import datetime
 
 from pymongo import ASCENDING, DESCENDING
@@ -22,10 +23,10 @@ def _coleccion():
     return mongo.coleccion(COLECCION)
 
 
-def registrar(tipo: str, usuario_id: int | None, servicio: str, datos: dict) -> dict:
+def registrar(tipo: str, usuario_id: uuid.UUID | str | None, servicio: str, datos: dict) -> dict:
     evento = {
         "tipo": tipo,
-        "usuario_id": usuario_id,
+        "usuario_id": str(usuario_id) if usuario_id is not None else None,
         "servicio": servicio,
         "datos": datos,
         "fecha": mongo.ahora(),

@@ -9,7 +9,7 @@ from tests.datos import ADMIN_ID, CLIENTE_ID, OTRO_CLIENTE_ID
 URL = "/api/v1/conversaciones/"
 
 
-def crear(usuario_id: int = CLIENTE_ID, titulo: str = "Manchas en hojas") -> str:
+def crear(usuario_id=CLIENTE_ID, titulo: str = "Manchas en hojas") -> str:
     return str(servicios.crear(usuario_id, titulo)["_id"])
 
 
@@ -19,7 +19,7 @@ def test_crear_conversacion(cliente):
     assert respuesta.status_code == 201
     cuerpo = respuesta.json()
     assert cuerpo["titulo"] == "Manchas en hojas"
-    assert cuerpo["usuario_id"] == CLIENTE_ID
+    assert cuerpo["usuario_id"] == str(CLIENTE_ID)
     assert cuerpo["mensajes"] == []
     assert ObjectId.is_valid(cuerpo["id"])
 

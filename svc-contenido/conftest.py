@@ -1,5 +1,7 @@
 """Fixtures compartidas: MongoDB simulado y clientes de API con tokens de cada usuario."""
 
+import uuid
+
 import mongomock
 import pytest
 from django.conf import settings
@@ -18,7 +20,7 @@ def mongo_simulado(monkeypatch):
     return cliente.get_default_database()
 
 
-def token(usuario_id: int, rol: str | None = "cliente", **extra) -> str:
+def token(usuario_id: uuid.UUID, rol: str | None = "cliente", **extra) -> str:
     return firmar_token(settings.LLAVE_PRIVADA_PRUEBAS, usuario_id=usuario_id, rol=rol, **extra)
 
 

@@ -11,7 +11,7 @@ from rest_framework import serializers
             "Pedido creado",
             value={
                 "tipo": "pedido_creado",
-                "usuario_id": 10,
+                "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
                 "servicio": "svc-tienda",
                 "datos": {"pedido_id": 7, "total": "840.50"},
             },
@@ -22,7 +22,7 @@ from rest_framework import serializers
             value={
                 "id": "6afe8007ae4b683f2b9e9973",
                 "tipo": "pedido_creado",
-                "usuario_id": 10,
+                "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
                 "servicio": "svc-tienda",
                 "datos": {"pedido_id": 7, "total": "840.50"},
                 "fecha": "2026-11-18T22:50:15-06:00",
@@ -38,7 +38,7 @@ class EventoSerializer(serializers.Serializer):
         max_length=50,
         error_messages={"invalid": "Usa minúsculas, números y guiones bajos (pedido_creado)."},
     )
-    usuario_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    usuario_id = serializers.UUIDField(required=False, allow_null=True, default=None)
     servicio = serializers.CharField(max_length=50)
     datos = serializers.DictField(required=False, default=dict)
     fecha = serializers.DateTimeField(read_only=True)

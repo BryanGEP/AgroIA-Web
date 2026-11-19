@@ -25,7 +25,7 @@ def datos(**cambios) -> dict:
     return base
 
 
-def guardar(usuario_id: int = CLIENTE_ID) -> str:
+def guardar(usuario_id=CLIENTE_ID) -> str:
     diagnostico = servicios.crear(
         usuario_id, imagen(), "sano", 0.8, {"sano": 0.8, "rona": 0.1, "antracnosis": 0.1}, "v1"
     )
@@ -40,7 +40,7 @@ def test_crear_diagnostico(cliente, mongo_simulado):
     assert cuerpo["clase"] == "antracnosis"
     assert cuerpo["confianza"] == 0.91
     assert cuerpo["probabilidades"] == PROBABILIDADES
-    assert cuerpo["usuario_id"] == CLIENTE_ID
+    assert cuerpo["usuario_id"] == str(CLIENTE_ID)
     assert cuerpo["imagen_url"].startswith("http://testserver/media/diagnosticos/")
     documento = mongo_simulado["diagnosticos"].find_one({"_id": ObjectId(cuerpo["id"])})
     assert default_storage.exists(documento["imagen"])

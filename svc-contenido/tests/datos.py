@@ -1,13 +1,14 @@
 """Datos de ejemplo compartidos por las pruebas."""
 
+import uuid
 from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
-CLIENTE_ID = 10
-OTRO_CLIENTE_ID = 11
-ADMIN_ID = 1
+CLIENTE_ID = uuid.UUID("c1e2a3b4-0000-4000-8000-000000000010")
+OTRO_CLIENTE_ID = uuid.UUID("c1e2a3b4-0000-4000-8000-000000000011")
+ADMIN_ID = uuid.UUID("a0d1e2f3-0000-4000-8000-000000000001")
 
 PROBABILIDADES = {"sano": 0.03, "rona": 0.06, "antracnosis": 0.91}
 
