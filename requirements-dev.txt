@@ -9,5 +9,6 @@
 # Paquete compartido en modo editable.
 -e ./comun
 
-# Para infra/generar_llaves.py.
+# Para infra/generar_llaves.py e infra/matriz_seguridad.py (que usa además httpx de web y
+# PyJWT de comun).
 cryptography==50.0.2
