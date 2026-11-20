@@ -1,0 +1,24 @@
+{% load agroia %}
+{% comment %} Estado del pedido y botones con las transiciones que permite svc-tienda
+   (`transiciones_permitidas`). Con HTMX se reemplaza este bloque. {% endcomment %}
+<section id="estado-pedido" aria-labelledby="titulo-estado" class="flex flex-col gap-3 self-start rounded-box border border-base-300 p-4">
+  <h2 id="titulo-estado" class="text-xl">Estado</h2>
+  <div>{% include "componentes/estado_pedido.html" with estado=pedido.estado %} <span class="badge badge-outline">Pago simulado</span></div>
+  {% if error %}<p class="text-sm text-error" role="alert">{{ error }}</p>{% endif %}
+  {% if aviso %}<p class="text-sm text-success" role="status">{{ aviso }}</p>{% endif %}
+  {% if pedido.transiciones_permitidas %}
+    <p class="text-sm opacity-80">Cambiar a:</p>
+    <div class="flex flex-wrap gap-2">
+      {% for estado in pedido.transiciones_permitidas %}
+        <form method="post" action="{% url 'panel:estado' pedido.id %}" hx-post="{% url 'panel:estado' pedido.id %}" hx-target="#estado-pedido" hx-swap="outerHTML"
+              {% if estado == "cancelado" %}hx-confirm="¿Cancelar el pedido #{{ pedido.id }}? Se devuelven las existencias."{% endif %}>
+          {% csrf_token %}
+          <input type="hidden" name="estado" value="{{ estado }}">
+          <button type="submit" class="btn btn-sm {% if estado == 'cancelado' %}btn-outline btn-error{% else %}btn-primary{% endif %}">{{ estados|elegir_clave:estado }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-sm opacity-80">Este pedido ya no cambia de estado.</p>
+  {% endif %}
+</section>

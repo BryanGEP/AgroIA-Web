@@ -1,0 +1,11 @@
+{# Lista de conversaciones con el botón para iniciar una nueva. #}
+<a href="{% url 'agroia:inicio' %}" class="btn btn-primary btn-sm w-full mb-3">Nueva conversación</a>
+{% if conversaciones %}
+  <ul class="menu w-full rounded-box bg-base-200 p-1">
+    {% for c in conversaciones %}
+      <li><a href="{% url 'agroia:ver' c.id %}" class="{% if conversacion.id == c.id %}menu-active{% endif %}" {% if conversacion.id == c.id %}aria-current="page"{% endif %}><span class="truncate">{{ c.titulo }}</span></a></li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="text-sm opacity-80">Todavía no tienes conversaciones.</p>
+{% endif %}

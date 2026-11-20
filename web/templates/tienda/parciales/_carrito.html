@@ -1,0 +1,47 @@
+{% load agroia %}
+{% comment %} Productos, cantidades y totales. Con HTMX, cambiar la cantidad o quitar un
+   producto reemplaza este bloque y el contador del menú. {% endcomment %}
+<div id="carrito" class="flex flex-col gap-6">
+  {% if carrito.items %}
+    <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300 bg-base-100">
+      {% for item in carrito.items %}
+        <li class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <div class="flex flex-1 items-center gap-3">
+            {% if item.producto.imagen %}<img src="{{ item.producto.imagen }}" alt="{{ item.producto.nombre }}" width="64" height="64" class="h-16 w-16 rounded object-contain bg-base-200">{% endif %}
+            <div>
+              <a href="{% url 'catalogo:detalle' item.producto.slug %}" class="link link-hover font-medium">{{ item.producto.nombre }}</a>
+              <p class="text-sm opacity-80">{{ item.producto.precio|pesos }} por {{ item.producto.unidad|unidad }}</p>
+              {% for clave, mensaje in errores.items %}{% if clave == item.id %}<p class="text-sm text-error" role="alert">{{ mensaje }}</p>{% endif %}{% endfor %}
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <form method="post" action="{% url 'tienda:cambiar' item.id %}" hx-post="{% url 'tienda:cambiar' item.id %}" hx-target="#carrito" hx-swap="outerHTML" class="flex items-center gap-2">
+              {% csrf_token %}
+              <label for="cantidad-{{ item.id }}" class="sr-only">Cantidad de {{ item.producto.nombre }}</label>
+              <input id="cantidad-{{ item.id }}" type="number" name="cantidad" value="{{ item.cantidad }}" min="1" max="999" class="input input-bordered input-sm w-20 tabular-nums">
+              <button type="submit" class="btn btn-ghost btn-sm">Actualizar</button>
+            </form>
+            <form method="post" action="{% url 'tienda:quitar' item.id %}" hx-post="{% url 'tienda:quitar' item.id %}" hx-target="#carrito" hx-swap="outerHTML">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm text-error">Quitar<span class="sr-only"> {{ item.producto.nombre }}</span></button>
+            </form>
+          </div>
+          <p class="font-display text-lg font-bold tabular-nums sm:w-28 sm:text-right">{{ item.importe|pesos }}</p>
+        </li>
+      {% endfor %}
+    </ul>
+    <dl class="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-right tabular-nums">
+      <dt class="text-left">Subtotal</dt><dd>{{ carrito.subtotal|pesos }}</dd>
+      <dt class="text-left">Envío</dt><dd>{% if carrito.envio == "0.00" %}Gratis{% else %}{{ carrito.envio|pesos }}{% endif %}</dd>
+      <dt class="text-left font-display text-xl font-bold">Total</dt><dd class="font-display text-xl font-bold">{{ carrito.total|pesos }}</dd>
+    </dl>
+    <div class="flex flex-wrap justify-end gap-3">
+      <a href="{% url 'catalogo:lista' %}" class="btn btn-ghost">Seguir comprando</a>
+      <a href="{% url 'tienda:checkout' %}" class="btn btn-primary">Continuar con el pedido</a>
+    </div>
+  {% else %}
+    {% url 'catalogo:lista' as catalogo %}
+    {% include "componentes/estado_vacio.html" with titulo="Tu carrito está vacío" texto="Agrega insumos desde el catálogo." enlace=catalogo accion="Ir al catálogo" %}
+  {% endif %}
+  {% if request.htmx %}{% include "componentes/contador_carrito.html" with oob=True %}{% endif %}
+</div>

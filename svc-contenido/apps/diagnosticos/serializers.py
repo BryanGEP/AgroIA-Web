@@ -1,7 +1,7 @@
 import json
 import math
 
-from django.core.files.storage import default_storage
+from django.urls import reverse
 from drf_spectacular.utils import OpenApiExample, extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
@@ -64,7 +64,9 @@ class CrearDiagnosticoSerializer(serializers.Serializer):
             value={
                 "id": "6adad34bdf98ab47ebafa190",
                 "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
-                "imagen_url": "http://127.0.0.1:8003/media/diagnosticos/449afb67798e4a89af85ed31976fbf04.png",
+                "imagen_url": (
+                    "http://svc-contenido:8000/api/v1/diagnosticos/6adad34bdf98ab47ebafa190/imagen/"
+                ),
                 "clase": "antracnosis",
                 "confianza": 0.91,
                 "probabilidades": {"sano": 0.03, "rona": 0.06, "antracnosis": 0.91},
@@ -87,6 +89,7 @@ class DiagnosticoSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.URLField())
     def get_imagen_url(self, diagnostico: dict) -> str:
-        url = default_storage.url(diagnostico["imagen"])
+        """El endpoint protegido de la foto, no la ruta del archivo (son datos personales)."""
+        url = reverse("diagnostico-imagen", kwargs={"id": str(diagnostico["_id"])})
         request = self.context.get("request")
         return request.build_absolute_uri(url) if request else url

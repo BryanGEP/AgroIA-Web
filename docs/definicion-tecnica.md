@@ -208,7 +208,7 @@ Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNego
 | POST | `/pedidos/` | cliente con correo verificado | Recibe `direccion_envio` y `metodo_pago` (`tarjeta`, `transferencia`, `contra_entrega`; todos simulados). Convierte el carrito en pedido, valida y descuenta stock en una transacción. Envío `COSTO_ENVIO`, gratis si el subtotal supera `ENVIO_GRATIS_DESDE` |
 | GET | `/pedidos/`, `/pedidos/<id>/` | dueño o administrador |  |
 | POST | `/pedidos/<id>/pagar/` | cliente dueño | Pago simulado: `pendiente → pagado`; responde `"pago_simulado": true`. Agregado en la fase 2 |
-| PATCH | `/pedidos/<id>/estado/` | administrador | `pendiente → pagado → enviado → entregado`, o `cancelado` desde `pendiente` o `pagado`; al cancelar se devuelve el stock |
+| PATCH | `/pedidos/<id>/estado/` | administrador | `pendiente → pagado → enviado → entregado`, o `cancelado` desde `pendiente` o `pagado`; el pedido trae `transiciones_permitidas` (solo lectura, vacía para clientes) con los estados a los que el administrador puede pasarlo; al cancelar se devuelve el stock |
 
 **`svc-contenido`**
 
@@ -218,7 +218,8 @@ Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNego
 | GET, DELETE | `/conversaciones/<id>/` | dueño (las conversaciones son privadas: el administrador recibe 404) |
 | POST | `/conversaciones/<id>/mensajes/` | dueño. `{"rol": "usuario" \| "agente", "texto", "fuentes"?}`; máximo 200 mensajes (`conversacion_llena`) |
 | GET, POST | `/diagnosticos/` | autenticado (solo los propios; el administrador lista todos). POST en `multipart`: imagen JPG, PNG o WebP (máx. 5 MB) y el resultado de svc-ia |
-| GET | `/diagnosticos/<id>/` | dueño o administrador |
+| GET | `/diagnosticos/<id>/` | dueño o administrador. `imagen_url` apunta al endpoint de la foto |
+| GET | `/diagnosticos/<id>/imagen/` | dueño o administrador (404 para los demás). Devuelve el archivo con `Cache-Control: private`. Las fotos no se sirven como archivos estáticos, ni con `DEBUG=True` |
 | GET, POST | `/bitacora/` | administrador. Filtros `tipo`, `desde`, `hasta`. POST manual por ahora; en la Entrega 4 la llenan los eventos |
 
 **`svc-ia`** — diseñado desde ahora para volverse asíncrono en la Entrega 4: cada respuesta trae `id` y `estado`.
@@ -304,7 +305,7 @@ El gateway renderiza HTML con plantillas de Django. daisyUI da los componentes, 
 7. **Responsive desde el inicio:** primero celular, después `md:` y `lg:`. Muchos productores van a entrar desde el teléfono.
 8. **HTMX y Alpine se sirven desde `static/vendor/`**, no desde un CDN, para que funcione sin internet en la demo. Las fuentes (Barlow y Barlow Semi Condensed, OFL) también son locales, en `static/fonts/`.
 9. **Accesibilidad mínima:** cada `input` con `label`, imágenes con `alt`, contraste del tema revisado.
-10. **Imágenes de otros servicios:** el navegador no alcanza las direcciones internas. El gateway reescribe las URLs de imagen de svc-tienda a `/media/tienda/<ruta>` y esa ruta reenvía el archivo (solo `productos/` e `image/*`), sin publicar svc-tienda. Con Cloud Storage (Entrega 5) las URLs serán públicas y no se reescriben.
+10. **Imágenes de otros servicios:** el navegador no alcanza las direcciones internas. El gateway reescribe las URLs de imagen de svc-tienda a `/media/tienda/<ruta>` y esa ruta reenvía el archivo (solo `productos/` e `image/*`), sin publicar svc-tienda. Con Cloud Storage (Entrega 5) las URLs serán públicas y no se reescriben. Las **fotos de diagnóstico** son datos personales: el gateway las sirve por id en `/diagnostico/<id>/imagen/`, pidiéndolas a `GET /api/v1/diagnosticos/<id>/imagen/` de svc-contenido con el token del usuario (svc-contenido comprueba que sea el dueño o un administrador); el gateway no conoce la ruta del archivo.
 11. **CSS compilado:** `static/css/agroia.css` se genera a partir de `fuente.css` y no se sube al repo; el contenedor `web` lo compila al arrancar.
 
 **Base visual hecha** (ver `docs/avances/web-base-catalogo.md`): temas `agroia` y `agroia-oscuro`, `base.html`, componentes, inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle y aviso de privacidad.
@@ -313,9 +314,9 @@ El gateway renderiza HTML con plantillas de Django. daisyUI da los componentes, 
 
 **Pantallas hechas en la Entrega 3** ([avance](avances/e3-gateway.md)): iniciar sesión (`/iniciar-sesion/`), registro, verificar correo (el enlace del correo), reenviar verificación, recuperar y restablecer contraseña, mi cuenta con direcciones y cambiar contraseña; menú con el nombre del usuario y banner «Verifica tu correo para poder comprar».
 
-**Pantallas pendientes** (siguiente fase): carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico por imagen con historial y panel de administrador para productos y pedidos. Sus APIs ya existen y se prueban con Swagger y Postman (también a través del proxy del gateway).
+**Pantallas protegidas de la Entrega 3** ([avance](avances/e3-pantallas.md)): carrito con contador en el menú, checkout, mis pedidos con pago simulado, chat con AgroIA (el gateway orquesta svc-contenido y svc-ia), diagnóstico por imagen con historial y panel de administrador (productos, categorías, pedidos y usuarios). Las respuestas del agente se muestran con el filtro `markdown_seguro`, que escapa el HTML antes de dar formato.
 
-**Content-Security-Policy:** el gateway manda `default-src 'self'` sin `unsafe-inline` ni `unsafe-eval`. Por eso Alpine es la versión CSP (`@alpinejs/csp` 3.17.4), la lógica compleja va en `Alpine.data()` en `static/js/componentes.js`, no hay `hx-on` ni scripts o estilos en línea, y HTMX corre con `allowEval: false`.
+**Content-Security-Policy:** el gateway manda `default-src 'self'` sin `unsafe-inline` ni `unsafe-eval`. Por eso Alpine es la versión CSP (`@alpinejs/csp` 3.17.4), la lógica compleja va en `Alpine.data()` en `static/js/componentes.js`, no hay `hx-on` ni scripts o estilos en línea, y HTMX corre con `allowEval: false`. `img-src` permite `blob:` para la vista previa de la foto del diagnóstico antes de enviarla (`URL.createObjectURL`).
 
 ## Autenticación
 
@@ -365,7 +366,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` / `/run/secrets/jwt_publica.pem` | usuarios / todos |
 | `JWT_ISSUER` | `agroia-usuarios` (emisor de los tokens; ver `contrato-identidad.md`) | todos menos web |
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
-| `SERVICIOS_TIMEOUT`, `IA_TIMEOUT` | `10` y `35` segundos | web |
+| `SERVICIOS_TIMEOUT`, `IA_TIMEOUT` | `10` y `50` segundos | web |
 | `CORS_ALLOWED_ORIGINS` | vacío (solo el propio gateway); nunca `*` | web |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | backend de consola en local | svc-usuarios |
 | `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
@@ -373,7 +374,7 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
 | `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | llave propia de cada integrante, `groq`, `openai/gpt-oss-120b` | contenedor `agente` |
 | `AGENTE_DB_PASSWORD` | contraseña de desarrollo | `agente` y `agente-db` (base `conocimiento`, usuario `agroia`) |
-| `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `30` | svc-ia |
+| `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `45` | svc-ia |
 
 Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
 

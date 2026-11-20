@@ -41,7 +41,8 @@ def test_crear_diagnostico(cliente, mongo_simulado):
     assert cuerpo["confianza"] == 0.91
     assert cuerpo["probabilidades"] == PROBABILIDADES
     assert cuerpo["usuario_id"] == str(CLIENTE_ID)
-    assert cuerpo["imagen_url"].startswith("http://testserver/media/diagnosticos/")
+    # La URL es el endpoint protegido de la foto, no la ruta del archivo.
+    assert cuerpo["imagen_url"] == f"http://testserver{URL}{cuerpo['id']}/imagen/"
     documento = mongo_simulado["diagnosticos"].find_one({"_id": ObjectId(cuerpo["id"])})
     assert default_storage.exists(documento["imagen"])
 
@@ -159,3 +160,49 @@ def test_detalle_401_y_403(anonimo, sin_rol):
 
     assert anonimo.get(url).status_code == 401
     assert sin_rol.get(url).status_code == 403
+
+
+# --- Foto del diagnóstico: solo el dueño o un administrador -------------------------------
+
+
+def test_el_dueno_ve_su_foto(cliente, mongo_simulado):
+    id_ = guardar()
+
+    respuesta = cliente.get(f"{URL}{id_}/imagen/")
+
+    assert respuesta.status_code == 200
+    assert respuesta["Content-Type"] == "image/png"
+    assert respuesta["Cache-Control"] == "private, max-age=3600"
+    assert b"".join(respuesta.streaming_content)[1:4] == b"PNG"  # firma de un PNG
+
+
+def test_el_administrador_ve_la_foto(admin, mongo_simulado):
+    assert admin.get(f"{URL}{guardar()}/imagen/").status_code == 200
+
+
+def test_otro_usuario_recibe_404(otro_cliente, mongo_simulado):
+    respuesta = otro_cliente.get(f"{URL}{guardar()}/imagen/")
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["error"] == "no_encontrado"
+
+
+def test_foto_sin_token_401_y_sin_rol_403(anonimo, sin_rol, mongo_simulado):
+    id_ = guardar()
+
+    assert anonimo.get(f"{URL}{id_}/imagen/").status_code == 401
+    assert sin_rol.get(f"{URL}{id_}/imagen/").status_code == 403
+
+
+@pytest.mark.parametrize("id_", ["no-es-un-id", "6adad34bdf98ab47ebafa190"])
+def test_foto_con_id_invalido_o_inexistente_404(cliente, mongo_simulado, id_):
+    assert cliente.get(f"{URL}{id_}/imagen/").status_code == 404
+
+
+def test_las_fotos_no_se_sirven_como_archivos(cliente, mongo_simulado, settings):
+    from django.urls import Resolver404, resolve
+
+    diagnostico = mongo_simulado["diagnosticos"].find_one({"_id": ObjectId(guardar())})
+
+    with pytest.raises(Resolver404):
+        resolve(f"/media/{diagnostico['imagen']}")

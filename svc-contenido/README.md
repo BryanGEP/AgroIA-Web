@@ -38,7 +38,7 @@ Las apps no tienen `models.py` ni `admin.py` porque no hay ORM. `config/mongo.py
 {"_id": ObjectId, "tipo": "pedido_creado", "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d", "servicio": "svc-tienda", "datos": {...}, "fecha": ISODate}
 ```
 
-`imagen` guarda el nombre del archivo en `default_storage`, no la URL: la respuesta calcula `imagen_url`, así sigue funcionando cuando se pase a Cloud Storage (Entrega 5). En desarrollo (`DEBUG=True`) el servicio sirve las imágenes en `/media/`.
+`imagen` guarda el nombre del archivo en `default_storage`, no la URL. La respuesta trae `imagen_url`, que apunta a `GET /api/v1/diagnosticos/<id>/imagen/`: la foto solo la recibe el dueño o un administrador (404 para los demás, como el detalle), con `Cache-Control: private`. **Las fotos no se sirven como archivos estáticos, ni con `DEBUG=True`**: son datos personales (corrección de seguridad de la Entrega 3). El gateway las muestra en `/diagnostico/<id>/imagen/` pidiéndolas con el token del usuario.
 
 Los índices se crean con `python manage.py crear_indices`, que el contenedor corre al arrancar y se puede repetir sin problema.
 
@@ -53,6 +53,7 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 | POST | `/conversaciones/<id>/mensajes/` | ✓ (propia) | ✓ (propia) | 401 | 403 (sin rol) |
 | GET, POST | `/diagnosticos/` | ✓ (los propios) | ✓ (lista todos) | 401 | 403 (sin rol) |
 | GET | `/diagnosticos/<id>/` | ✓ (propio) | ✓ (todos) | 401 | 403 (sin rol) |
+| GET | `/diagnosticos/<id>/imagen/` | ✓ (propio) | ✓ (todos) | 401 | 403 (sin rol) |
 | GET, POST | `/bitacora/` | 403 | ✓ | 401 | 403 |
 
 - **Las conversaciones son privadas**: ni el administrador ve las de otros (responde 404).

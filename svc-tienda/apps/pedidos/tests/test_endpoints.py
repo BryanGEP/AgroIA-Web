@@ -418,3 +418,41 @@ def test_cambiar_estado_401_y_403(anonimo, cliente):
     assert cliente.patch(url, {"estado": "pagado"}, format="json").status_code == 403
     pedido.refresh_from_db()
     assert pedido.estado == Pedido.Estado.PENDIENTE
+
+
+# --- transiciones_permitidas: el panel de administración muestra solo estas -------------
+
+
+@pytest.mark.parametrize(
+    ("estado", "esperadas"),
+    [
+        ("pendiente", ["pagado", "cancelado"]),
+        ("pagado", ["enviado", "cancelado"]),
+        ("enviado", ["entregado"]),
+        ("entregado", []),
+        ("cancelado", []),
+    ],
+)
+def test_el_administrador_ve_las_transiciones_permitidas(admin, estado, esperadas):
+    pedido = PedidoFactory(usuario_id=CLIENTE_ID, estado=estado)
+
+    detalle = admin.get(f"{PEDIDOS}{pedido.id}/").json()
+    listado = admin.get(PEDIDOS).json()["results"][0]
+
+    assert detalle["transiciones_permitidas"] == esperadas
+    assert listado["transiciones_permitidas"] == esperadas
+
+
+def test_el_cliente_recibe_la_lista_vacia(cliente):
+    pedido = PedidoFactory(usuario_id=CLIENTE_ID, estado="pendiente")
+
+    assert cliente.get(f"{PEDIDOS}{pedido.id}/").json()["transiciones_permitidas"] == []
+
+
+def test_al_cambiar_el_estado_responde_las_nuevas_transiciones(admin):
+    pedido = PedidoFactory(usuario_id=CLIENTE_ID, estado="pagado")
+
+    respuesta = admin.patch(f"{PEDIDOS}{pedido.id}/estado/", {"estado": "enviado"}, format="json")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["transiciones_permitidas"] == ["entregado"]

@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 PREFIJO_IMAGENES = "/media/tienda/"
 
 
+def reescribir_imagen(producto: dict, base_url: str | None = None) -> dict:
+    """La imagen de un producto con la dirección interna de svc-tienda pasa a /media/tienda/."""
+    url = producto.get("imagen")
+    if url:
+        partes = urlsplit(url)
+        interna = urlsplit((base_url or settings.URL_SVC_TIENDA).rstrip("/"))
+        if partes.netloc == interna.netloc and partes.path.startswith("/media/"):
+            producto["imagen"] = PREFIJO_IMAGENES + partes.path.removeprefix("/media/")
+    return producto
+
+
 class TiendaNoDisponible(Exception):
     """svc-tienda no respondió, tardó demasiado o devolvió un error del servidor."""
 
@@ -69,12 +80,7 @@ class ClienteTienda:
             raise TiendaNoDisponible from error
 
     def _reescribir_imagen(self, producto: dict) -> dict:
-        url = producto.get("imagen")
-        if url:
-            partes, interna = urlsplit(url), urlsplit(self.base_url)
-            if partes.netloc == interna.netloc and partes.path.startswith("/media/"):
-                producto["imagen"] = PREFIJO_IMAGENES + partes.path.removeprefix("/media/")
-        return producto
+        return reescribir_imagen(producto, self.base_url)
 
     def categorias(self) -> list[dict]:
         """Categorías activas (svc-tienda pagina de 20; hoy hay 5)."""

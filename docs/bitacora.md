@@ -57,3 +57,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** gateway web de la Entrega 3: sesión con los JWT guardados en el servidor y renovación automática; proxy /api/<servicio>/ que valida el token antes de reenviar (defensa en dos capas) y pone la IP real del cliente; CORS con rechazo de orígenes no permitidos; CSP estricta sin unsafe-inline ni unsafe-eval (Alpine en su versión CSP); pantallas de login, registro, verificación de correo, recuperación y restablecimiento de contraseña, mi cuenta con direcciones, cambio de contraseña y cierre de sesión. Flujo verificado en el navegador sin violaciones de la CSP. Postman con carpeta Gateway (180 aserciones, 0 fallas en dos corridas). 634 pruebas en verde.
 - **Qué sigue:** pantallas protegidas (carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico y panel de administrador).
 - **Bloqueos:** Docker Desktop se detuvo dos veces durante la sesión; se reinició sin pérdida de datos.
+
+
+## 2026-11-20 · Sprint 3
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** pantallas protegidas de la Entrega 3: carrito con contador en el menú, checkout con direcciones y aviso de correo sin verificar, mis pedidos con pago simulado; chat con AgroIA orquestado por el gateway (svc-contenido + svc-ia) con fuentes, reintento y manejo de fallos; diagnóstico con vista previa y flujo listo para el modelo; panel de administrador (productos, categorías, pedidos con transiciones que da svc-tienda y usuarios). Correcciones de seguridad: fotos de diagnóstico solo para su dueño o un administrador, redirección sin validar en el cambio de rol y filtro de Markdown del chat probado contra XSS. Timeout del agente a 45 s. 768 pruebas en verde.
+- **Qué sigue:** cierre de la Entrega 3: documento de arquitectura de seguridad y matriz de pruebas de acceso permitido y denegado.
+- **Bloqueos:** Ninguno.

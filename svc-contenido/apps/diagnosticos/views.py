@@ -1,6 +1,8 @@
+from django.http import FileResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -77,3 +79,31 @@ class DiagnosticoViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, id=None):
         diagnostico = servicios.obtener(usuario_id(request), es_administrador(request), id)
         return Response(DiagnosticoSerializer(diagnostico, context={"request": request}).data)
+
+    @extend_schema(
+        summary="Foto de un diagnóstico",
+        description=(
+            "Devuelve el archivo de la foto (JPG, PNG o WebP) solo al dueño o a un "
+            "administrador; para cualquier otro usuario responde 404, igual que el detalle. "
+            "Lleva `Cache-Control: private`: la foto es un dato personal y no debe guardarse "
+            "en cachés compartidas. Es la única forma de obtener la foto: svc-contenido no la "
+            "sirve como archivo estático."
+        ),
+        parameters=[ID],
+        responses={
+            (200, "image/*"): OpenApiResponse(
+                response=OpenApiTypes.BINARY, description="El archivo de la imagen."
+            ),
+            **SIN_TOKEN,
+            **SIN_ROL,
+            404: OpenApiResponse(description="No existe, el id no es válido o es de otro."),
+        },
+    )
+    @action(detail=True, methods=["get"], url_path="imagen", url_name="imagen")
+    def imagen(self, request, id=None):
+        diagnostico = servicios.obtener(usuario_id(request), es_administrador(request), id)
+        archivo, tipo = servicios.abrir_imagen(diagnostico)
+        respuesta = FileResponse(archivo, content_type=tipo)
+        respuesta["Cache-Control"] = "private, max-age=3600"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta

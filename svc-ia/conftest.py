@@ -30,7 +30,7 @@ os.environ["AUTH_ACTIVA"] = "True"
 os.environ["DEBUG"] = "False"
 os.environ["JWT_PUBLIC_KEY_PATH"] = str(_RUTA)
 os.environ["URL_AGENTE"] = "http://agente-de-prueba:8000"
-os.environ["AGENTE_TIMEOUT"] = "30"
+os.environ["AGENTE_TIMEOUT"] = "45"
 os.environ["JWT_ISSUER"] = "agroia-usuarios"
 
 

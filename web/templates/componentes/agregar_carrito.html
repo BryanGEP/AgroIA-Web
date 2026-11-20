@@ -1,0 +1,17 @@
+{% comment %} "Agregar al carrito". Con sesión: formulario con HTMX (y sin JavaScript también
+   funciona); sin sesión: enlace al login que regresa al producto. Parámetros: producto, grande. {% endcomment %}
+{% if producto.stock == 0 %}
+  <button type="button" class="btn {% if grande %}btn-lg{% else %}btn-sm{% endif %} btn-disabled" disabled>Agotado</button>
+{% elif usuario %}
+  <form method="post" action="{% url 'tienda:agregar' producto.slug %}"
+        hx-post="{% url 'tienda:agregar' producto.slug %}" hx-target="#agregado-{{ producto.slug }}" hx-swap="innerHTML"
+        hx-indicator="#agregando-{{ producto.slug }}" class="flex flex-wrap items-center gap-2">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-primary {% if grande %}btn-lg{% else %}btn-sm{% endif %}">Agregar al carrito<span class="sr-only">: {{ producto.nombre }}</span></button>
+    {% include "componentes/cargando.html" with id="agregando-"|add:producto.slug texto="Agregando…" %}
+  </form>
+  <div id="agregado-{{ producto.slug }}" role="status" aria-live="polite"></div>
+{% else %}
+  <a href="{% url 'cuentas:iniciar_sesion' %}?next={% url 'catalogo:detalle' producto.slug %}" class="btn btn-outline btn-primary {% if grande %}btn-lg{% else %}btn-sm{% endif %}">Inicia sesión para comprar<span class="sr-only">: {{ producto.nombre }}</span></a>
+{% endif %}

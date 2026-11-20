@@ -148,6 +148,8 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
+    # `estado` y `transiciones_permitidas` del pedido usan el mismo conjunto de estados.
+    "ENUM_NAME_OVERRIDES": {"EstadoPedidoEnum": "apps.pedidos.models.Pedido.Estado"},
     "TITLE": "AgroIA-Web · svc-tienda",
     "DESCRIPTION": "Categorías, productos, stock, carrito y pedidos (pago simulado).",
     "VERSION": "0.1.0",

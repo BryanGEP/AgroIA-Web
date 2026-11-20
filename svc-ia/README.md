@@ -79,7 +79,7 @@ El token sale del login de svc-usuarios (ver el [README raíz](../README.md#inic
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar el JWT |
 | `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `URL_AGENTE` | Dirección del agente (`http://agente:8000`) |
-| `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`30`) |
+| `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`45`; la primera pregunta tras arrancar es la más lenta) |
 
 Las variables del LLM (`GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`) ya no son de svc-ia: van al contenedor `agente`.
 

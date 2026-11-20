@@ -3,6 +3,7 @@ from decimal import Decimal
 from drf_spectacular.utils import OpenApiExample, extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
+from agroia_comun.permisos import es_administrador
 from apps.catalogo.models import Producto
 from apps.pedidos import servicios
 from apps.pedidos.models import Carrito, ItemCarrito, ItemPedido, Pedido
@@ -185,15 +186,40 @@ class ItemPedidoSerializer(serializers.ModelSerializer):
                 "metodo_pago": "tarjeta",
                 "pago_simulado": True,
                 "creado_en": "2026-11-18T22:50:13-06:00",
+                "transiciones_permitidas": [],
             },
             response_only=True,
-        )
+        ),
+        OpenApiExample(
+            "Pedido visto por un administrador",
+            value={
+                "id": 12,
+                "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
+                "estado": "pagado",
+                "direccion_envio": EJEMPLO_DIRECCION,
+                "items": [],
+                "subtotal": "735.00",
+                "envio": "150.00",
+                "total": "885.00",
+                "metodo_pago": "tarjeta",
+                "pago_simulado": True,
+                "creado_en": "2026-11-18T22:50:13-06:00",
+                "transiciones_permitidas": ["enviado", "cancelado"],
+            },
+            response_only=True,
+        ),
     ]
 )
 class PedidoSerializer(serializers.ModelSerializer):
     items = ItemPedidoSerializer(many=True, read_only=True)
     pago_simulado = serializers.SerializerMethodField(
         help_text="Siempre true: ninguna entrega integra una pasarela de pago."
+    )
+    transiciones_permitidas = serializers.SerializerMethodField(
+        help_text=(
+            "Estados a los que el pedido puede pasar con PATCH /pedidos/<id>/estado/. Solo "
+            "para administradores; para un cliente siempre es una lista vacía."
+        )
     )
 
     class Meta:
@@ -210,11 +236,22 @@ class PedidoSerializer(serializers.ModelSerializer):
             "metodo_pago",
             "pago_simulado",
             "creado_en",
+            "transiciones_permitidas",
         ]
         read_only_fields = fields
 
     def get_pago_simulado(self, pedido: Pedido) -> bool:
         return True
+
+    @extend_schema_field(
+        serializers.ListField(child=serializers.ChoiceField(choices=Pedido.Estado.choices))
+    )
+    def get_transiciones_permitidas(self, pedido: Pedido) -> list[str]:
+        """Estados a los que el administrador puede pasar el pedido; vacía para clientes."""
+        request = self.context.get("request")
+        if request is None or not es_administrador(request):
+            return []
+        return servicios.transiciones_permitidas(pedido)
 
 
 @extend_schema_serializer(examples=[OpenApiExample("Enviar", value={"estado": "enviado"})])

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block titulo %}No disponible{% endblock %}
+{% block contenido %}
+<div class="max-w-3xl mx-auto px-4">
+  {% include "componentes/error.html" with titulo="No pudimos cargar esta página" enlace=request.get_full_path accion="Intentar de nuevo" %}
+</div>
+{% endblock %}

@@ -8,6 +8,7 @@ responder, así sigue funcionando cuando se pase a Cloud Storage (Entrega 5). sv
 clasifica y no guarda nada; aquí se guarda el resultado que manda el gateway.
 """
 
+import mimetypes
 import uuid
 from pathlib import Path
 
@@ -58,6 +59,17 @@ def consulta(usuario_id: uuid.UUID | str, es_admin: bool) -> ConsultaMongo:
     """El cliente ve los suyos; el administrador, todos. Los más recientes primero."""
     filtro = {} if es_admin else {"usuario_id": str(usuario_id)}
     return ConsultaMongo(_coleccion(), filtro, [("creado_en", DESCENDING), ("_id", DESCENDING)])
+
+
+def abrir_imagen(diagnostico: dict):
+    """El archivo de la foto y su tipo. 404 si ya no existe en el almacenamiento."""
+    nombre = diagnostico["imagen"]
+    if not default_storage.exists(nombre):
+        raise Http404
+    tipo = mimetypes.guess_type(nombre)[0] or "application/octet-stream"
+    if not tipo.startswith("image/"):
+        raise Http404
+    return default_storage.open(nombre, "rb"), tipo
 
 
 def obtener(usuario_id: uuid.UUID | str, es_admin: bool, id_texto: str) -> dict:

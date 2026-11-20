@@ -57,9 +57,9 @@ URL_SVC_TIENDA = os.environ.get("URL_SVC_TIENDA", "http://svc-tienda:8000")
 URL_SVC_CONTENIDO = os.environ.get("URL_SVC_CONTENIDO", "http://svc-contenido:8000")
 URL_SVC_IA = os.environ.get("URL_SVC_IA", "http://svc-ia:8000")
 # Segundos máximos de espera al llamar a un servicio; svc-ia aparte, porque el agente
-# puede tardar hasta AGENTE_TIMEOUT (30 s).
+# puede tardar hasta AGENTE_TIMEOUT (45 s); se deja margen para que responda svc-ia.
 SERVICIOS_TIMEOUT = float(os.environ.get("SERVICIOS_TIMEOUT", "10"))
-IA_TIMEOUT = float(os.environ.get("IA_TIMEOUT", "35"))
+IA_TIMEOUT = float(os.environ.get("IA_TIMEOUT", "50"))
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
 INSTALLED_APPS = [
@@ -77,6 +77,10 @@ INSTALLED_APPS = [
     "apps.paginas",
     "apps.catalogo",
     "apps.cuentas",
+    "apps.tienda",
+    "apps.agroia",
+    "apps.diagnostico",
+    "apps.panel",
     "apps.proxy",
 ]
 
@@ -143,9 +147,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 # Sin scripts ni estilos en línea, sin eval: HTMX y Alpine (versión CSP) desde
-# static/vendor/ y la lógica en static/js/. /api/docs/ usa CSP_DOCS (Swagger UI).
+# static/vendor/ y la lógica en static/js/. `blob:` en img-src: la vista previa de la foto
+# del diagnóstico antes de enviarla (URL.createObjectURL). /api/docs/ usa CSP_DOCS (Swagger UI).
 CSP = (
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
     "font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; "
     "base-uri 'self'; object-src 'none'"
 )

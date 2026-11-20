@@ -28,6 +28,60 @@ document.addEventListener("alpine:init", function () {
     };
   });
 
+  // Chat con AgroIA: muestra al instante la pregunta enviada y desactiva el botón mientras
+  // responde el agente. Solo reacciona a las peticiones del formulario de la pregunta.
+  Alpine.data("chat", function () {
+    return {
+      enviando: false,
+      pregunta: "",
+      enviar(evento) {
+        var campo = evento.target.querySelector("textarea");
+        if (!campo || !campo.value.trim()) return;
+        this.pregunta = campo.value.trim();
+        this.enviando = true;
+      },
+      terminar(evento) {
+        var campo = evento.target.querySelector("textarea");
+        if (!campo) return;
+        this.enviando = false;
+        if (evento.detail.successful) campo.value = "";
+        var mensajes = document.getElementById("mensajes");
+        if (mensajes && mensajes.lastElementChild) {
+          mensajes.lastElementChild.scrollIntoView({ block: "nearest" });
+        }
+      },
+    };
+  });
+
+  // Foto del diagnóstico: vista previa antes de enviarla y validación de tipo y tamaño en el
+  // navegador (el gateway lo vuelve a validar). La vista previa usa una URL blob: (CSP).
+  Alpine.data("vistaPrevia", function () {
+    return {
+      url: "",
+      error: "",
+      elegir(evento) {
+        var archivo = evento.target.files && evento.target.files[0];
+        if (this.url) URL.revokeObjectURL(this.url);
+        this.url = "";
+        this.error = "";
+        if (!archivo) return;
+        if (["image/jpeg", "image/png"].indexOf(archivo.type) === -1) {
+          this.error = "Elige una foto JPG o PNG.";
+        } else if (archivo.size > 5 * 1024 * 1024) {
+          this.error = "La foto pesa más de 5 MB.";
+        }
+        if (this.error) {
+          evento.target.value = "";
+          return;
+        }
+        this.url = URL.createObjectURL(archivo);
+      },
+      get lista() {
+        return this.url !== "";
+      },
+    };
+  });
+
   // <details> de los filtros del catálogo: abierto sin JavaScript; en celular se pliega
   // si no hay filtros activos (data-hay-filtros).
   Alpine.data("plegarEnCelular", function () {

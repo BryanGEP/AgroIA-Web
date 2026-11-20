@@ -48,7 +48,7 @@ services:
       URL_SVC_CONTENIDO: ${URL_SVC_CONTENIDO:-http://svc-contenido:8000}
       URL_SVC_IA: ${URL_SVC_IA:-http://svc-ia:8000}
       SERVICIOS_TIMEOUT: ${SERVICIOS_TIMEOUT:-10}
-      IA_TIMEOUT: ${IA_TIMEOUT:-35}
+      IA_TIMEOUT: ${IA_TIMEOUT:-50}
       # Orígenes que pueden usar el proxy /api/ desde un navegador (separados por coma).
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     secrets:
@@ -163,7 +163,7 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
       # svc-ia no llama al LLM: traduce el contrato y llama al contenedor agente.
       URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
-      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-30}
+      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-45}
       # En Windows los cambios de archivos montados no generan eventos dentro del
       # contenedor; uvicorn --reload necesita revisar por sondeo.
       WATCHFILES_FORCE_POLLING: "true"

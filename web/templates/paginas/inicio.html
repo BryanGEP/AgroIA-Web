@@ -39,13 +39,13 @@
     </li>
     <li class="grid gap-2 py-5 sm:grid-cols-[14rem_1fr_auto] sm:items-center">
       <h3 class="text-lg">AgroIA chat</h3>
-      <p>Pregunta sobre riego, plagas o fertilización y recibe una orientación al momento.</p>
-      <span class="badge badge-outline justify-self-start">Próximamente</span>
+      <p>Pregunta sobre riego, plagas o fertilización y recibe una orientación al momento, con sus fuentes.</p>
+      <a href="{% url 'agroia:inicio' %}" class="btn btn-primary btn-sm justify-self-start">Preguntarle a AgroIA</a>
     </li>
     <li class="grid gap-2 py-5 sm:grid-cols-[14rem_1fr_auto] sm:items-center">
       <h3 class="text-lg">Diagnóstico por imagen</h3>
       <p>Sube una foto de la hoja o el fruto para saber si está sano o tiene roña o antracnosis.</p>
-      <span class="badge badge-outline justify-self-start">Próximamente</span>
+      <a href="{% url 'diagnostico:inicio' %}" class="btn btn-primary btn-sm justify-self-start">Analizar una foto</a>
     </li>
   </ul>
 </section>

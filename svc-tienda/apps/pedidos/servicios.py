@@ -25,6 +25,13 @@ TRANSICIONES = {
     Pedido.Estado.ENTREGADO: set(),
     Pedido.Estado.CANCELADO: set(),
 }
+# Orden en que se muestran las opciones (el del flujo del pedido).
+ORDEN_DE_ESTADOS = [estado for estado, _ in Pedido.Estado.choices]
+
+
+def transiciones_permitidas(pedido: Pedido) -> list[str]:
+    """Estados a los que el pedido puede pasar ahora (PATCH /pedidos/<id>/estado/)."""
+    return [estado for estado in ORDEN_DE_ESTADOS if estado in TRANSICIONES[pedido.estado]]
 
 
 def _validar_disponible(producto: Producto) -> None:
