@@ -1,0 +1,31 @@
+{% load agroia %}
+{% comment %} Clase, confianza, probabilidades y productos sugeridos. Parámetros: diagnostico,
+   nombres, sugeridos. Las barras son <progress>: sin estilos en línea (CSP). {% endcomment %}
+<div class="flex flex-col gap-4">
+  <div>
+    <p class="text-sm opacity-80">Resultado</p>
+    <p class="font-display text-3xl font-bold">{{ nombres|elegir_clave:diagnostico.clase }}</p>
+    <p>Confianza: {{ diagnostico.confianza|porcentaje }}</p>
+  </div>
+  <dl class="flex flex-col gap-2">
+    {% for clase, valor in diagnostico.probabilidades.items %}
+      <div>
+        <dt class="flex justify-between text-sm"><span>{{ nombres|elegir_clave:clase }}</span><span class="tabular-nums">{{ valor|porcentaje }}</span></dt>
+        <dd><progress class="progress {% if clase == diagnostico.clase %}progress-primary{% endif %} w-full" value="{{ valor|porcentaje_entero }}" max="100">{{ valor|porcentaje }}</progress></dd>
+      </div>
+    {% endfor %}
+  </dl>
+  {% if diagnostico.clase == "sano" %}
+    <p class="text-sm">La hoja se ve sana. Sigue revisando tu huerta después de las lluvias, cuando aparecen la roña y la antracnosis.</p>
+  {% elif sugeridos %}
+    <section aria-labelledby="sugeridos">
+      <h2 id="sugeridos" class="text-xl mb-2">Productos que pueden ayudar</h2>
+      <ul class="flex flex-col gap-2">
+        {% for producto in sugeridos %}
+          <li><a href="{% url 'catalogo:detalle' producto.slug %}" class="link">{{ producto.nombre }}</a> <span class="text-sm opacity-80">{{ producto.precio|pesos }}</span></li>
+        {% endfor %}
+      </ul>
+      <p class="mt-2 text-sm opacity-80">Antes de aplicar cualquier producto, confirma la dosis con un técnico.</p>
+    </section>
+  {% endif %}
+</div>

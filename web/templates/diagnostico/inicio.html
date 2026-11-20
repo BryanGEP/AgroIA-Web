@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Diagnóstico por imagen{% endblock %}
+{% block contenido %}
+<div class="max-w-4xl mx-auto px-4 py-10 md:py-14">
+  <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <h1 class="text-3xl">Diagnóstico por imagen</h1>
+    <a href="{% url 'diagnostico:historial' %}" class="link">Mis diagnósticos</a>
+  </div>
+  <p class="mb-8 max-w-prose opacity-80">Sube una foto de una hoja o un fruto de aguacate y AgroIA te dirá si se ve sano o si tiene síntomas de roña o antracnosis. Es una orientación: confirma el tratamiento con un técnico.</p>
+
+  <div class="grid gap-8 md:grid-cols-2">
+    <form method="post" enctype="multipart/form-data" action="{% url 'diagnostico:inicio' %}"
+          hx-post="{% url 'diagnostico:inicio' %}" hx-encoding="multipart/form-data" hx-target="#resultado" hx-swap="innerHTML"
+          hx-indicator="#analizando" x-data="vistaPrevia" class="flex flex-col gap-4" novalidate>
+      {% csrf_token %}
+      <div class="flex flex-col gap-1">
+        <label for="id_imagen" class="font-medium">{{ formulario.imagen.label }}</label>
+        <input type="file" name="imagen" id="id_imagen" accept="image/jpeg,image/png" required
+               class="file-input file-input-bordered w-full" aria-describedby="id_imagen-ayuda" @change="elegir">
+        <p id="id_imagen-ayuda" class="text-sm opacity-80">{{ formulario.imagen.help_text }}</p>
+        <p class="text-sm text-error" x-show="error" x-text="error" x-cloak role="alert"></p>
+        {% for error in formulario.imagen.errors %}<p class="text-sm text-error" role="alert">{{ error }}</p>{% endfor %}
+      </div>
+      <figure x-show="lista" x-cloak class="overflow-hidden rounded-box border border-base-300 bg-base-200">
+        <img :src="url" alt="Vista previa de la foto que vas a enviar" class="max-h-80 w-full object-contain">
+      </figure>
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary">Analizar foto</button>
+        {% include "componentes/cargando.html" with id="analizando" texto="Analizando la foto…" %}
+      </div>
+    </form>
+
+    <div id="resultado" aria-live="polite">
+      {% include "diagnostico/parciales/_resultado.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}
