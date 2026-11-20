@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% comment %} Marco del panel: título y pestañas. Bloques: encabezado, acciones, panel. {% endcomment %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4 py-8 md:py-10">
+  <p class="text-sm font-medium uppercase tracking-wide opacity-70">Administración</p>
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <h1 class="text-3xl">{% block encabezado %}{% endblock %}</h1>
+    <div class="flex gap-2">{% block acciones %}{% endblock %}</div>
+  </div>
+  {% with nombre=request.resolver_match.url_name %}
+  <nav class="tabs tabs-border mb-6 overflow-x-auto" aria-label="Secciones del panel">
+    <a href="{% url 'panel:productos' %}" class="tab whitespace-nowrap {% if 'producto' in nombre %}tab-active{% endif %}">Productos</a>
+    <a href="{% url 'panel:categorias' %}" class="tab whitespace-nowrap {% if 'categoria' in nombre %}tab-active{% endif %}">Categorías</a>
+    <a href="{% url 'panel:pedidos' %}" class="tab whitespace-nowrap {% if 'pedido' in nombre or nombre == 'estado' %}tab-active{% endif %}">Pedidos</a>
+    <a href="{% url 'panel:usuarios' %}" class="tab whitespace-nowrap {% if 'usuario' in nombre or nombre == 'rol' %}tab-active{% endif %}">Usuarios</a>
+  </nav>
+  {% endwith %}
+  {% block panel %}{% endblock %}
+</div>
+{% endblock %}

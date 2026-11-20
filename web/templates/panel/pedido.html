@@ -1,0 +1,24 @@
+{% extends "panel/marco.html" %}
+{% load agroia %}
+{% block titulo %}Pedido #{{ pedido.id }} · Administración{% endblock %}
+{% block encabezado %}Pedido #{{ pedido.id }}{% endblock %}
+{% block panel %}
+<div class="grid gap-8 md:grid-cols-[1fr_18rem]">
+  <section aria-labelledby="productos">
+    <h2 id="productos" class="text-xl mb-3">Productos</h2>
+    <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300">
+      {% for item in pedido.items %}<li class="flex justify-between gap-3 p-3"><span>{{ item.cantidad }} × {{ item.nombre_producto }}</span><span class="tabular-nums">{{ item.importe|pesos }}</span></li>{% endfor %}
+    </ul>
+    <dl class="ml-auto mt-3 grid max-w-xs grid-cols-2 gap-y-1 text-right tabular-nums">
+      <dt class="text-left">Subtotal</dt><dd>{{ pedido.subtotal|pesos }}</dd>
+      <dt class="text-left">Envío</dt><dd>{{ pedido.envio|pesos }}</dd>
+      <dt class="text-left font-bold">Total</dt><dd class="font-bold">{{ pedido.total|pesos }}</dd>
+    </dl>
+    {% with d=pedido.direccion_envio %}
+      <h2 class="text-xl mt-6 mb-2">Envío</h2>
+      <p class="text-sm">{{ d.calle }} {{ d.numero }}, {{ d.colonia }}, {{ d.municipio }}, {{ d.estado }}, C. P. {{ d.codigo_postal }}</p>
+    {% endwith %}
+  </section>
+  {% include "panel/parciales/_estado.html" %}
+</div>
+{% endblock %}

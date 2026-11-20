@@ -1,0 +1,36 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}{% if producto %}Editar producto{% else %}Nuevo producto{% endif %} · Administración{% endblock %}
+{% block encabezado %}{% if producto %}{{ producto.nombre }}{% else %}Nuevo producto{% endif %}{% endblock %}
+{% block panel %}
+<div class="grid gap-8 lg:grid-cols-[1fr_16rem]">
+  <form method="post" enctype="multipart/form-data" class="grid gap-4 sm:grid-cols-2" novalidate>
+    {% csrf_token %}
+    <div class="sm:col-span-2">{% include "componentes/errores_formulario.html" %}</div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.nombre %}</div>
+    {% include "componentes/campo.html" with campo=formulario.categoria %}
+    {% include "componentes/campo.html" with campo=formulario.unidad %}
+    {% include "componentes/campo.html" with campo=formulario.precio %}
+    {% include "componentes/campo.html" with campo=formulario.stock %}
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.descripcion %}</div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.ficha_tecnica %}</div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.imagen %}</div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.activo %}</div>
+    <div class="sm:col-span-2 flex gap-3">
+      <button type="submit" class="btn btn-primary">Guardar</button>
+      <a href="{% url 'panel:productos' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+  {% if producto %}
+    <aside class="flex flex-col gap-3 self-start">
+      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" class="rounded-box border border-base-300 bg-base-200 object-contain">{% endif %}
+      <a href="{% url 'catalogo:detalle' producto.slug %}" class="link text-sm">Ver en la tienda</a>
+      {% if producto.activo %}
+        <form method="post" action="{% url 'panel:desactivar_producto' producto.slug %}" hx-confirm="¿Desactivar este producto? Ya no aparecerá en la tienda.">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline btn-error btn-sm">Desactivar producto</button>
+        </form>
+      {% endif %}
+    </aside>
+  {% endif %}
+</div>
+{% endblock %}

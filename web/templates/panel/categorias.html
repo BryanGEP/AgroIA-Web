@@ -1,0 +1,31 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}Categorías · Administración{% endblock %}
+{% block encabezado %}Categorías{% endblock %}
+{% block acciones %}<a href="{% url 'panel:categoria_nueva' %}" class="btn btn-primary btn-sm">Nueva categoría</a>{% endblock %}
+{% block panel %}
+<div class="overflow-x-auto rounded-box border border-base-300">
+  <table class="table">
+    <thead><tr><th>Categoría</th><th>Descripción</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+    <tbody>
+      {% for c in categorias %}
+        <tr>
+          <td class="font-medium">{{ c.nombre }}</td>
+          <td class="max-w-sm text-sm">{{ c.descripcion|truncatechars:90 }}</td>
+          <td>{% if c.activa %}<span class="badge badge-success badge-sm">Activa</span>{% else %}<span class="badge badge-ghost badge-sm">Desactivada</span>{% endif %}</td>
+          <td class="flex justify-end gap-1">
+            <a href="{% url 'panel:categoria' c.slug %}" class="btn btn-ghost btn-xs">Editar<span class="sr-only"> {{ c.nombre }}</span></a>
+            {% if c.activa %}
+              <form method="post" action="{% url 'panel:desactivar_categoria' c.slug %}" hx-confirm="¿Desactivar «{{ c.nombre }}»? Sus productos dejarán de verse en la tienda.">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-xs text-error">Desactivar<span class="sr-only"> {{ c.nombre }}</span></button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">Todavía no hay categorías.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
