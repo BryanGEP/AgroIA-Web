@@ -31,7 +31,7 @@ class Settings:
     )
     # Contenedor del agente (red interna de Docker).
     url_agente: str = field(default_factory=lambda: os.getenv("URL_AGENTE", "http://agente:8000"))
-    agente_timeout: float = field(default_factory=lambda: float(os.getenv("AGENTE_TIMEOUT", "30")))
+    agente_timeout: float = field(default_factory=lambda: float(os.getenv("AGENTE_TIMEOUT", "45")))
 
 
 settings = Settings()
