@@ -1,7 +1,8 @@
 """Cliente HTTP de svc-tienda para el gateway.
 
-web no lee la base de otros servicios: todo pasa por la API, siempre con timeout. El
-catálogo y el detalle son públicos, así que por ahora no se envía token.
+web no lee la base de otros servicios: todo pasa por la API, con el cliente común
+(`clientes/api.py`) y siempre con timeout. El catálogo y el detalle son públicos, así que
+no se envía token.
 
 Las imágenes que devuelve svc-tienda apuntan a su dirección interna
 (`http://svc-tienda:8000/media/...`), que el navegador no alcanza; el cliente las
@@ -14,6 +15,8 @@ from urllib.parse import urlsplit
 
 import httpx
 from django.conf import settings
+
+from clientes.api import ClienteServicios, Servicio, ServicioNoDisponible
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +45,15 @@ class ClienteTienda:
         transport: httpx.BaseTransport | None = None,
     ):
         self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
-        self.transport = transport
+        # Las rutas de este cliente ya traen /api/v1/ o /media/: prefijo "/".
+        self.http = ClienteServicios(
+            {"tienda": Servicio(self.base_url, "/", timeout)}, transport=transport
+        )
 
     def _get(self, ruta: str, params: dict | None = None) -> httpx.Response:
         try:
-            with httpx.Client(
-                base_url=self.base_url, timeout=self.timeout, transport=self.transport
-            ) as http:
-                respuesta = http.get(ruta, params=params)
-        except httpx.HTTPError as error:
-            logger.warning("svc-tienda no respondió (%s): %s", ruta, type(error).__name__)
+            respuesta = self.http.enviar("tienda", "GET", ruta, params=params)
+        except ServicioNoDisponible as error:
             raise TiendaNoDisponible from error
         if respuesta.status_code == 404:
             raise NoEncontrado
@@ -95,4 +96,4 @@ class ClienteTienda:
 
 def obtener_cliente() -> ClienteTienda:
     """Cliente configurado; las pruebas lo sustituyen por uno con httpx.MockTransport."""
-    return ClienteTienda(settings.URL_SVC_TIENDA, settings.TIENDA_TIMEOUT)
+    return ClienteTienda(settings.URL_SVC_TIENDA, settings.SERVICIOS_TIMEOUT)

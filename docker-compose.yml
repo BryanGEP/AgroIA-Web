@@ -6,11 +6,14 @@
 # Antes de la primera vez: copiar .env.example a .env y generar las llaves JWT con
 # infra/generar_llaves.py (ver README.md). Cada servicio recibe solo sus variables.
 #
-# Los puertos se publican solo en 127.0.0.1: sirven para probar desde esta computadora
-# y no quedan visibles en la red. Además, los servicios confían en el último valor de
-# X-Forwarded-For (lo pone el gateway); desde un puerto directo se podría falsificar, por
-# eso nunca deben publicarse en 0.0.0.0 (ver docs/contrato-identidad.md). Dentro de Docker cada servicio escucha en el 8000 y
-# se llama por su nombre (http://svc-tienda:8000).
+# El punto de entrada es web (8000): páginas y proxy /api/<servicio>/. Los puertos
+# directos de los servicios (8001 a 8005) y de las bases son SOLO PARA DESARROLLO (Swagger
+# de cada servicio, Postman por servicio, depuración): se publican solo en 127.0.0.1, no
+# quedan visibles en la red y no forman parte de la API pública. Los servicios confían en
+# el último valor de X-Forwarded-For, que pone el gateway; desde un puerto directo se
+# podría falsificar, por eso nunca deben publicarse en 0.0.0.0. En el despliegue
+# (Entrega 5) solo se publica web (ver docs/contrato-identidad.md). Dentro de Docker cada
+# servicio escucha en el 8000 y se llama por su nombre (http://svc-tienda:8000).
 
 name: agroia-web
 
@@ -44,6 +47,10 @@ services:
       URL_SVC_TIENDA: ${URL_SVC_TIENDA:-http://svc-tienda:8000}
       URL_SVC_CONTENIDO: ${URL_SVC_CONTENIDO:-http://svc-contenido:8000}
       URL_SVC_IA: ${URL_SVC_IA:-http://svc-ia:8000}
+      SERVICIOS_TIMEOUT: ${SERVICIOS_TIMEOUT:-10}
+      IA_TIMEOUT: ${IA_TIMEOUT:-35}
+      # Orígenes que pueden usar el proxy /api/ desde un navegador (separados por coma).
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     secrets:
       - source: jwt_publica
         target: jwt_publica.pem

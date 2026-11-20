@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Mi cuenta{% endblock %}
+{% block contenido %}
+<div class="max-w-5xl mx-auto px-4 py-10 md:py-14">
+  <h1 class="text-3xl mb-2">Mi cuenta</h1>
+  <p class="opacity-80 mb-8">{{ perfil.email }}{% if perfil.email_verificado %} <span class="badge badge-success badge-sm ml-1">Verificado</span>{% else %} <span class="badge badge-warning badge-sm ml-1">Sin verificar</span>{% endif %}</p>
+
+  <div class="grid gap-10 lg:grid-cols-[22rem_1fr] lg:gap-12">
+    <section aria-labelledby="datos" class="flex flex-col gap-4">
+      <h2 id="datos" class="text-2xl">Mis datos</h2>
+      {% include "componentes/errores_formulario.html" with formulario=formulario_perfil %}
+      <form method="post" action="{% url 'cuentas:mi_cuenta' %}" class="flex flex-col gap-4" novalidate>
+        {% csrf_token %}
+        {% include "componentes/campo.html" with campo=formulario_perfil.nombre %}
+        {% include "componentes/campo.html" with campo=formulario_perfil.apellidos %}
+        {% include "componentes/campo.html" with campo=formulario_perfil.telefono %}
+        <button type="submit" class="btn btn-primary self-start">Guardar datos</button>
+      </form>
+      <a href="{% url 'cuentas:cambiar_password' %}" class="link text-sm">Cambiar contraseña</a>
+    </section>
+
+    <section id="direcciones" aria-labelledby="titulo-direcciones" class="flex flex-col gap-4" tabindex="-1">
+      <h2 id="titulo-direcciones" class="text-2xl">Direcciones de envío</h2>
+      {% include "cuentas/parciales/_direcciones.html" %}
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -50,3 +50,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** Entrega 3, identidad en svc-usuarios: login con JWT RS256 (access 15 min, refresh 7 días), renovación con rotación y blacklist, logout y logout-todo; correos con plantillas, verificación de correo, recuperación y cambio de contraseña; cambio de rol con registro; límite de intentos con DRF + Redis y bloqueo con django-axes; log de seguridad y registro de 401/403 en todos los servicios. Id de usuario como UUID en todos los servicios, JWT_ISSUER configurable y contrato de identidad con las diferencias con ms-usuarios. Revisión de seguridad con Semgrep, CodeQL y check --deploy, sin hallazgos de gravedad alta; se corrigieron los medios y bajos aplicables. Postman con login automático y carpeta de seguridad. 534 pruebas en verde.
 - **Qué sigue:** fase del gateway (sesión, enrutamiento, CORS y pantallas de login, registro y perfil).
 - **Bloqueos:** Ninguno.
+
+
+## 2026-11-20 · Sprint 3
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** gateway web de la Entrega 3: sesión con los JWT guardados en el servidor y renovación automática; proxy /api/<servicio>/ que valida el token antes de reenviar (defensa en dos capas) y pone la IP real del cliente; CORS con rechazo de orígenes no permitidos; CSP estricta sin unsafe-inline ni unsafe-eval (Alpine en su versión CSP); pantallas de login, registro, verificación de correo, recuperación y restablecimiento de contraseña, mi cuenta con direcciones, cambio de contraseña y cierre de sesión. Flujo verificado en el navegador sin violaciones de la CSP. Postman con carpeta Gateway (180 aserciones, 0 fallas en dos corridas). 634 pruebas en verde.
+- **Qué sigue:** pantallas protegidas (carrito, checkout, mis pedidos, chat con AgroIA, diagnóstico y panel de administrador).
+- **Bloqueos:** Docker Desktop se detuvo dos veces durante la sesión; se reinició sin pérdida de datos.

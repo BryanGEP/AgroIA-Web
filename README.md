@@ -84,7 +84,7 @@ Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /sal
 | svc-ia | http://localhost:8004/salud/ | http://localhost:8004/api/docs/ |
 | agente (solo pruebas) | http://localhost:8005/health | — (chat propio en http://localhost:8005/) |
 
-Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica) solo se publican en `127.0.0.1`: son para probar desde tu computadora. El navegador de los usuarios solo habla con `web`. Además, los servicios confían en el `X-Forwarded-For` que pondrá el gateway, que desde un puerto directo se podría falsificar: nunca los publiques en `0.0.0.0` (ver [`docs/contrato-identidad.md`](docs/contrato-identidad.md#ip-del-cliente-y-puertos-publicados)).
+**El punto de entrada es `web` (8000):** las páginas y el proxy de API `/api/<servicio>/<ruta>` (por ejemplo, `http://localhost:8000/api/tienda/productos/`), que valida el token antes de reenviar. Los puertos directos de los servicios (8001 a 8005) y de las bases (5432, 27017 y 6379; `agente-db` no se publica) son **solo para desarrollo**: se publican en `127.0.0.1`, sirven para el Swagger de cada servicio y para depurar, y no forman parte de la API pública. Además, los servicios confían en el `X-Forwarded-For` que pone el gateway, que desde un puerto directo se podría falsificar: nunca los publiques en `0.0.0.0` (ver [`docs/contrato-identidad.md`](docs/contrato-identidad.md#ip-del-cliente-y-puertos-publicados)).
 
 ### Bases de datos
 
@@ -100,7 +100,7 @@ Los puertos (también 5432, 27017 y 6379 de las bases; `agente-db` no se publica
 
 ### Iniciar sesión y tokens
 
-Desde la Entrega 3 los tokens los emite svc-usuarios: `POST http://localhost:8001/api/v1/auth/login/` con `{"email", "password"}` devuelve el `access` (15 minutos) y el `refresh` (7 días). Pega el `access` en el botón **Authorize** de `/api/docs/` de cualquier servicio o úsalo como `Authorization: Bearer <access>`. El contrato completo está en [`docs/contrato-identidad.md`](docs/contrato-identidad.md).
+En el navegador, inicia sesión en http://localhost:8000/iniciar-sesion/: los tokens se quedan en la sesión del servidor. Para la API, los tokens los emite svc-usuarios: `POST http://localhost:8000/api/usuarios/auth/login/` (a través del gateway) con `{"email", "password"}` devuelve el `access` (15 minutos) y el `refresh` (7 días). Pega el `access` en el botón **Authorize** de `/api/docs/` de cualquier servicio o úsalo como `Authorization: Bearer <access>`. El contrato completo está en [`docs/contrato-identidad.md`](docs/contrato-identidad.md).
 
 Para tener cuentas listas en desarrollo:
 

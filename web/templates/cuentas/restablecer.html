@@ -1,0 +1,13 @@
+{% extends "cuentas/marco.html" %}
+{% block titulo %}Contraseña nueva{% endblock %}
+{% block encabezado %}Elige una contraseña nueva{% endblock %}
+{% block intro %}<p class="opacity-80">Al guardarla se cerrará la sesión en todos tus dispositivos.</p>{% endblock %}
+{% block formulario %}
+  {% include "componentes/errores_formulario.html" %}
+  <form method="post" class="flex flex-col gap-4" novalidate>
+    {% csrf_token %}
+    {% include "componentes/campo.html" with campo=formulario.password %}
+    {% include "componentes/campo.html" with campo=formulario.password_confirmacion %}
+    <button type="submit" class="btn btn-primary mt-2">Guardar contraseña</button>
+  </form>
+{% endblock %}

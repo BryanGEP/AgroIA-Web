@@ -11,3 +11,4 @@ Un documento por fase o avance grande: qué se construyó, decisiones, verificac
 | Web · Base del gateway y catálogo público | 2026-10-22 | [web-base-catalogo.md](web-base-catalogo.md) | Entrega 2 |
 | Calidad · Revisión final y documento de la entrega | 2026-11-18 | [entregable-2.md](../entregable-2.md) | Entrega 2 |
 | Entrega 3 · Identidad en svc-usuarios | 2026-11-19 | [e3-identidad.md](e3-identidad.md) | Entrega 3 |
+| Entrega 3 · Gateway web | 2026-11-20 | [e3-gateway.md](e3-gateway.md) | Entrega 3 |

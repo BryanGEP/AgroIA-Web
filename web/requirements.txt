@@ -11,3 +11,5 @@ django-tailwind-cli==4.8.1
 django-htmx==1.29.0
 # Cliente HTTP hacia los servicios internos.
 httpx==0.28.1
+# CORS solo para el proxy /api/ (orígenes en CORS_ALLOWED_ORIGINS).
+django-cors-headers==4.9.0
