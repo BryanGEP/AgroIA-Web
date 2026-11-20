@@ -1,4 +1,4 @@
-"""Rutas del gateway: páginas, catálogo, /salud/ y /api/docs/."""
+"""Rutas del gateway: páginas, catálogo, cuentas, /salud/, /api/docs/ y el proxy /api/."""
 
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -8,9 +8,12 @@ from config.views import salud
 urlpatterns = [
     path("", include("apps.paginas.urls")),
     path("", include("apps.catalogo.urls")),
+    path("", include("apps.cuentas.urls")),
     path("salud/", salud, name="salud"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
+    # Proxy /api/<servicio>/<ruta> (después de docs y schema, que no son servicios).
+    path("", include("apps.proxy.urls")),
 ]
 
 handler404 = "apps.paginas.views.no_encontrado"
