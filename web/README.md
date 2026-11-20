@@ -57,6 +57,19 @@ web es el borde: el cliente común (`clientes/api.py`) pone en `X-Forwarded-For`
 | `/mi-cuenta/` | Datos y direcciones (agregar, borrar, predeterminada; con HTMX y sin JavaScript) | svc-usuarios |
 | `/mi-cuenta/contrasena/` | Cambiar contraseña; la sesión sigue con el par nuevo | svc-usuarios |
 | `/cerrar-sesion/` | Solo `POST` con CSRF | svc-usuarios |
+| `/carrito/` | Cambiar cantidad y quitar con HTMX; subtotal, envío y total. El contador del menú vive en la sesión (`carrito_cantidad`): se recalcula al iniciar sesión, al abrir el carrito y con cada cambio (`hx-swap-oob`) | svc-tienda |
+| `/checkout/` | Dirección de Mi cuenta (o una nueva ahí mismo) y método de pago simulado. El gateway manda la dirección a svc-tienda en `direccion_envio`. Con `email_no_verificado`, el aviso con el botón de reenvío | svc-tienda y svc-usuarios |
+| `/mis-pedidos/`, `/mis-pedidos/<id>/` | Estado, productos, dirección y totales; «Pagar» en los pendientes, con la etiqueta «Pago simulado» | svc-tienda |
+| `/agroia/`, `/agroia/<id>/` | Chat: conversaciones a un lado y la abierta al centro; fuentes bajo cada respuesta; reintentar si el agente no respondió | svc-contenido y svc-ia |
+| `/diagnostico/`, `/diagnostico/historial/`, `/diagnostico/<id>/` | Foto con vista previa (Alpine), resultado con probabilidades y productos sugeridos; mientras no hay modelo, «estará disponible pronto» | svc-ia, svc-contenido y svc-tienda |
+| `/diagnostico/<id>/imagen/` | La foto, pedida a svc-contenido con el token del usuario (dueño o administrador), `Cache-Control: private` | svc-contenido |
+| `/administracion/...` | Panel solo para administradores: productos (búsqueda, filtros, crear, editar con imagen y ficha técnica, desactivar), categorías, pedidos (solo las `transiciones_permitidas`) y usuarios (cambio de rol) | svc-tienda y svc-usuarios |
+
+### Chat: orquestación en el gateway
+
+Al preguntar, `apps/agroia/servicios.py` hace, de forma **síncrona**: 1) lee la conversación de svc-contenido; 2) guarda la pregunta (si responde `conversacion_llena`, ofrece una conversación nueva y no llama al agente); 3) pide la respuesta a svc-ia con el historial anterior; 4) guarda la respuesta con sus fuentes. Si el agente no responde, la pregunta queda guardada y aparece «Reintentar» (no la vuelve a guardar). Si falla guardar la respuesta, se muestra igual y queda en el log `seguridad` como `respuesta_no_guardada`, sin el texto. Nunca se inventa una respuesta. En la Entrega 4 pasará a eventos por Redis. El diagnóstico sigue el mismo patrón (`diagnostico_no_guardado`).
+
+Las respuestas del agente vienen en Markdown y se muestran con el filtro `markdown_seguro` (`apps/agroia/templatetags/`): primero escapa todo el HTML y después convierte negritas, cursivas, código, encabezados, listas y tablas a etiquetas fijas, sin estilos en línea.
 
 - **Producto inexistente o inactivo:** página 404 con enlace al catálogo.
 - **svc-tienda sin responder:** página 503 "El catálogo no está disponible en este momento" con botón para reintentar; el error se registra en el log, sin trazas en la página.
@@ -109,7 +122,7 @@ El ejecutable de Tailwind (tailwind-cli-extra 2.10.32: Tailwind 4.3.3 + daisyUI 
 | `CORS_ALLOWED_ORIGINS` | Orígenes que pueden usar `/api/` desde un navegador, separados por coma; vacío por defecto, nunca `*` |
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `web_db` para las sesiones |
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | Direcciones internas de los servicios |
-| `SERVICIOS_TIMEOUT`, `IA_TIMEOUT` | Segundos máximos de espera a un servicio (`10`) y a svc-ia (`35`, el agente tarda hasta 30) |
+| `SERVICIOS_TIMEOUT`, `IA_TIMEOUT` | Segundos máximos de espera a un servicio (`10`) y a svc-ia (`50`: el agente tiene hasta 45, `AGENTE_TIMEOUT`) |
 | `REDIS_URL` | Redis (caché y throttling) |
 
 ## Pruebas y estilo

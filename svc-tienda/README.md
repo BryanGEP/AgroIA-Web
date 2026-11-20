@@ -45,6 +45,8 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 
 Un cliente que pide el pedido o el item de carrito de otro recibe **404**, para no revelar que existe.
 
+Cada pedido trae `transiciones_permitidas`, de solo lectura: los estados a los que un administrador puede pasarlo con `PATCH /pedidos/<id>/estado/` (por ejemplo `["enviado", "cancelado"]` para uno pagado). Para un cliente siempre es una lista vacía. El panel del gateway muestra solo esos botones; la regla sigue viviendo aquí (`servicios.TRANSICIONES`).
+
 Filtros de `/productos/`: `categoria` (slug), `precio_min`, `precio_max`, `disponible` (`true`/`false`), `q` (busca en nombre y descripción) y, para administradores, `activo`. Orden con `ordering`: `precio`, `nombre`, `creado_en` (`-precio` para descendente). Paginación con `?page=`, 20 por página.
 
 ## Autenticación

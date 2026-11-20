@@ -73,6 +73,15 @@ El agente usa el LLM de [Groq](https://groq.com/). **Cada integrante necesita su
 
 La llave solo llega al contenedor `agente`, no a svc-ia. Sin llave el sistema arranca igual, pero `POST /agente/preguntar/` responde 503 `agente_no_disponible`. Para traer la versión más reciente del agente desde GitHub: `docker compose build --no-cache agente`.
 
+### Tiempo de respuesta del agente
+
+El agente tarda normalmente de 2 a 6 segundos, pero el LLM a veces se toma de 20 a 30 segundos en cualquier pregunta, no solo en la primera. Por eso svc-ia espera hasta `AGENTE_TIMEOUT=45` segundos y el gateway hasta `IA_TIMEOUT=50`; si se pasa, la pantalla del chat ofrece «Reintentar».
+
+- **Medición del 20 de noviembre de 2026** (agente recién reiniciado, tres preguntas seguidas, dos veces): primeras preguntas de 5,2 s y 5,9 s; las más lentas, 21,0 s y 29,3 s, fueron la tercera y la segunda.
+- **Arranque:** la primera pregunta carga el modelo de embeddings desde el volumen `modelos_hf`, lo que toma menos de un segundo. Si el volumen está vacío, primero lo descarga (unos 471 MB, ver arriba).
+- **Antes de una demo:** haz una pregunta de prueba en http://localhost:8000/agroia/. Así se carga el modelo y confirmas que la llave de Groq funciona.
+- **Si tu `.env` ya tenía** `AGENTE_TIMEOUT=30` o `IA_TIMEOUT=35`, cámbialos a `45` y `50` (`.env.example` ya los trae así) y reinicia con `docker compose up -d svc-ia web`.
+
 Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /salud/` y tiene su documentación en `/api/docs/`:
 
 | Servicio | Salud | Documentación |
