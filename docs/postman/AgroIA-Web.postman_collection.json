@@ -4138,7 +4138,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"tipo\": \"pedido_creado\",\n  \"usuario_id\": 10,\n  \"servicio\": \"svc-tienda\",\n  \"datos\": {\n    \"pedido_id\": 7\n  }\n}",
+                  "raw": "{\n  \"tipo\": \"pedido_creado\",\n  \"usuario_id\": \"{{cliente_id}}\",\n  \"servicio\": \"svc-tienda\",\n  \"datos\": {\n    \"pedido_id\": 7\n  }\n}",
                   "options": {
                     "raw": {
                       "language": "json"
