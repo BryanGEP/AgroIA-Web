@@ -37,14 +37,24 @@
       </div>
 
       {# Escritorio #}
+      {% with seccion=request.resolver_match.app_name %}
       <ul class="hidden md:flex items-center gap-1">
-        <li><a href="{% url 'catalogo:lista' %}" class="btn btn-ghost btn-sm {% if request.resolver_match.app_name == 'catalogo' %}btn-active{% endif %}" {% if request.resolver_match.app_name == 'catalogo' %}aria-current="page"{% endif %}>Catálogo</a></li>
-        <li><span class="inline-flex items-center gap-2 whitespace-nowrap px-3 text-sm font-medium text-base-content/70">AgroIA chat <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
-        <li><span class="inline-flex items-center gap-2 whitespace-nowrap px-3 text-sm font-medium text-base-content/70">Diagnóstico <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+        <li><a href="{% url 'catalogo:lista' %}" class="btn btn-ghost btn-sm {% if seccion == 'catalogo' %}btn-active{% endif %}" {% if seccion == 'catalogo' %}aria-current="page"{% endif %}>Catálogo</a></li>
+        <li><a href="{% url 'agroia:inicio' %}" class="btn btn-ghost btn-sm {% if seccion == 'agroia' %}btn-active{% endif %}" {% if seccion == 'agroia' %}aria-current="page"{% endif %}>AgroIA chat</a></li>
+        <li><a href="{% url 'diagnostico:inicio' %}" class="btn btn-ghost btn-sm {% if seccion == 'diagnostico' %}btn-active{% endif %}" {% if seccion == 'diagnostico' %}aria-current="page"{% endif %}>Diagnóstico</a></li>
+        {% if usuario.rol == "administrador" %}
+          <li><a href="{% url 'panel:productos' %}" class="btn btn-ghost btn-sm {% if seccion == 'panel' %}btn-active{% endif %}" {% if seccion == 'panel' %}aria-current="page"{% endif %}>Administración</a></li>
+        {% endif %}
       </ul>
+      {% endwith %}
 
       <div class="flex items-center gap-1">
         {% include "componentes/selector_tema.html" %}
+        {# Carrito: visible también en celular, fuera del menú plegable. #}
+        <a href="{% url 'tienda:carrito' %}" class="btn btn-ghost btn-sm gap-1" aria-label="Carrito">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+          {% include "componentes/contador_carrito.html" %}
+        </a>
         {% if usuario %}
           {# Menú de la cuenta; funciona sin JavaScript (<details>). #}
           <details class="dropdown dropdown-end hidden md:block">
@@ -53,6 +63,8 @@
               <span class="max-w-40 truncate">{{ usuario.nombre }}</span>
             </summary>
             <ul class="menu dropdown-content z-20 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2">
+              <li><a href="{% url 'tienda:mis_pedidos' %}">Mis pedidos</a></li>
+              <li><a href="{% url 'diagnostico:historial' %}">Mis diagnósticos</a></li>
               <li><a href="{% url 'cuentas:mi_cuenta' %}">Mi cuenta</a></li>
               <li><a href="{% url 'cuentas:cambiar_password' %}">Cambiar contraseña</a></li>
               <li>{% include "componentes/cerrar_sesion.html" %}</li>
@@ -69,10 +81,13 @@
           </summary>
           <ul class="menu dropdown-content z-20 mt-2 w-64 rounded-box border border-base-300 bg-base-100 p-2">
             <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
-            <li><span class="pointer-events-none text-base-content/70">AgroIA chat <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
-            <li><span class="pointer-events-none text-base-content/70">Diagnóstico <span class="badge badge-sm badge-outline">Próximamente</span></span></li>
+            <li><a href="{% url 'agroia:inicio' %}">AgroIA chat</a></li>
+            <li><a href="{% url 'diagnostico:inicio' %}">Diagnóstico</a></li>
+            {% if usuario.rol == "administrador" %}<li><a href="{% url 'panel:productos' %}">Administración</a></li>{% endif %}
             {% if usuario %}
               <li class="menu-title">{{ usuario.nombre }}</li>
+              <li><a href="{% url 'tienda:mis_pedidos' %}">Mis pedidos</a></li>
+              <li><a href="{% url 'diagnostico:historial' %}">Mis diagnósticos</a></li>
               <li><a href="{% url 'cuentas:mi_cuenta' %}">Mi cuenta</a></li>
               <li><a href="{% url 'cuentas:cambiar_password' %}">Cambiar contraseña</a></li>
               <li>{% include "componentes/cerrar_sesion.html" %}</li>

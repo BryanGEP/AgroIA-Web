@@ -34,7 +34,7 @@ def servicios() -> dict[str, Servicio]:
         "usuarios": Servicio(settings.URL_SVC_USUARIOS, "/api/v1/", settings.SERVICIOS_TIMEOUT),
         "tienda": Servicio(settings.URL_SVC_TIENDA, "/api/v1/", settings.SERVICIOS_TIMEOUT),
         "contenido": Servicio(settings.URL_SVC_CONTENIDO, "/api/v1/", settings.SERVICIOS_TIMEOUT),
-        # El agente puede tardar hasta AGENTE_TIMEOUT (30 s); se deja margen.
+        # El agente puede tardar hasta AGENTE_TIMEOUT (45 s); se deja margen (IA_TIMEOUT, 50 s).
         "ia": Servicio(settings.URL_SVC_IA, "/", settings.IA_TIMEOUT),
     }
 

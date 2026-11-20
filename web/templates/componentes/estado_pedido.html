@@ -1,0 +1,7 @@
+{# Estado de un pedido como insignia. Parámetro: estado. #}
+{% if estado == "pendiente" %}<span class="badge badge-warning">Pendiente de pago</span>
+{% elif estado == "pagado" %}<span class="badge badge-info">Pagado</span>
+{% elif estado == "enviado" %}<span class="badge badge-primary">Enviado</span>
+{% elif estado == "entregado" %}<span class="badge badge-success">Entregado</span>
+{% elif estado == "cancelado" %}<span class="badge badge-ghost">Cancelado</span>
+{% else %}<span class="badge">{{ estado }}</span>{% endif %}
