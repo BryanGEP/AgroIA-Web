@@ -151,7 +151,9 @@ def test_detalle(client, tienda_falsa):
     assert "Protección UV" in html and "Sí" in html
     assert "Cu" in html and "25%" in html
     assert "M, G" in html
-    assert "Agregar al carrito" in html
+    # Sin sesión, el botón lleva al login y regresa al producto.
+    assert 'href="/iniciar-sesion/?next=/catalogo/caldo-bordeles/"' in html
+    assert "Inicia sesión para comprar" in html
     assert "Fungicidas" in html
 
 

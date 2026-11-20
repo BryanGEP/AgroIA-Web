@@ -27,6 +27,11 @@ MENSAJES_DE_CAMPO = {
     "privacidad_no_aceptada": "Para crear tu cuenta debes aceptar el aviso de privacidad.",
 }
 NO_DISPONIBLE = "El servicio de cuentas no está disponible. Intenta de nuevo en unos minutos."
+NO_DISPONIBLES = {
+    "tienda": "La tienda no está disponible en este momento. Intenta de nuevo en unos minutos.",
+    "contenido": "Tu historial no está disponible ahora. Intenta de nuevo en unos minutos.",
+    "ia": "AgroIA no está disponible en este momento. Intenta de nuevo en unos minutos.",
+}
 
 
 @dataclass
@@ -83,15 +88,31 @@ def _publico(request: HttpRequest, metodo: str, ruta: str, **datos) -> dict:
     return respuesta.json() if respuesta.content else {}
 
 
-def _con_sesion(request: HttpRequest, metodo: str, ruta: str, **opciones) -> dict | list:
-    """Llamada con el token de la sesión; renueva sola si venció (SesionExpirada si no)."""
+def con_sesion_crudo(request: HttpRequest, servicio: str, metodo: str, ruta: str, **opciones):
+    """La respuesta tal cual (por ejemplo, un archivo), con el token de la sesión. Los
+    errores 4xx y 5xx llegan como ErrorApi y una caída del servicio como 503."""
     try:
-        respuesta = SesionApi(request).llamar("usuarios", metodo, ruta, **opciones)
+        respuesta = SesionApi(request).llamar(servicio, metodo, ruta, **opciones)
     except ServicioNoDisponible as error:
-        raise _sin_servicio() from error
+        raise ErrorApi(
+            estado=504 if error.tiempo_agotado else 503,
+            codigo="tiempo_agotado" if error.tiempo_agotado else "servicio_no_disponible",
+            detalle=NO_DISPONIBLES.get(servicio, NO_DISPONIBLE),
+        ) from error
     if respuesta.status_code >= 400:
         raise _error_de(respuesta)
+    return respuesta
+
+
+def con_sesion(request: HttpRequest, servicio: str, metodo: str, ruta: str, **opciones):
+    """Llamada a cualquier servicio con el token de la sesión; renueva sola si venció
+    (SesionExpirada si no se puede). Devuelve el JSON o lanza ErrorApi."""
+    respuesta = con_sesion_crudo(request, servicio, metodo, ruta, **opciones)
     return respuesta.json() if respuesta.content else {}
+
+
+def _con_sesion(request: HttpRequest, metodo: str, ruta: str, **opciones) -> dict | list:
+    return con_sesion(request, "usuarios", metodo, ruta, **opciones)
 
 
 def mensajes_de_campo(mensajes) -> list[str]:
@@ -108,6 +129,9 @@ def iniciar_sesion(request: HttpRequest, email: str, password: str) -> dict:
     # Llave de sesión nueva al entrar: evita la fijación de sesión.
     request.session.cycle_key()
     guardar_sesion(request, datos["access"], datos["refresh"], datos["usuario"])
+    from apps.tienda.servicios import recalcular_contador  # evita la importación circular
+
+    recalcular_contador(request)
     return datos["usuario"]
 
 

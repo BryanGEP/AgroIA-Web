@@ -35,7 +35,9 @@ def test_base_comun(client, tienda_falsa):
     assert "cdn." not in html  # sin CDN
     assert "Saltar al contenido" in html
     assert 'href="/aviso-de-privacidad/"' in html
-    assert html.count("Próximamente") >= 4  # chat y diagnóstico, en escritorio y en celular
+    assert "Próximamente" not in html  # carrito, chat y diagnóstico ya funcionan
+    assert 'href="/carrito/"' in html and 'href="/agroia/"' in html
+    assert 'href="/diagnostico/"' in html
     assert 'href="/iniciar-sesion/' in html  # el botón de iniciar sesión ya funciona
 
 

@@ -96,3 +96,32 @@ def ficha_filas(ficha) -> list[dict]:
         else:
             filas.append({"etiqueta": _etiqueta(clave), "valor": _valor(valor)})
     return filas
+
+
+@register.filter
+def elegir(elementos, identificador):
+    """El elemento de una lista de diccionarios cuyo `id` es `identificador`."""
+    return next((e for e in elementos or [] if str(e.get("id")) == str(identificador)), {})
+
+
+@register.filter
+def elegir_clave(diccionario, clave):
+    """El valor de `clave` en un diccionario (o la clave si no está)."""
+    return (diccionario or {}).get(clave, clave)
+
+
+@register.filter
+def porcentaje(valor) -> str:
+    """0.913 -> "91 %"."""
+    try:
+        return f"{round(float(valor) * 100)} %"
+    except (TypeError, ValueError):
+        return ""
+
+
+@register.filter
+def porcentaje_entero(valor) -> int:
+    try:
+        return round(float(valor) * 100)
+    except (TypeError, ValueError):
+        return 0
