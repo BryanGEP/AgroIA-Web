@@ -3026,7 +3026,8 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"transiciones_permitidas\", () => pm.expect(pm.response.json().transiciones_permitidas).to.eql([\"entregado\"]));"
                     ]
                   }
                 }
@@ -3083,7 +3084,8 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"transiciones_permitidas\", () => pm.expect(pm.response.json().transiciones_permitidas).to.eql([]));"
                     ]
                   }
                 }
@@ -3870,7 +3872,185 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"imagen_url es el endpoint protegido\", () => pm.expect(pm.response.json().imagen_url).to.match(/\\/api\\/v1\\/diagnosticos\\/[0-9a-f]+\\/imagen\\/$/));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Foto del diagnóstico (dueño)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_id}}/imagen/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_id}}",
+                    "imagen",
+                    ""
+                  ]
+                },
+                "description": "Solo el dueño o un administrador. `Cache-Control: private`: es un dato personal. Las fotos ya no se sirven como archivos estáticos.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Es una imagen\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.match(/^image\\//));",
+                      "pm.test(\"Cache-Control private\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"private\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Foto del diagnóstico (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_id}}/imagen/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_id}}",
+                    "imagen",
+                    ""
+                  ]
+                },
+                "description": "Un administrador también puede verla.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
                       "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Foto de otro usuario → 404",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_id}}/imagen/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_id}}",
+                    "imagen",
+                    ""
+                  ]
+                },
+                "description": "Otro cliente recibe 404, igual que en el detalle: no se revela que existe.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_usuario}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Foto sin token → 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_id}}/imagen/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_id}}",
+                    "imagen",
+                    ""
+                  ]
+                },
+                "description": "Endpoint autenticado.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
                     ]
                   }
                 }
@@ -4811,6 +4991,292 @@
                 "exec": [
                   "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
                   "pm.test(\"Error no_encontrado\", () => pm.expect(pm.response.json().error).to.eql(\"no_encontrado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear conversación (gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_gateway}}/api/contenido/conversaciones/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "contenido",
+                "conversaciones",
+                ""
+              ]
+            },
+            "description": "svc-contenido a través del proxy, con el token del cliente.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Roña desde el gateway\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set(\"conversacion_gateway_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guardar la pregunta (gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_gateway}}/api/contenido/conversaciones/{{conversacion_gateway_id}}/mensajes/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "contenido",
+                "conversaciones",
+                "{{conversacion_gateway_id}}",
+                "mensajes",
+                ""
+              ]
+            },
+            "description": "Como hace la pantalla del chat: primero se guarda la pregunta.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"usuario\",\n  \"texto\": \"¿Qué es la roña del aguacate?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preguntar a AgroIA (gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_gateway}}/api/ia/agente/preguntar/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "ia",
+                "agente",
+                "preguntar",
+                ""
+              ]
+            },
+            "description": "svc-ia a través del proxy (sin /api/v1/). El agente puede tardar varios segundos.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pregunta\": \"¿Qué es la roña del aguacate?\",\n  \"historial\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test(\"Respuesta y fuentes\", () => {",
+                  "    pm.expect(cuerpo.respuesta).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(cuerpo.fuentes).to.be.an(\"array\");",
+                  "});",
+                  "// Escapada para insertarla dentro de un texto JSON (comillas y saltos de línea).",
+              "pm.environment.set(\"respuesta_gateway\", JSON.stringify(cuerpo.respuesta).slice(1, -1));",
+                  "pm.environment.set(\"fuentes_gateway\", JSON.stringify(cuerpo.fuentes));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guardar la respuesta (gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_gateway}}/api/contenido/conversaciones/{{conversacion_gateway_id}}/mensajes/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "contenido",
+                "conversaciones",
+                "{{conversacion_gateway_id}}",
+                "mensajes",
+                ""
+              ]
+            },
+            "description": "La respuesta del agente con sus fuentes.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"agente\",\n  \"texto\": \"{{respuesta_gateway}}\",\n  \"fuentes\": {{fuentes_gateway}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Diagnóstico sin modelo → 503 (gateway)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_gateway}}/api/ia/diagnostico/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "ia",
+                "diagnostico",
+                ""
+              ]
+            },
+            "description": "Mientras no haya modelo de visión, svc-ia responde 503 `modelo_no_disponible`; la pantalla muestra «El diagnóstico por imagen estará disponible pronto».",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imagen",
+                  "type": "file",
+                  "src": "archivos/imagen-prueba.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 503\", () => pm.response.to.have.status(503));",
+                  "pm.test(\"modelo_no_disponible\", () => pm.expect(pm.response.json().error).to.eql(\"modelo_no_disponible\"));"
                 ]
               }
             }
