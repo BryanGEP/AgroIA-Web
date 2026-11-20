@@ -1,0 +1,18 @@
+{% extends "cuentas/marco.html" %}
+{% block titulo %}Iniciar sesión{% endblock %}
+{% block encabezado %}Iniciar sesión{% endblock %}
+{% block intro %}<p class="opacity-80">Entra para comprar, guardar tus direcciones y conversar con AgroIA.</p>{% endblock %}
+{% block formulario %}
+  {% include "componentes/errores_formulario.html" %}
+  <form method="post" action="{% url 'cuentas:iniciar_sesion' %}" class="flex flex-col gap-4" novalidate>
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% include "componentes/campo.html" with campo=formulario.email %}
+    {% include "componentes/campo.html" with campo=formulario.password %}
+    <button type="submit" class="btn btn-primary mt-2">Iniciar sesión</button>
+  </form>
+{% endblock %}
+{% block pie %}
+  <a href="{% url 'cuentas:recuperar' %}" class="link">¿Olvidaste tu contraseña?</a>
+  <p>¿Todavía no tienes cuenta? <a href="{% url 'cuentas:registro' %}" class="link font-medium">Crea una</a>.</p>
+{% endblock %}

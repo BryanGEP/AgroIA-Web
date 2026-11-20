@@ -30,11 +30,13 @@ def test_base_comun(client, tienda_falsa):
     assert 'lang="es-MX"' in html
     assert "hx-headers" in html and "X-CSRFToken" in html
     assert "vendor/htmx-2.0.11.min.js" in html
-    assert "vendor/alpine-3.17.4.min.js" in html
+    assert "vendor/alpine-csp-3.17.4.min.js" in html  # versión CSP de Alpine
+    assert "js/componentes.js" in html
     assert "cdn." not in html  # sin CDN
     assert "Saltar al contenido" in html
     assert 'href="/aviso-de-privacidad/"' in html
-    assert html.count("Próximamente") >= 4  # chat, diagnóstico e iniciar sesión
+    assert html.count("Próximamente") >= 4  # chat y diagnóstico, en escritorio y en celular
+    assert 'href="/iniciar-sesion/' in html  # el botón de iniciar sesión ya funciona
 
 
 def test_sin_lenguaje_del_proyecto_escolar(client, tienda_falsa):

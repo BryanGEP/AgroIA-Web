@@ -39,10 +39,11 @@
         <button type="button" class="btn btn-primary btn-lg self-start" @click="aviso = true" aria-controls="aviso-carrito" {% if producto.stock == 0 %}disabled{% endif %}>
           {% if producto.stock == 0 %}Agotado{% else %}Agregar al carrito{% endif %}
         </button>
-        <div id="aviso-carrito" x-show="aviso" x-transition.opacity role="status" class="alert alert-info" style="display:none">
-          <span>Para comprar necesitas iniciar sesión. Muy pronto podrás hacerlo desde aquí.</span>
+        <div id="aviso-carrito" x-show="aviso" x-transition.opacity x-cloak role="status" class="alert alert-info">
+          {% if usuario %}<span>Muy pronto podrás comprar desde aquí.</span>
+          {% else %}<span>Para comprar necesitas <a href="{% url 'cuentas:iniciar_sesion' %}?next={{ request.get_full_path|urlencode }}" class="link font-medium">iniciar sesión</a>. Muy pronto podrás hacerlo desde aquí.</span>{% endif %}
         </div>
-        <noscript><p class="text-sm">Para comprar necesitas iniciar sesión. Muy pronto podrás hacerlo desde aquí.</p></noscript>
+        <noscript><p class="text-sm">{% if usuario %}Muy pronto podrás comprar desde aquí.{% else %}Para comprar necesitas iniciar sesión. Muy pronto podrás hacerlo desde aquí.{% endif %}</p></noscript>
       </div>
 
       {% if producto.descripcion %}

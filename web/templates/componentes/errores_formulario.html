@@ -1,0 +1,6 @@
+{# Errores generales del formulario (credenciales, bloqueo, límite de intentos). Parámetro: formulario. #}
+{% if formulario.non_field_errors %}
+  <div class="alert alert-error" role="alert">
+    <div class="flex flex-col gap-1">{% for error in formulario.non_field_errors %}<span>{{ error }}</span>{% endfor %}</div>
+  </div>
+{% endif %}

@@ -1,0 +1,23 @@
+{% extends "cuentas/marco.html" %}
+{% block titulo %}Crear cuenta{% endblock %}
+{% block encabezado %}Crear cuenta{% endblock %}
+{% block intro %}<p class="opacity-80">Te enviaremos un enlace para verificar tu correo; lo necesitas para comprar.</p>{% endblock %}
+{% block formulario %}
+  {% include "componentes/errores_formulario.html" %}
+  <form method="post" action="{% url 'cuentas:registro' %}" class="flex flex-col gap-4" novalidate>
+    {% csrf_token %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% include "componentes/campo.html" with campo=formulario.nombre %}
+      {% include "componentes/campo.html" with campo=formulario.apellidos %}
+    </div>
+    {% include "componentes/campo.html" with campo=formulario.email %}
+    {% include "componentes/campo.html" with campo=formulario.password %}
+    {% include "componentes/campo.html" with campo=formulario.password_confirmacion %}
+    <p class="text-sm opacity-80">Al menos 8 caracteres; que no sea solo números ni se parezca a tu nombre o correo.</p>
+    {% include "componentes/campo.html" with campo=formulario.acepto_privacidad %}
+    <button type="submit" class="btn btn-primary mt-2">Crear cuenta</button>
+  </form>
+{% endblock %}
+{% block pie %}
+  <p>¿Ya tienes cuenta? <a href="{% url 'cuentas:iniciar_sesion' %}" class="link font-medium">Inicia sesión</a>.</p>
+{% endblock %}

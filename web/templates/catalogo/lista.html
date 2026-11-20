@@ -10,7 +10,7 @@
     <form id="filtros" method="get" action="{% url 'catalogo:lista' %}"
           hx-get="{% url 'catalogo:lista' %}" hx-target="#resultados" hx-push-url="true"
           hx-trigger="change, submit, input changed delay:400ms from:#id_q, search from:#id_q" hx-indicator="#cargando"
-          hx-on::config-request="for (const [k, v] of Object.entries(event.detail.parameters)) { if (v === '') delete event.detail.parameters[k] }"
+          data-quitar-vacios
           class="flex flex-col gap-4">
       <div class="flex flex-col gap-1">
         <label for="id_q" class="font-medium">Buscar</label>
@@ -18,7 +18,7 @@
       </div>
 
       {# Abierto por defecto (funciona sin JavaScript); en celular, Alpine lo pliega si no hay filtros. #}
-      <details open x-data x-init="if (window.matchMedia('(max-width: 767px)').matches && !{{ filtros.hay_filtros|yesno:'true,false' }}) $el.open = false">
+      <details open x-data="plegarEnCelular" data-hay-filtros="{{ filtros.hay_filtros|yesno:'true,false' }}">
         <summary class="btn btn-sm btn-outline w-full md:hidden">Filtros y orden</summary>
         <div class="mt-4 flex flex-col gap-4 md:mt-0">
           <div class="flex flex-col gap-1">

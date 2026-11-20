@@ -1,0 +1,20 @@
+{% comment %} Campo de formulario con su etiqueta, ayuda y errores (los de la API llegan
+   aquí con agregar_errores_de_api). Parámetro: campo (un BoundField). {% endcomment %}
+{% with id=campo.id_for_label ayuda_id=campo.id_for_label|add:"-ayuda" error_id=campo.id_for_label|add:"-error" %}
+{% if campo.field.widget.input_type == "checkbox" %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="flex items-start gap-3 cursor-pointer">
+      {{ campo }}
+      <span>{{ campo.label }}{% if campo.name == "acepto_privacidad" %} (<a href="{% url 'paginas:aviso_privacidad' %}" class="link" target="_blank" rel="noopener">leer el aviso</a>){% endif %}</span>
+    </label>
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
+{% else %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal opacity-70">(opcional)</span>{% endif %}</label>
+    {{ campo }}
+    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm opacity-80">{{ campo.help_text }}</p>{% endif %}
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
+{% endif %}
+{% endwith %}

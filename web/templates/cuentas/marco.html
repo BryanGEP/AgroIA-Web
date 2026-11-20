@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% comment %} Marco de las pantallas de cuenta: una columna angosta y centrada.
+   Bloques: titulo, intro, formulario y pie. {% endcomment %}
+{% block contenido %}
+<div class="max-w-md mx-auto px-4 py-10 md:py-14">
+  <h1 class="text-3xl mb-2">{% block encabezado %}{% endblock %}</h1>
+  {% block intro %}{% endblock %}
+  <div class="mt-6 flex flex-col gap-5">
+    {% block formulario %}{% endblock %}
+  </div>
+  <div class="mt-8 flex flex-col gap-2 text-sm">
+    {% block pie %}{% endblock %}
+  </div>
+</div>
+{% endblock %}
