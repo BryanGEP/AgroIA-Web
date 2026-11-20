@@ -1,0 +1,7 @@
+{# Resultado de "Agregar al carrito" con HTMX, más el contador del menú fuera de banda. #}
+{% if error %}
+  <p class="text-sm text-error mt-1">{{ error }}</p>
+{% else %}
+  <p class="text-sm text-success mt-1">Lo agregamos. <a href="{% url 'tienda:carrito' %}" class="link font-medium">Ver carrito</a></p>
+{% endif %}
+{% include "componentes/contador_carrito.html" with oob=True %}

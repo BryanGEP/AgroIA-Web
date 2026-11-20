@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}Mis pedidos{% endblock %}
+{% block contenido %}
+<div class="max-w-4xl mx-auto px-4 py-10 md:py-14">
+  <h1 class="text-3xl mb-6">Mis pedidos</h1>
+  {% if pedidos.results %}
+    <ul class="flex flex-col gap-3">
+      {% for pedido in pedidos.results %}
+        <li><a href="{% url 'tienda:pedido' pedido.id %}" class="card border border-base-300 bg-base-100 hover:border-primary">
+          <div class="card-body flex-row flex-wrap items-center justify-between gap-3 p-4">
+            <div><p class="font-display text-lg font-bold">Pedido #{{ pedido.id }}</p><p class="text-sm opacity-80">{{ pedido.creado_en|slice:":10" }} · {{ pedido.items|length }} producto{{ pedido.items|length|pluralize }}</p></div>
+            <div class="flex items-center gap-3">{% include "componentes/estado_pedido.html" with estado=pedido.estado %}<span class="font-display text-lg font-bold tabular-nums">{{ pedido.total|pesos }}</span></div>
+          </div>
+        </a></li>
+      {% endfor %}
+    </ul>
+    <nav class="mt-6 flex justify-between" aria-label="Páginas">
+      {% if pedidos.previous %}<a class="btn btn-ghost btn-sm" href="?page={{ pagina|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
+      {% if pedidos.next %}<a class="btn btn-ghost btn-sm" href="?page={{ pagina|add:1 }}">Siguientes</a>{% endif %}
+    </nav>
+  {% else %}
+    {% url 'catalogo:lista' as catalogo %}
+    {% include "componentes/estado_vacio.html" with titulo="Todavía no tienes pedidos" texto="Cuando compres, aquí verás su estado." enlace=catalogo accion="Ir al catálogo" %}
+  {% endif %}
+</div>
+{% endblock %}
