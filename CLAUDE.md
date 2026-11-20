@@ -42,7 +42,7 @@ AgroIA-Web/
 ├── .env.example
 ├── ruff.toml
 ├── docs/                 # entregables, colección de Postman
-├── infra/                # init de PostgreSQL, script de llaves JWT
+├── infra/                # init de PostgreSQL, llaves JWT, tokens de prueba, matriz de accesos
 ├── comun/agroia_comun/   # autenticación JWT, permisos, formato de errores
 ├── web/                  # gateway con plantillas
 ├── svc-usuarios/

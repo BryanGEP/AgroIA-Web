@@ -69,6 +69,8 @@ docker compose exec svc-tienda python manage.py cargar_datos_demo
 
 Carga 5 categorías (fungicidas, fertilizantes, herramientas, riego y protección) y 20 productos con precios en pesos y fichas técnicas. Se puede correr varias veces: no duplica y restablece precio y stock de esos productos.
 
+Para borrar lo que dejan las pruebas (productos y categorías con sufijo de timestamp, de Postman o de la matriz, y los pedidos y carritos de las cuentas demo y de prueba), solo con `DJANGO_DEBUG=True`: `python manage.py limpiar_datos_prueba --usuarios <ids>`. Nunca toca el catálogo de demostración. Ver [Correr las pruebas de seguridad](../README.md#correr-las-pruebas-de-seguridad).
+
 ## Variables de entorno
 
 Salen del `.env` de la raíz (ver [`.env.example`](../.env.example)).

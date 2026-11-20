@@ -263,7 +263,7 @@ Catálogo, pedidos, agente y diagnóstico reconocen al usuario leyendo el token,
    - Poner esta configuración y las clases de permiso de la sección 8 en un paquete común del monorepo (por ejemplo `comun/`), para no copiar código entre servicios.
 4. **Leer el id y el rol del usuario desde el token.**
    - `request.user` será un `TokenUser`: `request.user.id` y `request.user.token["rol"]`.
-   - Los modelos de otros servicios guardan `usuario_id` como entero o UUID simple, sin `ForeignKey` a `Usuario` (viven en otra base).
+   - Los modelos de otros servicios guardan `usuario_id` como UUID (en MongoDB, como texto), sin `ForeignKey` a `Usuario` (viven en otra base). Ver [`contrato-identidad.md`](contrato-identidad.md).
    - Si un servicio necesita datos del usuario que no están en el token (por ejemplo, la dirección en pedidos), llama a `svc-usuarios` reenviando el token del usuario.
 
 **Pruebas mínimas:** en cada servicio, token válido aceptado; token firmado con otra llave rechazado; token vencido rechazado; token sin `rol` rechazado en endpoints que lo piden.

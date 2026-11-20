@@ -14,7 +14,7 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
 | `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
 | `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django. | — | — | [README](comun/README.md) |
-| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT) y `emitir_token.py` (tokens solo para pruebas). | — | — | — |
+| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT), `emitir_token.py` (tokens solo para pruebas) y `matriz_seguridad.py` ([matriz de accesos](#matriz-de-accesos)). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
 Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), y **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector). En total, diez contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
@@ -134,7 +134,56 @@ La colección [`docs/postman/`](docs/postman/) inicia sesión sola: la carpeta �
 newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var "token_vencido=$(python infra/emitir_token.py --vencido)"
 ```
 
-La carpeta «Seguridad» agota el límite de 10 logins por minuto: entre dos corridas espera un minuto.
+La carpeta «Seguridad» agota el límite de 10 logins por minuto: entre dos corridas espera un minuto. Además, cada corrida hace dos registros (límite de 5 por hora por IP), así que caben dos corridas por hora. Para empezar con los límites en cero, ver [Correr las pruebas de seguridad](#correr-las-pruebas-de-seguridad).
+
+### Matriz de accesos
+
+[`infra/matriz_seguridad.py`](infra/matriz_seguridad.py) prueba quién puede hacer qué **a través del gateway** (`http://127.0.0.1:8000/api/`): ocho actores (anónimo, cliente sin verificar, cliente verificado, administrador, token vencido, token de otra llave, refresh en la blacklist y origen no permitido) contra endpoints de los cuatro servicios, más el bloqueo por intentos fallidos y el exceso de logins y de recuperaciones. Compara el código HTTP y el código de error de cada respuesta con lo esperado y escribe [`docs/entregable-3/matriz-accesos.md`](docs/entregable-3/matriz-accesos.md). Termina con código 1 si algún caso no coincide.
+
+Con el sistema levantado, `cargar_datos_demo` y `cargar_usuarios_demo`, y el venv de la raíz activo, desde la raíz:
+
+```powershell
+python infra/matriz_seguridad.py                    # completa, unos 2 minutos
+python infra/matriz_seguridad.py --omitir-limites   # sin los casos de exceso de intentos
+```
+
+- **Usa las cuentas de demostración** y crea lo que necesita: un producto, un pedido, y una conversación y un diagnóstico por cuenta. Al terminar lo borra (el pedido, el producto y los diagnósticos con el `manage.py` de su servicio, porque la API no los borra), restaura el carrito del cliente y cierra sus sesiones. Necesita `docker` en el PATH para esa limpieza.
+- **Respeta los límites, sin subirlos:** antes de los casos de login espera 61 s. La recuperación permite 3 por hora por IP y la matriz la agota: si corres Postman después, «Pedir recuperación» responde 429 hasta que pase una hora o hasta correr `reiniciar_limites`. Por eso Postman va primero y la matriz al final.
+- **Llama al agente** tres veces (una por cuenta), así que necesita la llave de Groq.
+
+### Correr las pruebas de seguridad
+
+Postman y la matriz usan las cuentas de demostración, gastan los límites de intentos y dejan datos de prueba. Dos comandos, que **solo corren con `DJANGO_DEBUG=True`** (con `False` fallan con un mensaje claro), preparan y limpian el entorno sin cambiar los límites ni la lógica de seguridad:
+
+- **`reiniciar_limites`** (svc-usuarios) borra los contadores de intentos de Redis (`throttle_*`: login, registro, recuperación, reenvío y cambio de contraseña) y los bloqueos de django-axes.
+- **`limpiar_datos_prueba`** (svc-usuarios, svc-tienda y svc-contenido) borra lo que crean las pruebas. Se puede correr varias veces y dice cuánto borró:
+  - en svc-tienda, los productos y categorías con sufijo de timestamp (los de Postman, como `Fosfito de potasio 1 L 1795210684`) o de la matriz (`matriz-…`), y los pedidos y carritos de las cuentas demo y de prueba;
+  - en svc-contenido, las conversaciones, los diagnósticos con su foto y los eventos de bitácora de esas cuentas;
+  - en svc-usuarios, los usuarios que registran las pruebas (`<palabra>.<timestamp>@example.com`).
+
+  Nunca toca el catálogo de demostración, las cuentas demo ni la base de conocimiento del agente. svc-tienda y svc-contenido no leen la base de usuarios: los ids de las cuentas demo y de prueba los imprime svc-usuarios con `--listar-ids` y se les pasan con `--usuarios`. Por eso svc-usuarios se limpia al final.
+
+Orden recomendado, desde la raíz en PowerShell, con el venv activo:
+
+```powershell
+# 1. Límites en cero
+docker compose exec svc-usuarios python manage.py reiniciar_limites
+
+# 2. Postman
+newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var "token_vencido=$(python infra/emitir_token.py --vencido)"
+
+# 3. Esperar un minuto (10 logins por minuto) y correr la matriz
+Start-Sleep -Seconds 60
+python infra/matriz_seguridad.py
+
+# 4. Limpiar los datos de prueba (svc-usuarios al final)
+$ids = docker compose exec -T svc-usuarios python manage.py limpiar_datos_prueba --listar-ids
+docker compose exec svc-tienda python manage.py limpiar_datos_prueba --usuarios $ids
+docker compose exec svc-contenido python manage.py limpiar_datos_prueba --usuarios $ids
+docker compose exec svc-usuarios python manage.py limpiar_datos_prueba
+```
+
+Las compras de Postman descuentan stock del catálogo de demostración; `cargar_datos_demo` lo restablece.
 
 ## Comandos del día a día
 
@@ -178,6 +227,8 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - [CLAUDE.md](CLAUDE.md): reglas que siempre se respetan (resumen para Claude Code y para el equipo).
 - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
 - [Documento del Entregable 2](docs/entregable-2.md)
+- [Documento del Entregable 3](docs/entregable-3.md) y su [matriz de accesos](docs/entregable-3/matriz-accesos.md)
+- [Contrato de identidad](docs/contrato-identidad.md): qué emite svc-usuarios y cómo valida el token cada servicio.
 
 ## Entregas
 
@@ -185,6 +236,9 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
   - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
 - **Entrega 2:** microservicios con Django/DRF y FastAPI, PostgreSQL y MongoDB, integración con el agente de IA, pruebas, Swagger, Postman y Docker Compose.
   - [Documento del Entregable 2](docs/entregable-2.md)
+- **Entrega 3:** seguridad: autenticación JWT con rotación y blacklist, propagación de identidad a los microservicios, API Gateway, control de acceso por roles, buenas prácticas (CORS, CSP, límites de intentos, log de seguridad) y las pantallas protegidas.
+  - [Documento del Entregable 3](docs/entregable-3.md)
+  - [Matriz de accesos](docs/entregable-3/matriz-accesos.md)
 
 ## Cómo contribuir
 

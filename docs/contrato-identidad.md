@@ -131,7 +131,7 @@ Cada servicio escribe una línea JSON por evento en el logger `seguridad` (`agro
 ## Límites conocidos
 
 - **Un access ya emitido sigue sirviendo hasta que vence (máximo 15 minutos)** después de `logout`, `logout-todo`, un cambio de contraseña, un cambio de rol o la desactivación de la cuenta. Los servicios validan el token sin consultar la base, así que no conocen `token_version` ni la blacklist. Lo que sí se corta de inmediato es la renovación. Si hiciera falta cortarlo antes, la opción sería publicar en Redis los `jti` revocados o el `token_version` vigente (Entrega 4).
-- El refresh queda en el cliente (en la fase del gateway, en la sesión del servidor, nunca en el navegador).
+- El refresh queda en quien inició sesión: en las pantallas, en la sesión del servidor del gateway (`web_db`), nunca en el navegador; en el proxy `/api/`, en el cliente de API.
 - 2FA está preparado en el login, pero todavía no se puede activar.
 
 ## Diferencias con ms-usuarios
