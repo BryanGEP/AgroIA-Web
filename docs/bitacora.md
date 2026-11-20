@@ -64,3 +64,10 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** pantallas protegidas de la Entrega 3: carrito con contador en el menú, checkout con direcciones y aviso de correo sin verificar, mis pedidos con pago simulado; chat con AgroIA orquestado por el gateway (svc-contenido + svc-ia) con fuentes, reintento y manejo de fallos; diagnóstico con vista previa y flujo listo para el modelo; panel de administrador (productos, categorías, pedidos con transiciones que da svc-tienda y usuarios). Correcciones de seguridad: fotos de diagnóstico solo para su dueño o un administrador, redirección sin validar en el cambio de rol y filtro de Markdown del chat probado contra XSS. Timeout del agente a 45 s. 768 pruebas en verde.
 - **Qué sigue:** cierre de la Entrega 3: documento de arquitectura de seguridad y matriz de pruebas de acceso permitido y denegado.
 - **Bloqueos:** Ninguno.
+
+
+## 2026-11-20 · Sprint 3
+- **Integrante:** Bryan Gael Esquivel Pérez
+- **Qué se hizo:** cierre de la Entrega 3: verificación completa desde cero (10 contenedores, 789 pruebas en verde, Postman sin fallas); matriz de accesos automatizada a través del gateway con 106 de 106 casos correctos (26 permitidos y 80 denegados); análisis estático de todo el código con CodeQL y Semgrep sin hallazgos reales; documento del Entregable 3 con la arquitectura de seguridad, diagramas de secuencia, evidencia y capturas; comandos de desarrollo para limpiar datos de prueba y reiniciar límites; documentación alineada con el código.
+- **Qué sigue:** fusionar develop en main (v3.0) y empezar la Entrega 4 (comunicación asíncrona entre microservicios).
+- **Bloqueos:** Ninguno.
