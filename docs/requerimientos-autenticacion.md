@@ -275,7 +275,7 @@ El gateway guarda los JWT en su sesión de servidor; el navegador solo recibe la
 1. **Guardar los JWT en la sesión de Django.**
    - Usar `SESSION_ENGINE = "django.contrib.sessions.backends.db"` (o `cache` con Redis).
    - Al hacer login: `request.session["access"]`, `["refresh"]`, `["usuario"]` (id, nombre, rol, email\_verificado) y llamar `request.session.cycle_key()` para evitar fijación de sesión.
-   - Crear un cliente HTTP único (`web/servicios/api.py`) que agrega `Authorization: Bearer <access>` a cada llamada a los servicios.
+   - Crear un cliente HTTP único (`web/clientes/api.py`, junto al cliente del catálogo) que agrega `Authorization: Bearer <access>` a cada llamada a los servicios y pone en `X-Forwarded-For` la IP real del navegador.
 2. **Configurar la cookie de sesión.**
    - `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`, `SESSION_COOKIE_AGE = 604800` (7 días, igual que el refresh).
    - En producción: `SESSION_COOKIE_SECURE = True`, `CSRF_COOKIE_SECURE = True`; en desarrollo pueden quedar en `False` porque se usa HTTP.
@@ -284,7 +284,7 @@ El gateway guarda los JWT en su sesión de servidor; el navegador solo recibe la
    - En el cliente HTTP: si un servicio responde `401`, llamar a `/token/renovar/`, guardar el par nuevo en la sesión y repetir la petición una sola vez.
    - Opcional: renovar antes de que caduque leyendo el `exp` del token, para ahorrar el primer `401`.
 4. **Redirigir al login cuando el refresh expire.**
-   - Si la renovación falla: `session.flush()` y redirigir a `/login/?next=<ruta actual>` con el mensaje "Tu sesión expiró".
+   - Si la renovación falla: `session.flush()` y redirigir a `/iniciar-sesion/?next=<ruta actual>` con el mensaje "Tu sesión expiró". Las rutas del gateway van en español: `/iniciar-sesion/`, `/registro/`, `/verificar-correo/`, `/recuperar/`, `/restablecer/<uid>/<token>/`, `/mi-cuenta/` y `/cerrar-sesion/`.
    - Crear el decorador `@login_requerido` y `@rol_requerido("administrador")` para las vistas del gateway.
    - Hacer disponible `usuario` en todas las plantillas con un *context processor*, para el menú y el banner de correo sin verificar.
 

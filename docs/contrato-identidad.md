@@ -76,7 +76,7 @@ El resto (registro, verificación, recuperación, cambio de contraseña y de rol
 | svc-tienda, svc-contenido, svc-usuarios | `agroia_comun.autenticacion.AutenticacionJWT` (simplejwt `JWTStatelessUserAuthentication`), configurada con `configurar_jwt(llave_publica, issuer=JWT_ISSUER)` | Firma RS256 con la pública, `exp`, `iss`, `token_type == "access"`, `user_id` presente y UUID. No consulta la base de svc-usuarios |
 | svc-ia (FastAPI) | `app/seguridad.py` con PyJWT | Las mismas reglas: `require` de `exp`, `iss` y `jti`, `token_type == "access"`, `user_id` UUID, emisor `JWT_ISSUER` |
 | svc-usuarios, al renovar | `RefreshToken` de simplejwt más la base | Además: blacklist, `is_active` y `token_version` contra la base |
-| web (gateway) | Fase siguiente | Guardará los tokens en la sesión y los reenviará a los servicios |
+| web (gateway) | Proxy `/api/<servicio>/` con `agroia_comun.tokens.validar_access` (PyJWT); las páginas guardan los tokens en la sesión del servidor | Las mismas reglas que svc-ia antes de reenviar; no revisa roles (ver «Dos capas de validación») |
 
 Permisos (en `agroia_comun.permisos` y su equivalente en svc-ia), leídos del token:
 
@@ -88,6 +88,17 @@ Permisos (en `agroia_comun.permisos` y su equivalente en svc-ia), leídos del to
 | `CorreoVerificado` | `email_verificado` en `true` | 403 `email_no_verificado`, «Verifica tu correo para poder hacer esta acción.» |
 
 Con `AUTH_ACTIVA=False` (solo con `DEBUG=True`) se apagan las revisiones de rol; un token que llega se sigue validando.
+
+## Dos capas de validación
+
+| Capa | Dónde | Qué revisa | Si falla |
+| --- | --- | --- | --- |
+| 1. Gateway | `web`, proxy `/api/<servicio>/<ruta>` (`agroia_comun.tokens.validar_access`) | Firma RS256, `JWT_ISSUER`, `exp`, `token_type == "access"` y `user_id` UUID, antes de reenviar. Las rutas públicas (login, registro, verificación, recuperación, catálogo) pasan sin token | 401 `no_autenticado` o `token_invalido`, sin llegar al servicio |
+| 2. Servicio | Cada servicio (`AutenticacionJWT` en los Django, `app/seguridad.py` en svc-ia) | Las mismas reglas, y además los roles y la verificación del correo | 401, o 403 `sin_permiso` / `email_no_verificado` |
+
+La segunda capa no se quita aunque exista la primera (defensa en profundidad): un servicio nunca confía en que la petición pasó por el gateway.
+
+**El proxy nunca toma el token de la sesión del navegador.** Solo acepta `Authorization: Bearer <access>`; una petición a `/api/` con una cookie de sesión válida y sin ese encabezado es anónima (401 en una ruta privada). Así ningún sitio ajeno puede usar la sesión de un usuario a través del proxy, y el proxy no necesita CSRF. Las páginas del gateway sí usan la sesión: el gateway guarda los tokens en `web_db` y los manda él mismo.
 
 ## Errores
 
@@ -109,9 +120,9 @@ Todos con el formato común `{"error": "codigo_corto", "detalle": "mensaje para 
 
 Los límites de intentos, el bloqueo de axes y el log de seguridad necesitan la IP del cliente. Los servicios confían en **un** proxy, el gateway `web` (`NUM_PROXIES = 1` en DRF y `AXES_CLIENT_IP_CALLABLE = agroia_comun.seguridad.ip_cliente`): toman el último valor de `X-Forwarded-For`, que agrega el gateway, o la IP de la conexión si no viene.
 
-Quien llegue directo a un servicio podría mandar su propio `X-Forwarded-For` y hacerse pasar por otra IP. Por eso los puertos directos (8001 a 8004) **solo se publican en `127.0.0.1`**: sirven para probar desde la propia computadora, no son visibles en la red y nunca deben publicarse en `0.0.0.0`. En producción solo el gateway queda expuesto.
+Quien llegue directo a un servicio podría mandar su propio `X-Forwarded-For` y hacerse pasar por otra IP. Por eso los puertos directos (8001 a 8005) **solo se publican en `127.0.0.1` y solo para desarrollo** (Swagger de cada servicio, Postman por servicio, depuración): no son visibles en la red, no forman parte de la API pública y nunca deben publicarse en `0.0.0.0`. El punto de entrada es el gateway (`8000`); en el despliegue (Entrega 5) solo se publica web.
 
-**Condición para la fase del gateway:** el gateway debe poner en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenviar el `X-Forwarded-For` que mande el cliente. Si lo reenviara, cualquier cliente elegiría la IP con la que se le cuentan los intentos y podría esquivar el límite de logins y el bloqueo por correo + IP.
+**Cumplido en la fase del gateway:** el gateway pone en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenvía el `X-Forwarded-For` que mande el cliente (`web/clientes/api.py`; hay pruebas para el proxy y para el login desde `/iniciar-sesion/`). Si un balanceador se pone delante de web en el despliegue, esta regla se revisa. Si lo reenviara, cualquier cliente elegiría la IP con la que se le cuentan los intentos y podría esquivar el límite de logins y el bloqueo por correo + IP.
 
 ## Log de seguridad
 

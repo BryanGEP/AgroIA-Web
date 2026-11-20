@@ -106,7 +106,8 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - CSRF para HTMX con `hx-headers` en el `<body>` de `base.html`.
 - Indicador de carga (`hx-indicator` + `loading` de daisyUI) en peticiones que tarden, sobre todo agente y diagnóstico.
 - Diseño mobile-first. Cada `input` con `label`, cada imagen con `alt`.
-- HTMX y Alpine se sirven desde `static/vendor/`, no desde CDN.
+- HTMX y Alpine se sirven desde `static/vendor/`, no desde CDN. Alpine es la versión CSP (`@alpinejs/csp`): la lógica compleja va en `Alpine.data()` dentro de `static/js/`; sin `hx-on`, sin scripts ni estilos en línea (`style=`, `onclick=`), porque la Content-Security-Policy no permite `unsafe-inline` ni `unsafe-eval`.
+- El proxy `/api/<servicio>/` del gateway solo acepta el token en `Authorization`, nunca el de la sesión.
 - No uses Bootstrap, React ni jQuery.
 
 ## Pruebas
