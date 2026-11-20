@@ -7,7 +7,7 @@ Responde preguntas con el agente AgroIA y clasifica imágenes de aguacate (`sano
 - **Documentación de la API:** http://localhost:8004/api/docs/ (Swagger de FastAPI, botón **Authorize**)
 - **Salud:** `GET http://localhost:8004/salud/` → `{"estado": "ok"}`
 
-Todas las respuestas de negocio traen `id` y `estado` (hoy siempre `"listo"`), para volverse asíncronas en la Entrega 4. En la Entrega 2 svc-ia y svc-contenido no se llaman entre sí: el gateway llama a svc-ia y después guarda el resultado en svc-contenido.
+Todas las respuestas de negocio traen `id` y `estado` (hoy siempre `"listo"`), para volverse asíncronas en la Entrega 4. Hasta la Entrega 3 svc-ia y svc-contenido no se llaman entre sí: el gateway llama a svc-ia y después guarda el resultado en svc-contenido.
 
 ```
 web ──► svc-ia ──HTTP──► agente (repo AgroIA) ──► Groq (LLM)
@@ -79,7 +79,7 @@ El token sale del login de svc-usuarios (ver el [README raíz](../README.md#inic
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar el JWT |
 | `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `URL_AGENTE` | Dirección del agente (`http://agente:8000`) |
-| `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`45`; la primera pregunta tras arrancar es la más lenta) |
+| `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`45`; el LLM a veces tarda de 20 a 30 s en cualquier pregunta, ver el [README raíz](../README.md#tiempo-de-respuesta-del-agente)) |
 
 Las variables del LLM (`GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`) ya no son de svc-ia: van al contenedor `agente`.
 

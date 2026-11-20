@@ -79,11 +79,11 @@ Al rebasar un límite: 429 `demasiados_intentos` con el encabezado `Retry-After`
 
 ### Correo y contraseña
 
-- **Verificación:** el correo trae `{FRONTEND_URL}/verificar-correo/?token=...` (firmado con `TimestampSigner`, vence en 24 horas). El gateway mandará ese `token` a `POST /auth/verificar-correo/`: 400 `token_invalido` si se alteró, 400 `token_expirado` si venció, 200 «Tu correo ya estaba verificado.» si ya lo estaba. Sin verificar se puede iniciar sesión, pero comprar en svc-tienda responde 403 `email_no_verificado`.
+- **Verificación:** el correo trae `{FRONTEND_URL}/verificar-correo/?token=...` (firmado con `TimestampSigner`, vence en 24 horas). La pantalla `/verificar-correo/` del gateway manda ese `token` a `POST /auth/verificar-correo/`: 400 `token_invalido` si se alteró, 400 `token_expirado` si venció, 200 «Tu correo ya estaba verificado.» si ya lo estaba. Sin verificar se puede iniciar sesión, pero comprar en svc-tienda responde 403 `email_no_verificado`.
 - **Reenvío y recuperación:** siempre 200 con un mensaje genérico, exista o no la cuenta.
 - **Restablecer:** el correo trae `{FRONTEND_URL}/restablecer/<uid>/<token>/` (de un solo uso, vence en 1 hora). `POST /auth/restablecer/` con `{"uid", "token", "password", "password_confirmacion"}`: cierra todas las sesiones, marca el correo como verificado y envía el aviso «Tu contraseña fue cambiada». Enlace inválido, usado o vencido: 400 `enlace_invalido`.
 - **Cambiar contraseña:** `{"password_actual", "password_nueva", "password_confirmacion"}`. Errores: `password_actual_incorrecta`, `password_repetida` o `validacion`. Cierra las demás sesiones y devuelve un par nuevo para este dispositivo, más el aviso por correo.
-- Las pantallas de estos enlaces llegan en la fase del gateway; mientras, el enlace se copia de la consola.
+- Los enlaces abren las pantallas del gateway (`/verificar-correo/` y `/restablecer/<uid>/<token>/`). En desarrollo, el correo se imprime en `docker compose logs svc-usuarios` y el enlace se copia de ahí.
 
 ### Roles
 
@@ -127,6 +127,8 @@ docker compose exec svc-usuarios python manage.py createsuperuser
 ```
 
 `cargar_usuarios_demo` crea `cliente@demo.agroia.test` (verificado), `sin-verificar@demo.agroia.test` y `admin@demo.agroia.test`, las tres con la contraseña `solo-demo-no-usar-en-produccion`, que está en el entorno de Postman a propósito. **Estas cuentas no deben existir fuera de desarrollo:** el comando se niega a correr con `DJANGO_DEBUG=False`.
+
+Para las pruebas de seguridad hay dos comandos más, también solo con `DJANGO_DEBUG=True`: `reiniciar_limites` vacía los contadores de intentos de Redis y los bloqueos de axes, y `limpiar_datos_prueba` borra los usuarios que registran las pruebas (`<palabra>.<timestamp>@example.com`); con `--listar-ids` solo imprime los ids de las cuentas demo y de prueba para svc-tienda y svc-contenido. Ver [Correr las pruebas de seguridad](../README.md#correr-las-pruebas-de-seguridad).
 
 ## Mantenimiento
 

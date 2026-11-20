@@ -9,7 +9,7 @@ Conversaciones con el agente, historial de diagnósticos y bitácora de activida
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
 
-En la Entrega 2 este servicio no llama a nadie: el gateway pregunta a svc-ia y después guarda aquí la conversación o el diagnóstico. En la Entrega 4 lo harán eventos por Redis.
+Hasta la Entrega 3 este servicio no llama a nadie: el gateway pregunta a svc-ia y después guarda aquí la conversación o el diagnóstico. En la Entrega 4 lo harán eventos por Redis.
 
 ## Estructura
 
@@ -40,7 +40,7 @@ Las apps no tienen `models.py` ni `admin.py` porque no hay ORM. `config/mongo.py
 
 `imagen` guarda el nombre del archivo en `default_storage`, no la URL. La respuesta trae `imagen_url`, que apunta a `GET /api/v1/diagnosticos/<id>/imagen/`: la foto solo la recibe el dueño o un administrador (404 para los demás, como el detalle), con `Cache-Control: private`. **Las fotos no se sirven como archivos estáticos, ni con `DEBUG=True`**: son datos personales (corrección de seguridad de la Entrega 3). El gateway las muestra en `/diagnostico/<id>/imagen/` pidiéndolas con el token del usuario.
 
-Los índices se crean con `python manage.py crear_indices`, que el contenedor corre al arrancar y se puede repetir sin problema.
+Los índices se crean con `python manage.py crear_indices`, que el contenedor corre al arrancar y se puede repetir sin problema. `limpiar_datos_prueba --usuarios <ids>` (solo con `DJANGO_DEBUG=True`) borra las conversaciones, los diagnósticos con su foto y los eventos de bitácora de las cuentas demo y de prueba; ver [Correr las pruebas de seguridad](../README.md#correr-las-pruebas-de-seguridad).
 
 ## Endpoints × rol
 

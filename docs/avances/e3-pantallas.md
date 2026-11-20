@@ -234,6 +234,6 @@ Rama `feat/e3-pantallas` desde `develop`. Los commits se proponen al cerrar la f
 
 - **Entrega 4:** pasar la orquestación del chat y del diagnóstico a eventos por Redis (svc-ia responde `pendiente` y svc-contenido guarda el resultado).
 - **Modelo de visión:** cuando svc-ia lo tenga, el flujo del diagnóstico ya está listo, probado con un resultado simulado.
-- **Tiempo del agente:** en una corrida tardó 28,3 s, cerca de `AGENTE_TIMEOUT` (30 s). Conviene vigilarlo; con eventos dejará de bloquear la petición.
+- **Tiempo del agente:** en una corrida tardó 28,3 s, cerca del `AGENTE_TIMEOUT` de entonces (30 s). Se subió a 45 s (ver «Ajustes antes de cerrar la fase»); con eventos dejará de bloquear la petición.
 - **Respuestas no guardadas:** se muestran, pero no quedan en el historial; al recargar la página desaparecen.
 - **Despliegue (Entrega 5):** las fotos se servirán desde Cloud Storage con URLs firmadas o a través del mismo endpoint protegido.
