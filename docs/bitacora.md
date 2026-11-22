@@ -71,3 +71,20 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - **Qué se hizo:** cierre de la Entrega 3: verificación completa desde cero (10 contenedores, 789 pruebas en verde, Postman sin fallas); matriz de accesos automatizada a través del gateway con 106 de 106 casos correctos (26 permitidos y 80 denegados); análisis estático de todo el código con CodeQL y Semgrep sin hallazgos reales; documento del Entregable 3 con la arquitectura de seguridad, diagramas de secuencia, evidencia y capturas; comandos de desarrollo para limpiar datos de prueba y reiniciar límites; documentación alineada con el código.
 - **Qué sigue:** fusionar develop en main (v3.0) y empezar la Entrega 4 (comunicación asíncrona entre microservicios).
 - **Bloqueos:** Ninguno.
+
+
+## 2026-11-22 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Diseño de la comunicación asíncrona: catálogo de eventos, sobre común y diagrama del flujo en `docs/eventos.md`.
+- Librería de eventos en `comun` sobre Redis Streams con grupos de consumidores: publicación validada, confirmación, reintentos con espera creciente, reclamo de mensajes colgados, stream de fallidos, reproceso e idempotencia. El núcleo no depende de Django, así que también lo usa `svc-ia`.
+- Redis con persistencia (`appendonly`) y `noeviction`; eventos separados de la caché del límite de intentos.
+- Primer evento real: `usuario_registrado`, de `svc-usuarios` a la bitácora de `svc-contenido`, con un contenedor consumidor propio (11 contenedores).
+- Prueba de punta a punta en Docker (`infra/prueba_eventos.py`): flujo completo, consumidor caído, evento fallido y reproceso, y apagado limpio.
+
+**Qué sigue:**
+- Fase 2: eventos de negocio (`correo_verificado`, `rol_cambiado`, eventos de pedidos y `correo_solicitado`) y `correlacion_id` generado por el gateway.
+
+**Bloqueos:** Ninguno.

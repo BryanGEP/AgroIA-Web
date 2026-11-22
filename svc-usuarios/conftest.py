@@ -4,13 +4,24 @@ El `user_id` del token es el `id` (UUID) del Usuario, así que cada fixture crea
 con un id fijo y firma el token para ese id.
 """
 
+import fakeredis
 import pytest
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
+from agroia_comun.eventos import conexion as conexion_eventos
 from apps.usuarios.tests.factories import UsuarioFactory
 from tests.datos import ADMIN_ID, CLIENTE_ID, OTRO_CLIENTE_ID
 from tests.tokens import api_con, token
+
+
+@pytest.fixture(autouse=True)
+def redis_de_eventos():
+    """Los eventos usan un Redis simulado y vacío en cada prueba (sin contenedor)."""
+    simulado = fakeredis.FakeRedis(decode_responses=True)
+    conexion_eventos.usar(simulado)
+    yield simulado
+    conexion_eventos.usar(None)
 
 
 @pytest.fixture(autouse=True)

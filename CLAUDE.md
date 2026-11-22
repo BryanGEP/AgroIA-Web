@@ -13,10 +13,10 @@ Si algo de este archivo contradice esos documentos, gana este archivo; avisa de 
 
 - Python 3.12, Django 5.2 LTS, Django REST Framework, drf-spectacular, django-filter.
 - Autenticación: djangorestframework-simplejwt (RS256) + django-axes.
-- PostgreSQL 16, MongoDB 7 (pymongo), Redis 7.
+- PostgreSQL 16, MongoDB 7 (pymongo), Redis 7 (caché del límite de intentos y eventos con Redis Streams).
 - `svc-ia` usa FastAPI (reutiliza el agente del repo BryanGEP/AgroIA).
 - Frontend en `web/`: plantillas de Django + Tailwind CSS 4 + daisyUI 5 (vía `django-tailwind-cli`, sin Node) + HTMX 2 (`django-htmx`) + Alpine.js 3.
-- Pruebas: pytest, pytest-django, factory-boy, responses, mongomock. Estilo: ruff.
+- Pruebas: pytest, pytest-django, factory-boy, responses, mongomock, fakeredis. Estilo: ruff.
 - Todo corre con `docker compose up --build`.
 
 ## Servicios
@@ -31,7 +31,7 @@ Si algo de este archivo contradice esos documentos, gana este archivo; avisa de 
 
 Dentro de Docker cada servicio escucha en el puerto 8000 y se llama por su nombre (`http://svc-tienda:8000`).
 
-Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), más `postgres`, `mongo` y `redis`: diez contenedores.
+Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), `svc-contenido-eventos` (el consumidor de eventos de svc-contenido: misma imagen, otro comando), más `postgres`, `mongo` y `redis`: once contenedores.
 
 ## Estructura
 
@@ -43,7 +43,7 @@ AgroIA-Web/
 ├── ruff.toml
 ├── docs/                 # entregables, colección de Postman
 ├── infra/                # init de PostgreSQL, llaves JWT, tokens de prueba, matriz de accesos
-├── comun/agroia_comun/   # autenticación JWT, permisos, formato de errores
+├── comun/agroia_comun/   # autenticación JWT, permisos, formato de errores, eventos
 ├── web/                  # gateway con plantillas
 ├── svc-usuarios/
 ├── svc-tienda/
@@ -58,10 +58,11 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - El navegador solo habla con `web`. Ningún servicio interno se expone hacia afuera.
 - Cada servicio es dueño de su base. Nunca leas ni escribas la base de otro servicio; usa su API.
 - Entre servicios no hay ForeignKey: guarda `usuario_id` como UUID (el `id` de svc-usuarios, compatible con ms-usuarios; en MongoDB, como texto). El contrato de los tokens está en `docs/contrato-identidad.md`.
-- Código compartido (autenticación JWT, permisos, formato de errores) solo en `comun/agroia_comun/`. No lo copies a los servicios.
-- Llamadas entre servicios: HTTP síncrono por ahora, siempre con timeout. En la Entrega 4 se pasarán a eventos por Redis; no acoples la lógica al transporte.
+- Código compartido (autenticación JWT, permisos, formato de errores y eventos) solo en `comun/agroia_comun/`. No lo copies a los servicios.
+- Entre servicios: lo que necesita respuesta inmediata va por HTTP síncrono, siempre con timeout; los avisos y lo lento van por eventos con Redis Streams (`agroia_comun.eventos`, catálogo y reglas en `docs/eventos.md`). No acoples la lógica de negocio al transporte.
+- Eventos: publica después del commit (`publicar_al_confirmar`) y solo con los campos del catálogo, sin tokens ni datos personales innecesarios; todo manejador de eventos debe ser idempotente por sí mismo; cada consumidor corre en su propio contenedor.
 - `svc-ia` responde siempre con `id` y `estado`, aunque hoy siempre sea `"listo"`. No guarda nada: las imágenes y resultados de diagnóstico los guarda `svc-contenido`.
-- `svc-ia` valida el JWT con PyJWT (las clases de `comun/` son de DRF).
+- `svc-ia` valida el JWT con PyJWT (las clases de DRF de `comun/` no le sirven) e instala solo el núcleo de `comun` (sin Django ni DRF), para los eventos.
 - La ficha técnica variable del producto es un `JSONField` en PostgreSQL. MongoDB solo guarda conversaciones, diagnósticos y bitácora.
 - Archivos (imágenes de productos y diagnósticos) siempre con `STORAGES` / `default_storage` de Django, nunca rutas a mano: en la Entrega 5 se pasarán a Cloud Storage cambiando solo la configuración.
 - El pago es simulado: un botón "Pagar" marca el pedido como `pagado` y la interfaz muestra la etiqueta "pago simulado". No integres pasarelas de pago.
@@ -115,7 +116,7 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - Cada app tiene `tests/` (`test_modelos.py`, `test_endpoints.py`, `test_servicios.py` si aplica).
 - Por endpoint: caso correcto, validación que falla y, con `AUTH_ACTIVA=True`, 401 y 403.
 - Simula llamadas a otros servicios y al LLM con `responses` o `unittest.mock`; las pruebas no dependen de otros contenedores.
-- `svc-contenido` usa `mongomock`.
+- `svc-contenido` usa `mongomock`; los eventos se prueban con `fakeredis` (Redis simulado).
 - Al terminar una tarea, corre las pruebas del servicio: `docker compose exec <servicio> pytest`.
 
 ## Comandos

@@ -2,14 +2,25 @@
 
 import uuid
 
+import fakeredis
 import mongomock
 import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
 
+from agroia_comun.eventos import conexion as conexion_eventos
 from agroia_comun.pruebas import firmar_token
 from config import mongo
 from tests.datos import ADMIN_ID, CLIENTE_ID, OTRO_CLIENTE_ID
+
+
+@pytest.fixture(autouse=True)
+def redis_de_eventos():
+    """Los eventos usan un Redis simulado y vacío en cada prueba (sin contenedor)."""
+    simulado = fakeredis.FakeRedis(decode_responses=True)
+    conexion_eventos.usar(simulado)
+    yield simulado
+    conexion_eventos.usar(None)
 
 
 @pytest.fixture(autouse=True)

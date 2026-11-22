@@ -1,5 +1,7 @@
-"""Paquete compartido por los servicios Django de AgroIA-Web.
+"""Paquete compartido de AgroIA-Web.
 
-Lo instalan web, svc-usuarios, svc-tienda y svc-contenido. svc-ia no lo usa:
-valida el JWT con PyJWT porque estas clases son de DRF.
+- Núcleo, sin Django (lo instalan todos, también svc-ia): `tokens` (validar el access con
+  PyJWT) y `eventos` (Redis Streams).
+- Con el extra [django] (web, svc-usuarios, svc-tienda y svc-contenido): autenticación y
+  permisos de DRF, formato de errores, log de seguridad y configuración.
 """

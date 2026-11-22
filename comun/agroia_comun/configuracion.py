@@ -100,8 +100,9 @@ def configurar_jwt(llave_publica: str, issuer: str = ISSUER_POR_DEFECTO) -> dict
 
 
 def configurar_logging(nivel: str = "INFO") -> dict:
-    """LOGGING de Django: el logger `seguridad` escribe una línea JSON por evento en la
-    consola (ver seguridad.py); lo demás conserva el comportamiento de Django."""
+    """LOGGING de Django: los loggers `seguridad` (ver seguridad.py) y `eventos` (ver
+    eventos/registro.py) escriben una línea JSON por suceso en la consola; lo demás
+    conserva el comportamiento de Django."""
     return {
         "version": 1,
         "disable_existing_loggers": False,
@@ -111,5 +112,6 @@ def configurar_logging(nivel: str = "INFO") -> dict:
         },
         "loggers": {
             "seguridad": {"handlers": ["seguridad"], "level": nivel, "propagate": False},
+            "eventos": {"handlers": ["seguridad"], "level": nivel, "propagate": False},
         },
     }

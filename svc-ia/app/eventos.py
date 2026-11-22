@@ -1,4 +1,5 @@
-"""Registro de eventos de seguridad, equivalente a agroia_comun.seguridad (svc-ia no usa comun).
+"""Log de seguridad, equivalente a agroia_comun.seguridad (que depende de Django; svc-ia solo
+instala el núcleo de comun).
 
 Una línea JSON por evento en el logger `seguridad`, con el mismo formato que los servicios
 Django: `evento`, `fecha`, `servicio`, `ip`, `metodo`, `ruta`, `usuario_id` y los datos

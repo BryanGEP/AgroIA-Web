@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from agroia_comun.eventos.en_django import correlacion_de
 from agroia_comun.permisos import EsAdministrador, EsDuenoOAdmin, usuario_id
 from apps.usuarios import servicios
 from apps.usuarios.filters import UsuarioFilter
@@ -87,6 +88,7 @@ class RegistroView(APIView):
             password=datos.validated_data["password"],
             nombre=datos.validated_data["nombre"],
             apellidos=datos.validated_data["apellidos"],
+            correlacion_id=correlacion_de(request),
         )
         return Response(
             {"id": usuario.id, "email": usuario.email, "mensaje": MENSAJE_REGISTRO},

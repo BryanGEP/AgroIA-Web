@@ -1,5 +1,6 @@
-# Entorno local de AgroIA-Web: cinco servicios propios, el agente (repo AgroIA) con su
-# base de conocimiento (agente-db) y tres de infraestructura: diez contenedores.
+# Entorno local de AgroIA-Web: cinco servicios propios, el consumidor de eventos de
+# svc-contenido, el agente (repo AgroIA) con su base de conocimiento (agente-db) y tres de
+# infraestructura: once contenedores.
 #
 #   docker compose up --build
 #
@@ -24,6 +25,13 @@ x-django-env: &django-env
   AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
   JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
   JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
+
+# Eventos entre servicios (Redis Streams, Entrega 4; ver docs/eventos.md). Van en la base
+# lógica 1 de Redis; la caché del límite de intentos sigue en la 0.
+x-eventos-env: &eventos-env
+  EVENTOS_REDIS_URL: ${EVENTOS_REDIS_URL:-redis://redis:6379/1}
+  EVENTOS_MAX_REINTENTOS: ${EVENTOS_MAX_REINTENTOS:-5}
+  EVENTOS_ESPERA_BASE: ${EVENTOS_ESPERA_BASE:-2}
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -72,7 +80,7 @@ services:
       context: .
       dockerfile: svc-usuarios/Dockerfile
     environment:
-      <<: [*django-env, *postgres-env]
+      <<: [*django-env, *postgres-env, *eventos-env]
       POSTGRES_DB: usuarios_db
       POSTGRES_USER: usuarios
       POSTGRES_PASSWORD: ${USUARIOS_DB_PASSWORD:?Falta USUARIOS_DB_PASSWORD en .env}
@@ -136,7 +144,7 @@ services:
       context: .
       dockerfile: svc-contenido/Dockerfile
     environment:
-      <<: *django-env
+      <<: [*django-env, *eventos-env]
       MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
     secrets:
       - source: jwt_publica
@@ -152,6 +160,34 @@ services:
         condition: service_healthy
     networks: [agroia]
 
+  # Consumidor de eventos de svc-contenido: misma imagen y código, otro comando. Lee los
+  # streams de Redis con el grupo svc-contenido y guarda en la bitácora. Con
+  # `docker compose stop` (SIGTERM) termina el evento en curso y sale; si se cae, Docker lo
+  # reinicia y procesa lo que quedó pendiente.
+  svc-contenido-eventos:
+    build:
+      context: .
+      dockerfile: svc-contenido/Dockerfile
+    command: ["python", "manage.py", "consumir_eventos"]
+    restart: unless-stopped
+    stop_grace_period: 20s
+    environment:
+      <<: [*django-env, *eventos-env]
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-contenido:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
   svc-ia:
     build:
       context: .
@@ -164,6 +200,7 @@ services:
       # svc-ia no llama al LLM: traduce el contrato y llama al contenedor agente.
       URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
       AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-45}
+      <<: *eventos-env
       # En Windows los cambios de archivos montados no generan eventos dentro del
       # contenedor; uvicorn --reload necesita revisar por sondeo.
       WATCHFILES_FORCE_POLLING: "true"
@@ -172,6 +209,7 @@ services:
         target: jwt_publica.pem
     volumes:
       - ./svc-ia:/app
+      - ./comun:/comun
       - ./ruff.toml:/ruff.toml:ro
     ports:
       - "127.0.0.1:8004:8000"
@@ -278,8 +316,22 @@ services:
       start_period: 10s
     networks: [agroia]
 
+  # Caché del límite de intentos (base 0) y eventos (base 1). Persistencia AOF para que los
+  # eventos no se pierdan al reiniciar. noeviction: al llenarse la memoria, Redis rechaza
+  # escrituras en lugar de borrar llaves; otra política podría borrar eventos sin
+  # procesar, porque comparten instancia con la caché (ver docs/eventos.md).
   redis:
     image: redis:7
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_datos:/data
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
@@ -301,6 +353,7 @@ volumes:
   mongo_datos:
   agente_db_datos:
   modelos_hf:
+  redis_datos:
 
 networks:
   agroia:

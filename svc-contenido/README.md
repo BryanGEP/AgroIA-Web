@@ -9,7 +9,7 @@ Conversaciones con el agente, historial de diagnósticos y bitácora de activida
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
 
-Hasta la Entrega 3 este servicio no llama a nadie: el gateway pregunta a svc-ia y después guarda aquí la conversación o el diagnóstico. En la Entrega 4 lo harán eventos por Redis.
+Este servicio no llama a nadie por HTTP: el gateway pregunta a svc-ia y después guarda aquí la conversación o el diagnóstico. Desde la Entrega 4 además **consume eventos** de Redis en su propio contenedor, `svc-contenido-eventos` (`python manage.py consumir_eventos`, grupo `svc-contenido`): hoy guarda `usuario_registrado` en la bitácora, una sola vez aunque llegue repetido (índice único de `evento_id`). Ver [`docs/eventos.md`](../docs/eventos.md).
 
 ## Estructura
 
@@ -60,7 +60,7 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 - Un id mal formado, inexistente o de otro usuario responde **404** (`no_encontrado`), sin revelar si existe.
 - **Mensajes:** `{"rol": "usuario" | "agente", "texto", "fuentes"?}`; `fuentes` solo en mensajes del agente. Una conversación admite **200 mensajes**; al llegar al límite responde **409 `conversacion_llena`** y hay que iniciar otra. El límite se aplica en el mismo `update` de MongoDB, así que se respeta aunque lleguen dos mensajes al mismo tiempo.
 - **Diagnósticos:** `multipart/form-data` con `imagen` (JPG, PNG o WebP, máximo 5 MB, debe ser una imagen real), `clase` (`sano`, `rona`, `antracnosis`), `confianza`, `probabilidades` (texto JSON con las tres clases, que suman 1) y `modelo_version`. `confianza` debe ser igual a la probabilidad de `clase`.
-- **Bitácora:** filtros `tipo`, `desde` y `hasta` (`AAAA-MM-DD`, ambos inclusive). `POST` es solo para administradores por ahora; en la Entrega 4 la llenarán los eventos.
+- **Bitácora:** filtros `tipo`, `desde` y `hasta` (`AAAA-MM-DD`, ambos inclusive). La llenan los eventos de Redis (cada documento trae `evento_id` y `correlacion_id`); el `POST`, solo para administradores, queda para registros manuales.
 - Listados paginados de 20 en 20 (`?page=`), los más recientes primero.
 
 ## Autenticación

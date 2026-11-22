@@ -7,7 +7,7 @@
 -r svc-contenido/requirements-dev.txt
 
 # Paquete compartido en modo editable.
--e ./comun
+-e ./comun[django]
 
 # Para infra/generar_llaves.py e infra/matriz_seguridad.py (que usa además httpx de web y
 # PyJWT de comun).

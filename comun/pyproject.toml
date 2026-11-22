@@ -4,15 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agroia-comun"
-version = "0.2.0"
-description = "Código compartido de los servicios Django de AgroIA-Web: autenticación JWT, permisos y formato de errores."
+version = "0.3.0"
+description = "Código compartido de AgroIA-Web: autenticación JWT, permisos, formato de errores y eventos con Redis Streams."
 requires-python = ">=3.12"
+# Núcleo sin Django: lo instala también svc-ia (FastAPI), que usa agroia_comun.eventos.
+# Los servicios Django instalan además el extra [django] (`pip install -e /comun[django]`).
 # Django y DRF los fija cada servicio. Estas versiones deben coincidir con las de sus
 # requirements.txt.
 dependencies = [
-    "djangorestframework-simplejwt==5.5.1",
     "PyJWT==2.15.1",
     "cryptography==50.0.2",
+    "redis==8.1.0",
+]
+
+[project.optional-dependencies]
+django = [
+    "djangorestframework-simplejwt==5.5.1",
 ]
 
 [tool.setuptools.packages.find]

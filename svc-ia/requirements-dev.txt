@@ -6,3 +6,8 @@ pytest==9.1.1
 # Cliente que usa el TestClient de starlette (también está en el venv del agente).
 httpx2==2.13.1
 ruff==0.17.2
+
+# Redis simulado para las pruebas de eventos (agroia_comun.eventos). sortedcontainers
+# es su dependencia, fijada aquí.
+fakeredis==2.40.0
+sortedcontainers==2.4.0

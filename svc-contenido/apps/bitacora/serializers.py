@@ -42,6 +42,16 @@ class EventoSerializer(serializers.Serializer):
     servicio = serializers.CharField(max_length=50)
     datos = serializers.DictField(required=False, default=dict)
     fecha = serializers.DateTimeField(read_only=True)
+    evento_id = serializers.CharField(
+        read_only=True,
+        default=None,
+        help_text="Id del evento de Redis; vacío si se registró a mano.",
+    )
+    correlacion_id = serializers.CharField(
+        read_only=True,
+        default=None,
+        help_text="Sigue un flujo entre servicios (ver docs/eventos.md).",
+    )
 
 
 class FiltroBitacoraSerializer(serializers.Serializer):
