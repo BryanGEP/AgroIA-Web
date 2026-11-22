@@ -1,6 +1,9 @@
 # comun — paquete compartido `agroia_comun`
 
-Código que comparten los servicios Django (`web`, `svc-usuarios`, `svc-tienda` y `svc-contenido`). `svc-ia` no lo instala: valida el JWT con PyJWT.
+Código que comparten los servicios. Tiene dos partes:
+
+- **Núcleo, sin Django** (`pip install -e /comun`): `tokens.py` y el paquete `eventos/`. Lo instalan todos, también `svc-ia` (FastAPI), que lo usa para los eventos. Dependencias: PyJWT, cryptography y redis.
+- **Extra `[django]`** (`pip install -e "/comun[django]"`): todo lo demás, para `web`, `svc-usuarios`, `svc-tienda` y `svc-contenido`. Agrega simplejwt. `svc-ia` valida el JWT con PyJWT en su propio código.
 
 | Módulo | Contenido |
 | --- | --- |
@@ -11,6 +14,8 @@ Código que comparten los servicios Django (`web`, `svc-usuarios`, `svc-tienda` 
 | `errores.py` | Manejador de excepciones con el formato común y `ErrorDeNegocio` para las reglas de negocio |
 | `openapi.py` | Hook de drf-spectacular `documentar_errores`: agrega a cada respuesta de error de Swagger el esquema común y un ejemplo por código |
 | `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` (con `usuario_id` UUID y `emisor=`) |
+| `eventos/` (núcleo) | Eventos con Redis Streams (ver [`docs/eventos.md`](../docs/eventos.md)): `catalogo.py` (tipos, streams y campos permitidos), `sobre.py` (sobre común y `correlacion_valida`), `productor.py` (`publicar`, sin romper si Redis no responde), `consumidor.py` (`Consumidor`: grupos, reintentos con espera creciente, fallidos, idempotencia y apagado limpio), `operacion.py` y `python -m agroia_comun.eventos estado\|reprocesar`, `conexion.py` (clientes con timeout) y `registro.py` (logger `eventos`) |
+| `eventos/en_django.py` | `publicar_al_confirmar` (publica con `transaction.on_commit`) y `correlacion_de(request)` |
 
 ## Cómo se usa en un servicio
 
@@ -79,14 +84,14 @@ La lista de códigos está en la [definición técnica](../docs/definicion-tecni
 
 ## Cómo se instala
 
-- **Docker:** cada `Dockerfile` copia `comun/` a `/comun` y lo instala con `pip install -e /comun` (con sus dependencias: simplejwt, PyJWT y cryptography). `docker-compose.yml` monta `./comun` en `/comun`, así que los cambios de código se ven sin reconstruir; los de `pyproject.toml` piden `docker compose up --build`.
+- **Docker:** cada `Dockerfile` copia `comun/` a `/comun` y lo instala en modo editable: los servicios Django con `pip install -e "/comun[django]"` (PyJWT, cryptography, redis y simplejwt) y svc-ia con `pip install -e /comun` (sin simplejwt ni Django). `docker-compose.yml` monta `./comun` en `/comun`, así que los cambios de código se ven sin reconstruir; los de `pyproject.toml` piden `docker compose up --build`.
 - **Venv local de la raíz:** el `requirements-dev.txt` de la raíz lo instala en modo editable (`-e ./comun`).
 
 No copies este código dentro de los servicios: impórtalo desde `agroia_comun`.
 
 ## Pruebas
 
-Corren con un Django mínimo propio (sin base de datos), dentro del contenedor de cualquier servicio Django:
+Corren con un Django mínimo propio (sin base de datos), dentro del contenedor de cualquier servicio Django. Las de `eventos/` usan Redis simulado (`fakeredis`, en los `requirements-dev.txt` de svc-tienda, svc-usuarios, svc-contenido y svc-ia):
 
 ```bash
 docker compose exec -w /comun svc-tienda pytest
