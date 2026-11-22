@@ -20,6 +20,7 @@ Reglas que se cumplen en `servicios.py`:
 
 - Crear un pedido corre en `transaction.atomic()` con `select_for_update()` sobre los productos (ordenados por id): valida stock y que el producto siga activo, descuenta, copia nombre, precio y dirección, calcula subtotal, envío y total, y vacía el carrito. Si algo falla, no cambia nada.
 - Envío: `COSTO_ENVIO`; gratis si el subtotal es **mayor** que `ENVIO_GRATIS_DESDE`.
+- Eventos (después del commit, ver [`docs/eventos.md`](../docs/eventos.md)): `pedido_creado` (`pedido_id`, `usuario_id`, `total`, `productos`, `unidades`, `metodo_pago`; sin dirección ni nombres) y un `pedido_estado_cambiado` por cada transición, también el pago (`estado_anterior`, `estado_nuevo`, `total`, `cambiado_por`). Todas las transiciones pasan por `_cambiar_estado_bloqueado`, el único lugar que publica. Validar y descontar stock sigue siendo síncrono.
 - Estados: `pendiente → pagado → enviado → entregado`, y `cancelado` desde `pendiente` o `pagado`. Al cancelar se devuelve el stock.
 - El carrito no aparta stock: se valida al agregar y se descuenta al crear el pedido.
 - Categorías y productos se borran de forma lógica (`activa` / `activo` en `False`).

@@ -266,5 +266,7 @@ class PedidoViewSet(
         pedido = self.get_object()
         datos = CambiarEstadoSerializer(data=request.data)
         datos.is_valid(raise_exception=True)
-        pedido = servicios.cambiar_estado(pedido, datos.validated_data["estado"])
+        pedido = servicios.cambiar_estado(
+            pedido, datos.validated_data["estado"], usuario_id(request)
+        )
         return Response(PedidoSerializer(pedido, context={"request": request}).data)

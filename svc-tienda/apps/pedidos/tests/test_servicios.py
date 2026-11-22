@@ -9,7 +9,7 @@ from apps.catalogo.tests.factories import CategoriaFactory, ProductoFactory
 from apps.pedidos import servicios
 from apps.pedidos.models import Carrito, ItemCarrito, Pedido
 from apps.pedidos.tests.factories import ItemPedidoFactory, PedidoFactory
-from tests.datos import CLIENTE_ID, DIRECCION
+from tests.datos import ADMIN_ID, CLIENTE_ID, DIRECCION
 
 pytestmark = pytest.mark.django_db
 
@@ -259,7 +259,7 @@ def test_no_se_paga_dos_veces():
 def test_transiciones_validas(actual, nuevo):
     pedido = PedidoFactory(estado=actual)
 
-    assert servicios.cambiar_estado(pedido, nuevo).estado == nuevo
+    assert servicios.cambiar_estado(pedido, nuevo, ADMIN_ID).estado == nuevo
 
 
 @pytest.mark.parametrize(
@@ -278,7 +278,7 @@ def test_transiciones_invalidas(actual, nuevo):
     pedido = PedidoFactory(estado=actual)
 
     with pytest.raises(ErrorDeNegocio) as error:
-        servicios.cambiar_estado(pedido, nuevo)
+        servicios.cambiar_estado(pedido, nuevo, ADMIN_ID)
 
     assert codigo_de(error) == "transicion_invalida"
     pedido.refresh_from_db()
@@ -291,7 +291,7 @@ def test_cancelar_devuelve_el_stock(estado):
     pedido = PedidoFactory(estado=estado)
     ItemPedidoFactory(pedido=pedido, producto=producto, cantidad=3)
 
-    servicios.cambiar_estado(pedido, "cancelado")
+    servicios.cambiar_estado(pedido, "cancelado", ADMIN_ID)
 
     producto.refresh_from_db()
     assert producto.stock == 7
@@ -302,8 +302,8 @@ def test_flujo_completo_conserva_el_stock_correcto():
     servicios.agregar_al_carrito(USUARIO, producto, 2)
     pedido = servicios.crear_pedido_desde_carrito(USUARIO, DIRECCION, "contra_entrega")
     servicios.pagar_pedido(pedido)
-    servicios.cambiar_estado(pedido, "enviado")
-    servicios.cambiar_estado(pedido, "entregado")
+    servicios.cambiar_estado(pedido, "enviado", ADMIN_ID)
+    servicios.cambiar_estado(pedido, "entregado", ADMIN_ID)
 
     producto.refresh_from_db()
     pedido.refresh_from_db()
