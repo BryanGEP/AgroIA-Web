@@ -6,3 +6,8 @@ pytest-django==4.14.0
 factory-boy==3.3.3
 responses==0.26.3
 ruff==0.17.2
+
+# Redis simulado para las pruebas de eventos (agroia_comun.eventos). sortedcontainers
+# es su dependencia, fijada aquí.
+fakeredis==2.40.0
+sortedcontainers==2.4.0
