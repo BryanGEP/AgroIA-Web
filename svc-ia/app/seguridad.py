@@ -1,4 +1,4 @@
-"""Validación del JWT RS256 con PyJWT y la llave pública (svc-ia no usa comun, que es de DRF).
+"""Validación del JWT RS256 con PyJWT y la llave pública (las clases de comun son de DRF).
 
 Mismas reglas que agroia_comun (docs/contrato-identidad.md): emisor JWT_ISSUER
 (`agroia-usuarios` por defecto), vencimiento obligatorio, `token_type: "access"` y

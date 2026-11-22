@@ -61,7 +61,7 @@ Devuelve `{"id", "estado": "listo", "tipo": "agente" | "diagnostico", "creada_en
 
 ## Autenticación
 
-svc-ia no usa `comun` (sus clases son de DRF): valida el JWT con PyJWT en `app/seguridad.py`, con las mismas reglas:
+svc-ia instala solo el núcleo de `comun` (sin Django ni DRF), para los eventos de `agroia_comun.eventos`. Las clases de autenticación de `comun` son de DRF, así que valida el JWT con PyJWT en `app/seguridad.py`, con las mismas reglas:
 
 - RS256 con la llave pública (`JWT_PUBLIC_KEY_PATH`), emisor `JWT_ISSUER` (`agroia-usuarios` por defecto), `exp` obligatorio, `token_type: "access"` y `user_id` UUID (ver [`docs/contrato-identidad.md`](../docs/contrato-identidad.md)).
 - Sin token o token inválido: **401**. Token sin rol válido: **403**. Cada 401 y 403 queda como `acceso_denegado` en el log `seguridad` (`app/eventos.py`, mismo formato que `agroia_comun.seguridad`).

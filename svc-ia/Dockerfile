@@ -1,6 +1,7 @@
 # Imagen de desarrollo de svc-ia (FastAPI). Mismo Python que el agente de AgroIA.
-# El build context es la raíz del repo (ver docker-compose.yml). svc-ia no instala comun/:
-# valida el JWT con PyJWT.
+# El build context es la raíz del repo (ver docker-compose.yml). svc-ia instala solo el
+# núcleo de comun/ (sin Django ni DRF), para los eventos (agroia_comun.eventos). El JWT lo
+# sigue validando con PyJWT en app/seguridad.py.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,6 +10,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
+
+# Núcleo de comun en modo editable: docker-compose.yml monta ./comun en /comun.
+COPY comun /comun
+RUN pip install -e /comun
 
 # Incluye las dependencias de desarrollo para correr pytest y ruff dentro del contenedor.
 COPY svc-ia/requirements.txt svc-ia/requirements-dev.txt ./
