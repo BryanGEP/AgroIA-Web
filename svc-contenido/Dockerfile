@@ -11,7 +11,7 @@ WORKDIR /app
 
 # Paquete compartido, en modo editable: docker-compose.yml monta ./comun en /comun.
 COPY comun /comun
-RUN pip install -e /comun
+RUN pip install -e "/comun[django]"
 
 # Incluye las dependencias de desarrollo para correr pytest y ruff dentro del contenedor.
 COPY svc-contenido/requirements.txt svc-contenido/requirements-dev.txt ./

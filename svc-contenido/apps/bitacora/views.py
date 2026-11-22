@@ -39,8 +39,9 @@ class BitacoraViewSet(viewsets.GenericViewSet):
     @extend_schema(
         summary="Registrar un evento",
         description=(
-            "Solo administrador; la fecha la pone el servidor. En la Entrega 4 la bitácora se "
-            "llenará con los eventos que publiquen los servicios."
+            "Solo administrador; la fecha la pone el servidor. Los eventos de negocio llegan "
+            "solos por Redis (consumidor `consumir_eventos`, ver docs/eventos.md); este POST "
+            "queda para registros manuales."
         ),
         request=EventoSerializer,
         responses={201: EventoSerializer, **ERRORES_ADMIN},

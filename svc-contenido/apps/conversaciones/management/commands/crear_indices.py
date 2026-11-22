@@ -22,4 +22,7 @@ class Command(BaseCommand):
             for claves in modulo.INDICES:
                 nombre = coleccion.create_index(claves)
                 self.stdout.write(f"{modulo.COLECCION}: {nombre}")
+            for claves in getattr(modulo, "INDICES_UNICOS", []):
+                nombre = coleccion.create_index(claves, unique=True, sparse=True)
+                self.stdout.write(f"{modulo.COLECCION}: {nombre} (único)")
         self.stdout.write(self.style.SUCCESS("Índices listos."))
