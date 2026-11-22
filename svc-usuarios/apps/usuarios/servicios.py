@@ -23,6 +23,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from agroia_comun.errores import ErrorDeNegocio
+from agroia_comun.eventos.en_django import publicar_al_confirmar
 from agroia_comun.permisos import usuario_id
 from agroia_comun.seguridad import registrar_evento
 from apps.usuarios import bloqueo, correos, tokens
@@ -30,9 +31,14 @@ from apps.usuarios.managers import normalizar_email
 from apps.usuarios.models import CambioRol, Direccion, Usuario
 
 
-def registrar_usuario(email: str, password: str, nombre: str, apellidos: str) -> Usuario:
+def registrar_usuario(
+    email: str, password: str, nombre: str, apellidos: str, correlacion_id: str | None = None
+) -> Usuario:
     """Crea la cuenta sin verificar (rol cliente) y guarda la aceptación del aviso de
-    privacidad con su fecha y versión. Todo o nada."""
+    privacidad con su fecha y versión. Todo o nada.
+
+    Al confirmar publica `usuario_registrado` (solo el id y el rol: ni correo ni nombre).
+    Si Redis no responde, el registro no falla: queda `evento_no_publicado` en el log."""
     with transaction.atomic():
         usuario = Usuario.objects.create_user(
             email=email,
@@ -44,6 +50,11 @@ def registrar_usuario(email: str, password: str, nombre: str, apellidos: str) ->
         )
         # Solo se envía si el usuario se guardó; si el envío falla, puede pedir reenvío.
         transaction.on_commit(lambda: correos.enviar_verificacion(usuario))
+        publicar_al_confirmar(
+            "usuario_registrado",
+            {"usuario_id": str(usuario.id), "rol": usuario.rol},
+            correlacion_id,
+        )
     return usuario
 
 
