@@ -13,11 +13,11 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `svc-tienda/` | Categorías, productos, stock, carrito y pedidos (pago simulado). | PostgreSQL `tienda_db` | 8002 | [README](svc-tienda/README.md) |
 | `svc-contenido/` | Conversaciones con el agente, historial de diagnósticos y bitácora. | MongoDB `contenido` | 8003 | [README](svc-contenido/README.md) |
 | `svc-ia/` | Adaptador en FastAPI: traduce las preguntas al contenedor `agente` y clasifica imágenes (sano, roña o antracnosis; el modelo llega en una entrega posterior). | ninguna | 8004 | [README](svc-ia/README.md) |
-| `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django. | — | — | [README](comun/README.md) |
-| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT), `emitir_token.py` (tokens solo para pruebas) y `matriz_seguridad.py` ([matriz de accesos](#matriz-de-accesos)). | — | — | — |
+| `comun/` | Paquete `agroia_comun`: autenticación JWT, permisos y formato de errores para los servicios Django, y la librería de eventos con Redis Streams (sin Django; también la usa svc-ia). | — | — | [README](comun/README.md) |
+| `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT), `emitir_token.py` (tokens solo para pruebas), `matriz_seguridad.py` ([matriz de accesos](#matriz-de-accesos)) y `prueba_eventos.py` ([prueba de los eventos](#eventos-entre-servicios)). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
-Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), y **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector). En total, diez contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
+Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector), y **`svc-contenido-eventos`**, el consumidor de eventos de svc-contenido (misma imagen, otro comando). En total, once contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
 
 ## Requisitos
 
@@ -105,7 +105,7 @@ Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /sal
   docker compose up --build
   ```
 
-  > **Cuidado:** `down -v` borra los volúmenes, es decir, **todos los datos** de PostgreSQL y MongoDB, la base de conocimiento del agente y el modelo descargado. Sin `-v`, `docker compose down` detiene los contenedores y conserva los datos.
+  > **Cuidado:** `down -v` borra los volúmenes, es decir, **todos los datos** de PostgreSQL, MongoDB y Redis (incluidos los eventos sin procesar y los fallidos), la base de conocimiento del agente y el modelo descargado. Sin `-v`, `docker compose down` detiene los contenedores y conserva los datos.
 
 ### Iniciar sesión y tokens
 
@@ -150,6 +150,34 @@ python infra/matriz_seguridad.py --omitir-limites   # sin los casos de exceso de
 - **Usa las cuentas de demostración** y crea lo que necesita: un producto, un pedido, y una conversación y un diagnóstico por cuenta. Al terminar lo borra (el pedido, el producto y los diagnósticos con el `manage.py` de su servicio, porque la API no los borra), restaura el carrito del cliente y cierra sus sesiones. Necesita `docker` en el PATH para esa limpieza.
 - **Respeta los límites, sin subirlos:** antes de los casos de login espera 61 s. La recuperación permite 3 por hora por IP y la matriz la agota: si corres Postman después, «Pedir recuperación» responde 429 hasta que pase una hora o hasta correr `reiniciar_limites`. Por eso Postman va primero y la matriz al final.
 - **Llama al agente** tres veces (una por cuenta), así que necesita la llave de Groq.
+
+### Eventos entre servicios
+
+Desde la Entrega 4 los servicios se avisan por **eventos con Redis Streams** (base lógica 1 de Redis, con persistencia). Hoy funciona `usuario_registrado`: svc-usuarios lo publica al registrarse alguien y el contenedor `svc-contenido-eventos` lo guarda en la bitácora. El catálogo completo, el sobre común, los reintentos, el stream de fallidos y el diagrama están en [`docs/eventos.md`](docs/eventos.md).
+
+```powershell
+# Estado: streams, grupos, pendientes, consumidores y los últimos fallidos
+docker compose exec svc-contenido python -m agroia_comun.eventos estado
+
+# Volver a publicar eventos fallidos (con el mismo id)
+docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --id <id>
+docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --todos
+
+# Ver lo que hace el consumidor
+docker compose logs -f svc-contenido-eventos
+```
+
+**Prueba de punta a punta:** [`infra/prueba_eventos.py`](infra/prueba_eventos.py) comprueba, con el sistema levantado, cuatro cosas:
+1. un registro por el gateway llega a la bitácora;
+2. `docker compose stop` del consumidor sale limpio, con código 0;
+3. lo publicado con el consumidor detenido se procesa al volver;
+4. con MongoDB detenido, el evento agota sus 5 reintentos y llega a fallidos, y al reprocesarlo se guarda una sola vez.
+
+Imprime cada comprobación con `[ok]` o `[FALLA]` y sirve como evidencia del entregable. Tarda unos 2 minutos porque espera los reintentos reales. Necesita `docker` en el PATH y las cuentas demo. Al empezar corre `reiniciar_limites` y al terminar borra lo que creó con `limpiar_datos_prueba`.
+
+```powershell
+python infra/prueba_eventos.py
+```
 
 ### Correr las pruebas de seguridad
 
@@ -229,6 +257,7 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - [Documento del Entregable 2](docs/entregable-2.md)
 - [Documento del Entregable 3](docs/entregable-3.md) y su [matriz de accesos](docs/entregable-3/matriz-accesos.md)
 - [Contrato de identidad](docs/contrato-identidad.md): qué emite svc-usuarios y cómo valida el token cada servicio.
+- [Eventos entre servicios](docs/eventos.md): qué es asíncrono, catálogo de eventos, sobre común, reintentos, fallidos y diagrama del flujo.
 
 ## Entregas
 

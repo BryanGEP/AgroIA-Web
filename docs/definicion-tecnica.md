@@ -1,6 +1,6 @@
 # AgroIA-Web · Definición técnica
 
-Aprobada el 22 de octubre de 2026 · actualizada el 20 de noviembre de 2026 (cierre de la Entrega 3)
+Aprobada el 22 de octubre de 2026 · actualizada el 22 de noviembre de 2026 (Entrega 4: base de eventos)
 
 ## Stack decidido
 
@@ -16,7 +16,7 @@ AgroIA-Web se construye con Django 5.2 LTS y DRF en el backend, y Tailwind + dai
 | Autenticación | djangorestframework-simplejwt + django-axes | última estable | JWT, blacklist y bloqueo por intentos |
 | Base relacional | PostgreSQL | 16 | Usuarios, catálogo y pedidos |
 | Base de documentos | MongoDB + pymongo | 7 | Conversaciones, diagnósticos y bitácora |
-| Caché / mensajería | Redis | 7 | Throttling ahora; eventos en la Entrega 4 |
+| Caché / mensajería | Redis | 7 | Throttling (base 0) y eventos con Redis Streams (base 1; ver [`eventos.md`](eventos.md)) |
 | Servicio de IA | FastAPI | la del repo AgroIA | Adaptador del agente (contenedor `agente` del repo AgroIA, LangChain + Groq) y modelo de visión |
 | Estilos | Tailwind CSS + daisyUI | 4.x + 5.x | Diseño y componentes, sin Node con `django-tailwind-cli` |
 | Interactividad | HTMX + django-htmx | 2.x | Actualizar partes de la página sin recargar |
@@ -59,7 +59,7 @@ El gateway es el único punto de entrada: recibe al navegador y reparte cada pet
 
 ## Servicios
 
-Son cinco servicios propios, el contenedor `agente` (construido desde el repo AgroIA) con su base de conocimiento `agente-db`, y tres de infraestructura: diez contenedores. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
+Son cinco servicios propios, el consumidor de eventos de svc-contenido (`svc-contenido-eventos`), el contenedor `agente` (construido desde el repo AgroIA) con su base de conocimiento `agente-db`, y tres de infraestructura: once contenedores. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
 
 | Servicio | Responsabilidad | Base de datos | Puerto local | Pieza del maestro |
 | --- | --- | --- | --- | --- |
@@ -67,18 +67,19 @@ Son cinco servicios propios, el contenedor `agente` (construido desde el repo Ag
 | `svc-usuarios` | Registro, login, JWT, recuperación, roles, perfil y direcciones | PostgreSQL `usuarios_db` | 8001 | Identidad y usuarios |
 | `svc-tienda` | Categorías, productos, stock, carrito y pedidos | PostgreSQL `tienda_db` | 8002 | Negocio principal |
 | `svc-contenido` | Conversaciones con el agente, historial de diagnósticos y bitácora de actividad | MongoDB `contenido` | 8003 | Datos no estructurados |
+| `svc-contenido-eventos` | Consumidor de eventos de svc-contenido (misma imagen, `python manage.py consumir_eventos`): guarda en la bitácora | MongoDB `contenido` | no se publica | Comunicación asíncrona |
 | `svc-ia` | Adaptador: traduce el contrato al agente y clasifica imágenes de aguacate (modelo pendiente) | ninguna | 8004 | Integración de IA |
 | `agente` | Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (`main:svc-agente`): LangChain + Groq con herramientas (RAG, reglas y Bayes). Solo red interna | PostgreSQL + pgvector `conocimiento` (en `agente-db`) | 8005 (solo pruebas) | — |
 | `agente-db` | Base de conocimiento del agente (`pgvector/pgvector:pg16`). Separada de `postgres`: es del agente. Se llena con `docker compose run --rm agente python -m ingesta.cargar` | — | no se publica | — |
 | `postgres` | Un contenedor con una base por servicio | — | 5432 | — |
 | `mongo` | Base de documentos | — | 27017 | — |
-| `redis` | Caché para throttling; eventos en la Entrega 4 | — | 6379 | — |
+| `redis` | Caché del límite de intentos (base 0) y eventos con Redis Streams (base 1), con persistencia AOF | — | 6379 | Bróker de eventos |
 
 **Reglas entre servicios:**
 
 - El navegador solo habla con `web`. Ningún servicio interno se publica hacia afuera.
 - Cada servicio es dueño de su base: nadie lee la base de otro. Si necesita un dato, llama a su API.
-- En la Entrega 2 las llamadas entre servicios son HTTP síncronas. En la Entrega 4, guardar conversaciones y diagnósticos en `svc-contenido` pasa a ser un evento por Redis.
+- Lo que necesita respuesta inmediata va por HTTP síncrono, siempre con timeout. Los avisos entre servicios y lo lento van por eventos con Redis Streams: catálogo, sobre común, reintentos, fallidos y diagrama en [`eventos.md`](eventos.md). En la Entrega 4: primero `usuario_registrado` (hecho), después los eventos de negocio y, al final, el chat y el diagnóstico (guardar en `svc-contenido` pasa a ser un evento).
 - Dentro de Docker, los servicios se llaman por su nombre: `http://svc-tienda:8000`. El puerto local solo sirve para probar desde la computadora.
 
 ## Estructura del monorepo
@@ -220,7 +221,7 @@ Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNego
 | GET, POST | `/diagnosticos/` | autenticado (solo los propios; el administrador lista todos). POST en `multipart`: imagen JPG, PNG o WebP (máx. 5 MB) y el resultado de svc-ia |
 | GET | `/diagnosticos/<id>/` | dueño o administrador. `imagen_url` apunta al endpoint de la foto |
 | GET | `/diagnosticos/<id>/imagen/` | dueño o administrador (404 para los demás). Devuelve el archivo con `Cache-Control: private`. Las fotos no se sirven como archivos estáticos, ni con `DEBUG=True` |
-| GET, POST | `/bitacora/` | administrador. Filtros `tipo`, `desde`, `hasta`. POST manual por ahora; en la Entrega 4 la llenan los eventos |
+| GET, POST | `/bitacora/` | administrador. Filtros `tipo`, `desde`, `hasta`. La llenan los eventos (`usuario_registrado` desde la Entrega 4; cada documento trae `evento_id` y `correlacion_id`); el POST queda para registros manuales |
 
 **`svc-ia`** — diseñado desde ahora para volverse asíncrono en la Entrega 4: cada respuesta trae `id` y `estado`.
 
@@ -342,9 +343,9 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 
 **`docker-compose.yml` debe incluir:**
 
-- Los diez contenedores de la tabla de servicios (incluidos `agente` y `agente-db`), en una red interna común. El modelo de embeddings del agente (~471 MB) se guarda en el volumen `modelos_hf`.
+- Los once contenedores de la tabla de servicios (incluidos `agente`, `agente-db` y `svc-contenido-eventos`), en una red interna común. El modelo de embeddings del agente (~471 MB) se guarda en el volumen `modelos_hf`.
 - `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db`, `tienda_db` y `web_db` (sesiones del gateway), cada una con su propio usuario (`usuarios`, `tienda`, `web`). Las contraseñas no van en el script: psql las lee del entorno con `\getenv`. Solo corre la primera vez que se crea el volumen; para repetirlo, `docker compose down -v` (borra los datos).
-- Volúmenes con nombre para PostgreSQL y MongoDB, para no perder datos al reiniciar.
+- Volúmenes con nombre para PostgreSQL, MongoDB y Redis, para no perder datos al reiniciar. Redis con `--appendonly yes` y `--maxmemory-policy noeviction` (ver [`eventos.md`](eventos.md#infraestructura)).
 - Puertos publicados solo en `127.0.0.1` (también los de las bases): sirven para probar desde la computadora y no quedan visibles en la red.
 - `healthcheck` en las bases y `depends_on: condition: service_healthy` en los servicios que las usan.
 - Código montado como volumen en desarrollo, para que los cambios se vean sin reconstruir la imagen.
@@ -362,7 +363,8 @@ Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada 
 | `POSTGRES_SUPERUSER_PASSWORD` | contraseña de desarrollo | contenedor `postgres` |
 | `USUARIOS_DB_PASSWORD`, `TIENDA_DB_PASSWORD`, `WEB_DB_PASSWORD` | contraseña de desarrollo | `init.sql` y cada servicio |
 | `MONGO_URL` | `mongodb://mongo:27017/contenido` | svc-contenido |
-| `REDIS_URL` | `redis://redis:6379/0` | usuarios, web |
+| `REDIS_URL` | `redis://redis:6379/0` (caché del límite de intentos) | usuarios (web la recibe, pero hoy no la usa) |
+| `EVENTOS_REDIS_URL`, `EVENTOS_MAX_REINTENTOS`, `EVENTOS_ESPERA_BASE` | `redis://redis:6379/1`, `5`, `2` segundos | usuarios, contenido, `svc-contenido-eventos`, ia |
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` / `/run/secrets/jwt_publica.pem` | usuarios / todos |
 | `JWT_ISSUER` | `agroia-usuarios` (emisor de los tokens; ver `contrato-identidad.md`) | todos menos web |
 | `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
@@ -460,7 +462,8 @@ La fase 0 la hace una sola persona porque todo depende de ella. Después, las fa
 5. **Fase 4 · Seguridad completa.** Primera parte hecha el 19 de noviembre de 2026 ([avance](avances/e3-identidad.md)): recuperación y cambio de contraseña, cambio de rol con registro, revisión de `token_version` al renovar, límite de intentos (DRF + Redis y django-axes), log de seguridad en todos los servicios y contrato de identidad compatible con ms-usuarios. Segunda parte, la fase del gateway, hecha el 20 de noviembre de 2026 ([avance](avances/e3-gateway.md)): sesión con los JWT en el servidor y renovación automática, proxy `/api/<servicio>/` que valida el JWT antes de reenviar, CORS solo para `/api/`, Content-Security-Policy y las pantallas de cuenta. **Condición de seguridad cumplida:** el gateway pone en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenvía el `X-Forwarded-For` que mande el cliente; los servicios confían en el último valor de ese encabezado para el límite de intentos, el bloqueo de axes y el log de seguridad (ver [`contrato-identidad.md`](contrato-identidad.md#ip-del-cliente-y-puertos-publicados)). Tercera parte, el mismo día ([avance](avances/e3-pantallas.md)): pantallas protegidas, fotos de diagnóstico servidas solo al dueño o al administrador, y pruebas de XSS del filtro `markdown_seguro`. 2FA y los opcionales solo si sobra tiempo.
 6. **Fase 5 · Calidad y entrega.** Hecha para la Entrega 2 el 18 de noviembre de 2026: pruebas, Swagger con ejemplos y errores documentados, colección de Postman en verde, READMEs revisados y [documento de la entrega](entregable-2.md). La revisión con `insecure-defaults` y `static-analysis` de la autenticación se hizo el 19 de noviembre de 2026 (Semgrep, CodeQL y `check --deploy`; ver la [revisión de seguridad](avances/e3-identidad.md#revisión-de-seguridad)). Cierre de la Entrega 3 el 20 de noviembre de 2026: verificación desde cero, matriz de accesos automatizada (`infra/matriz_seguridad.py`), Semgrep y CodeQL sobre todo el código y [documento de la entrega](entregable-3.md).
 7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
-8. **Entrega 5 · Despliegue.** Solo se publica `web` (los puertos 8001 a 8005 y los de las bases quedan para desarrollo). Además de Cloud Storage para las imágenes, quedan pendientes de la revisión de seguridad de la Entrega 3: contenedores que no corran como root; gunicorn (Django) y uvicorn sin `--reload` (svc-ia) en lugar de los servidores de desarrollo; contraseña y TLS en Redis y MongoDB; opciones de HTTPS y cookies seguras (`SECURE_HSTS_SECONDS`, `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, que hoy reporta `check --deploy`), y SMTP real para los correos (con `DJANGO_DEBUG=False` svc-usuarios ya no arranca con el backend de consola).
+8. **Entrega 4 · Eventos.** Primera parte hecha el 22 de noviembre de 2026 ([avance](avances/e4-eventos-base.md)): Redis Streams con grupos de consumidores, librería `agroia_comun.eventos` (sobre común, catálogo, reintentos con espera creciente, fallidos, idempotencia y reproceso), consumidor de svc-contenido en su propio contenedor y el evento `usuario_registrado` de punta a punta. Siguen los eventos de negocio (fase 2) y el chat y el diagnóstico asíncronos (fase 3).
+9. **Entrega 5 · Despliegue.** Solo se publica `web` (los puertos 8001 a 8005 y los de las bases quedan para desarrollo). Además de Cloud Storage para las imágenes, quedan pendientes de la revisión de seguridad de la Entrega 3: contenedores que no corran como root; gunicorn (Django) y uvicorn sin `--reload` (svc-ia) en lugar de los servidores de desarrollo; contraseña y TLS en Redis y MongoDB; opciones de HTTPS y cookies seguras (`SECURE_HSTS_SECONDS`, `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, que hoy reporta `check --deploy`), y SMTP real para los correos (con `DJANGO_DEBUG=False` svc-usuarios ya no arranca con el backend de consola).
 
 ## Decisiones tomadas
 
@@ -476,3 +479,4 @@ El equipo aprobó estas decisiones el 22 de octubre de 2026. En el documento de 
 | Imágenes | Volumen local, siempre con `STORAGES` y `default_storage` de Django, nunca rutas a mano | En la Entrega 5 se pasa a Cloud Storage con `django-storages` cambiando solo la configuración. Las imágenes de diagnóstico las guarda `svc-contenido`; `svc-ia` no guarda nada |
 | Roles | Solo `cliente` y `administrador` | No hay funciones que requieran otro rol; agregar uno después es una migración pequeña |
 | Commits y push | Siempre manuales, por cada integrante | Claude Code no ejecuta `git commit` ni `git push` en este proyecto |
+| Bróker de eventos (Entrega 4, 22 de noviembre de 2026) | Redis Streams con un grupo de consumidores por servicio; librería propia en `comun` para reintentos, fallidos, idempotencia y reproceso; svc-ia instala solo el núcleo de `comun` (sin Django) | No pierde eventos si un consumidor está caído, confirma cada uno y permite que varios servicios escuchen el mismo evento, sin dependencias nuevas. Pub/sub pierde mensajes; Celery y RQ son colas de tareas para un solo destinatario. Comparación completa en [`eventos.md`](eventos.md) |
