@@ -30,6 +30,13 @@ web es el único servicio que habla con el navegador y con los clientes externos
 
 Los puertos directos de los servicios (8001 a 8005) son solo para desarrollo; la API pública es la del gateway.
 
+### `X-Correlacion-Id` y log por petición
+
+- **La correlación:** `CorrelacionMiddleware` (de `comun`) le da a cada petición una correlación: la del navegador o cliente de API si es un UUID válido, o una nueva. El cliente común la reenvía validada a los servicios en `X-Correlacion-Id`; el proxy nunca reenvía el valor crudo del cliente. La respuesta la devuelve en el mismo encabezado, expuesto en CORS.
+- **El log por petición:** `config/peticiones.py` escribe una línea JSON (`peticion`) con el método, la **ruta como patrón** (por ejemplo `restablecer/<str:uid>/<str:token>/`), el estado, la duración, la correlación y el usuario. Nunca escribe la ruta real ni la query string, porque `/restablecer/<uid>/<token>/` y `/verificar-correo/?token=` llevan tokens.
+- **Los logs de Django:** el log de runserver (`django.server`) se descarta y `django.request` escribe el patrón en lugar de la ruta.
+- **Pruebas:** comprueban que el token de verificación y el de recuperación no aparecen en ningún log.
+
 ### `X-Forwarded-For`
 
 web es el borde: el cliente común (`clientes/api.py`) pone en `X-Forwarded-For` la `REMOTE_ADDR` de la conexión y **nunca** reenvía la que mande el cliente. Así el límite de intentos, el bloqueo de axes y el log de seguridad de los servicios cuentan por la IP real del navegador, también en el login desde `/iniciar-sesion/`.

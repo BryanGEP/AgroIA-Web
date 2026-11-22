@@ -85,6 +85,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Correlación de la petición (X-Correlacion-Id); primero, para que la tengan todos.
+    "agroia_comun.correlacion.CorrelacionMiddleware",
+    # Una línea por petición, con la ruta como patrón (sin tokens): config/peticiones.py.
+    "config.peticiones.LogDePeticionesMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # Content-Security-Policy en todas las respuestas (config/seguridad.py).
     "config.seguridad.PoliticaDeContenidoMiddleware",
@@ -165,7 +169,7 @@ CSP_DOCS = (
 CORS_URLS_REGEX = r"^/api/.*$"
 CORS_ALLOWED_ORIGINS = lista("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOW_CREDENTIALS = False
-CORS_EXPOSE_HEADERS = ["Retry-After"]
+CORS_EXPOSE_HEADERS = ["Retry-After", "X-Correlacion-Id"]
 
 # Las imágenes de diagnóstico pasan por el proxy; el resto de los cuerpos es JSON pequeño.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
@@ -216,6 +220,14 @@ SPECTACULAR_SETTINGS = {
 MESSAGE_STORAGE = "django.contrib.messages.storage.cookie.CookieStorage"
 
 LOGGING = configurar_logging()
+# Ningún log escribe la ruta real (puede llevar un token): ver config/peticiones.py.
+LOGGING["filters"] = {"sin_rutas_reales": {"()": "config.peticiones.SinRutasReales"}}
+LOGGING["loggers"]["django.server"] = {
+    "handlers": [],
+    "filters": ["sin_rutas_reales"],
+    "propagate": False,
+}
+LOGGING["loggers"]["django.request"] = {"filters": ["sin_rutas_reales"], "propagate": True}
 
 # Tailwind 4 + daisyUI 5 con django-tailwind-cli (sin Node). El ejecutable se descarga al
 # construir la imagen en /opt/tailwind (fuera del volumen del código); en local, en
