@@ -71,7 +71,7 @@ Al rebasar un límite: 429 `demasiados_intentos` con el encabezado `Retry-After`
 
 ### Registro, login y sesión
 
-- **Registro:** recibe `nombre`, `apellidos`, `email`, `password`, `password_confirmacion` y `acepto_privacidad` (debe ser `true`). Responde 201 con `{"id", "email", "mensaje"}`, sin tokens, y envía el correo de verificación con `transaction.on_commit`. También al confirmar publica el evento `usuario_registrado` (solo `usuario_id` y `rol`; la correlación sale de `X-Correlacion-Id` si es un UUID válido). Si Redis no responde, el registro responde 201 igual y queda `evento_no_publicado` en el log (ver [`docs/eventos.md`](../docs/eventos.md)). Errores en `validacion`: `email_registrado`, `password_no_coincide`, `privacidad_no_aceptada` y los mensajes de contraseña de Django, en español.
+- **Registro:** recibe `nombre`, `apellidos`, `email`, `password`, `password_confirmacion` y `acepto_privacidad` (debe ser `true`). Responde 201 con `{"id", "email", "mensaje"}`, sin tokens, y, al confirmar, pide el correo de verificación (evento `correo_solicitado`, lo envía `svc-usuarios-eventos`) y publica `usuario_registrado` (solo `usuario_id` y `rol`; la correlación sale de `X-Correlacion-Id` si es un UUID válido). Si Redis no responde, el registro responde 201 igual y queda `evento_no_publicado` en el log (ver [`docs/eventos.md`](../docs/eventos.md)). Errores en `validacion`: `email_registrado`, `password_no_coincide`, `privacidad_no_aceptada` y los mensajes de contraseña de Django, en español.
 - **Login:** `{"email", "password"}` → `{"access", "refresh", "usuario": {"id", "nombre", "rol", "email_verificado"}}`. Access de 15 minutos y refresh de 7 días, RS256. Correo inexistente, contraseña incorrecta y cuenta desactivada responden igual: 401 `credenciales_invalidas`, «Correo o contraseña incorrectos.». Si la cuenta tiene `tiene_2fa`, responde 501 `2fa_no_disponible` (el `if` de la sección 12 queda listo; todavía no hay forma de activar 2FA).
 - **Renovación:** `{"refresh"}` → `{"access", "refresh"}`. El anterior entra a la blacklist (rotación); hay que reemplazar ambos. Revisa en la base `is_active` y `token_version`, y recalcula los claims: un cambio de rol o la verificación del correo aparecen aquí. Si falla, 401 `refresh_invalido`.
 - **Logout:** `{"refresh"}` con el access → 205. Mete el refresh a la blacklist; si ya estaba o venció, también 205. Un refresh de otro usuario da 403. **Logout de todos los dispositivos:** `POST /auth/logout-todo/` sube `token_version`.
@@ -83,7 +83,7 @@ Al rebasar un límite: 429 `demasiados_intentos` con el encabezado `Retry-After`
 - **Reenvío y recuperación:** siempre 200 con un mensaje genérico, exista o no la cuenta.
 - **Restablecer:** el correo trae `{FRONTEND_URL}/restablecer/<uid>/<token>/` (de un solo uso, vence en 1 hora). `POST /auth/restablecer/` con `{"uid", "token", "password", "password_confirmacion"}`: cierra todas las sesiones, marca el correo como verificado y envía el aviso «Tu contraseña fue cambiada». Enlace inválido, usado o vencido: 400 `enlace_invalido`.
 - **Cambiar contraseña:** `{"password_actual", "password_nueva", "password_confirmacion"}`. Errores: `password_actual_incorrecta`, `password_repetida` o `validacion`. Cierra las demás sesiones y devuelve un par nuevo para este dispositivo, más el aviso por correo.
-- Los enlaces abren las pantallas del gateway (`/verificar-correo/` y `/restablecer/<uid>/<token>/`). En desarrollo, el correo se imprime en `docker compose logs svc-usuarios` y el enlace se copia de ahí.
+- Los enlaces abren las pantallas del gateway (`/verificar-correo/` y `/restablecer/<uid>/<token>/`). En desarrollo, el correo se imprime en `docker compose logs svc-usuarios-eventos` (el consumidor que lo envía) y el enlace se copia de ahí.
 
 ### Roles
 
@@ -92,10 +92,10 @@ Al rebasar un límite: 429 `demasiados_intentos` con el encabezado `Retry-After`
 
 ## Correos
 
-Todos salen de `apps/usuarios/correos.py`, con versión `.txt` y `.html` en `apps/usuarios/templates/emails/` (verificación, recuperación y contraseña cambiada). En desarrollo `EMAIL_BACKEND` es el de consola: el correo completo, con su enlace, se ve en
+Todos salen de `apps/usuarios/correos.py`, con versión `.txt` y `.html` en `apps/usuarios/templates/emails/` (verificación, recuperación y contraseña cambiada). En desarrollo `EMAIL_BACKEND` es el de consola: el correo completo, con su enlace, se ve en el log del consumidor que lo envía (desde la Entrega 4, ver «Eventos y correos»):
 
 ```powershell
-docker compose logs -f svc-usuarios
+docker compose logs -f svc-usuarios-eventos
 ```
 
 Ese log de consola sí muestra los enlaces con su token: es solo para desarrollo. Para la demo con correos reales se configuran las variables `EMAIL_*` en `.env` (por ejemplo, una cuenta de Gmail con contraseña de aplicación) y se prueba con `python manage.py sendtestemail tu@correo.com`. Si el envío falla, se registra el error (sin el contenido) y la petición sigue.
@@ -137,6 +137,27 @@ Los refresh emitidos y los que están en la blacklist se acumulan en la base. Un
 ```powershell
 docker compose exec svc-usuarios python manage.py flushexpiredtokens
 ```
+
+## Eventos y correos (Entrega 4)
+
+Ver [`docs/eventos.md`](../docs/eventos.md). Cada acción publica su evento después del commit, con la correlación de la petición (`X-Correlacion-Id`):
+
+| Acción | Evento | Datos |
+| --- | --- | --- |
+| Registro | `usuario_registrado` | `usuario_id`, `rol` |
+| Verificar el correo (o restablecer la contraseña de una cuenta sin verificar) | `correo_verificado` | `usuario_id`, `via` |
+| Cambio de rol | `rol_cambiado` | `usuario_id`, `rol_anterior`, `rol_nuevo`, `cambiado_por` |
+| Cambiar o restablecer la contraseña | `password_cambiada` | `usuario_id`, `motivo` |
+| `logout-todo` | `sesiones_cerradas` | `usuario_id` |
+
+**Los correos** (verificación, recuperación y aviso de contraseña cambiada) ya no se envían dentro de la petición:
+- **Publicación:** la acción publica `correo_solicitado` (solo `usuario_id` y `tipo_correo`) en el stream `agroia:eventos:correos`.
+- **Envío:** el consumidor `python manage.py consumir_eventos`, que corre en el contenedor `svc-usuarios-eventos`, genera el token del enlace y envía.
+- **Antes de enviar,** revisa que todavía toque: no manda la verificación a un correo ya verificado ni nada a una cuenta desactivada.
+- **Si el envío falla,** reintenta y, al agotarse, el evento queda en fallidos para reprocesarlo.
+- **Idempotencia:** `CorreoEnviado` evita mandar dos veces el mismo evento.
+- **En desarrollo,** los correos se imprimen en `docker compose logs svc-usuarios-eventos`.
+- **Riesgo B5:** la recuperación responde igual y tarda lo mismo exista o no la cuenta, así que el tiempo ya no delata un correo registrado.
 
 ## Variables de entorno
 

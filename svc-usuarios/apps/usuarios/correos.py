@@ -4,12 +4,18 @@ Cada correo tiene versión de texto y HTML (`templates/emails/<plantilla>.txt|.h
 En desarrollo EMAIL_BACKEND es el de consola: el correo, con su enlace, se imprime en
 `docker compose logs svc-usuarios`. En pruebas Django usa locmem (`mail.outbox`).
 
-Quien llama lo hace dentro de `transaction.on_commit`, para que solo se envíe si los
-cambios se guardaron. Si el envío falla se registra el error y la petición sigue: el
-usuario puede pedir el correo otra vez.
+Desde la Entrega 4 nadie los envía dentro de una petición: las acciones publican el evento
+`correo_solicitado` (solo `usuario_id` y el tipo) y el consumidor de svc-usuarios
+(apps/usuarios/eventos.py, contenedor svc-usuarios-eventos) llama a estas funciones. Por
+eso el token del enlace se genera al enviar, nunca viaja en el evento.
+
+Si el envío falla, se lanza `ErrorDeEnvio` (sin destinatario ni contenido: el correo lleva
+enlaces con tokens) y el consumidor reintenta; al agotar los reintentos, el evento va al
+stream de fallidos y se puede reprocesar.
 """
 
 import logging
+from datetime import datetime
 from urllib.parse import quote
 
 from django.conf import settings
@@ -23,7 +29,12 @@ from apps.usuarios.models import Usuario
 logger = logging.getLogger(__name__)
 
 
-def enviar_correo(destinatario: str, asunto: str, plantilla: str, contexto: dict) -> bool:
+class ErrorDeEnvio(Exception):
+    """El servidor de correo no aceptó el mensaje. El texto no lleva destinatario ni
+    contenido, porque termina en el log del consumidor."""
+
+
+def enviar_correo(destinatario: str, asunto: str, plantilla: str, contexto: dict) -> None:
     contexto = {"asunto": asunto, "frontend_url": settings.FRONTEND_URL, **contexto}
     texto = render_to_string(f"emails/{plantilla}.txt", contexto)
     html = render_to_string(f"emails/{plantilla}.html", contexto)
@@ -32,15 +43,15 @@ def enviar_correo(destinatario: str, asunto: str, plantilla: str, contexto: dict
     try:
         mensaje.send()
     except Exception as error:  # SMTP caído, credenciales malas, tiempo agotado...
-        # Sin el destinatario ni el contenido: el correo lleva enlaces con tokens.
-        logger.error("No se pudo enviar el correo «%s»: %s", plantilla, type(error).__name__)
-        return False
-    return True
+        # Solo la clase del error: el mensaje de SMTP puede traer el destinatario.
+        raise ErrorDeEnvio(
+            f"No se pudo enviar el correo «{plantilla}»: {type(error).__name__}"
+        ) from None
 
 
-def enviar_verificacion(usuario: Usuario) -> bool:
+def enviar_verificacion(usuario: Usuario) -> None:
     token = quote(tokens.token_de_verificacion(usuario), safe="")
-    return enviar_correo(
+    enviar_correo(
         usuario.email,
         "Verifica tu correo en AgroIA",
         "verificacion",
@@ -51,9 +62,9 @@ def enviar_verificacion(usuario: Usuario) -> bool:
     )
 
 
-def enviar_recuperacion(usuario: Usuario) -> bool:
+def enviar_recuperacion(usuario: Usuario) -> None:
     uid, token = tokens.uid_de(usuario), tokens.token_de_recuperacion(usuario)
-    return enviar_correo(
+    enviar_correo(
         usuario.email,
         "Restablece tu contraseña de AgroIA",
         "recuperacion",
@@ -61,14 +72,15 @@ def enviar_recuperacion(usuario: Usuario) -> bool:
     )
 
 
-def enviar_aviso_password(usuario: Usuario) -> bool:
-    return enviar_correo(
+def enviar_aviso_password(usuario: Usuario, fecha: datetime | None = None) -> None:
+    """`fecha` es cuándo cambió la contraseña (la del evento), no cuándo sale el correo."""
+    enviar_correo(
         usuario.email,
         "Tu contraseña de AgroIA fue cambiada",
         "password_cambiada",
         {
             "nombre": usuario.nombre,
-            "fecha": timezone.localtime(),
+            "fecha": timezone.localtime(fecha or timezone.now()),
             "enlace": f"{settings.FRONTEND_URL}/recuperar/",
         },
     )

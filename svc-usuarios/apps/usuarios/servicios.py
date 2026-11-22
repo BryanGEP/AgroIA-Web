@@ -26,7 +26,7 @@ from agroia_comun.errores import ErrorDeNegocio
 from agroia_comun.eventos.en_django import publicar_al_confirmar
 from agroia_comun.permisos import usuario_id
 from agroia_comun.seguridad import registrar_evento
-from apps.usuarios import bloqueo, correos, tokens
+from apps.usuarios import bloqueo, tokens
 from apps.usuarios.managers import normalizar_email
 from apps.usuarios.models import CambioRol, Direccion, Usuario
 
@@ -37,8 +37,9 @@ def registrar_usuario(
     """Crea la cuenta sin verificar (rol cliente) y guarda la aceptación del aviso de
     privacidad con su fecha y versión. Todo o nada.
 
-    Al confirmar publica `usuario_registrado` (solo el id y el rol: ni correo ni nombre).
-    Si Redis no responde, el registro no falla: queda `evento_no_publicado` en el log."""
+    Al confirmar publica `usuario_registrado` (solo el id y el rol: ni correo ni nombre) y
+    `correo_solicitado` (el consumidor de correos envía la verificación). Si Redis no
+    responde, el registro no falla: queda `evento_no_publicado` en el log."""
     with transaction.atomic():
         usuario = Usuario.objects.create_user(
             email=email,
@@ -48,8 +49,7 @@ def registrar_usuario(
             acepto_privacidad_en=timezone.now(),
             version_privacidad=settings.VERSION_AVISO_PRIVACIDAD,
         )
-        # Solo se envía si el usuario se guardó; si el envío falla, puede pedir reenvío.
-        transaction.on_commit(lambda: correos.enviar_verificacion(usuario))
+        _solicitar_correo(usuario, "verificacion")
         publicar_al_confirmar(
             "usuario_registrado",
             {"usuario_id": str(usuario.id), "rol": usuario.rol},
@@ -148,9 +148,12 @@ def _correo_para_log(texto: str) -> str:
     return texto
 
 
-def _en_commit(funcion, usuario: Usuario) -> None:
-    """Envía el correo solo si la transacción se guardó."""
-    transaction.on_commit(lambda: funcion(usuario))
+def _solicitar_correo(usuario: Usuario, tipo_correo: str) -> None:
+    """Pide el correo al consumidor de correos (evento `correo_solicitado`), solo si la
+    transacción se guarda. El evento no lleva el token: lo genera el consumidor."""
+    publicar_al_confirmar(
+        "correo_solicitado", {"usuario_id": str(usuario.pk), "tipo_correo": tipo_correo}
+    )
 
 
 def validar_password_nueva(password: str, confirmacion: str, usuario: Usuario) -> None:
@@ -273,7 +276,9 @@ def cerrar_sesion(request, refresh_texto: str) -> None:
 
 def cerrar_todas_las_sesiones(request) -> None:
     """Sube token_version: ningún refresh emitido antes vuelve a renovar."""
-    Usuario.objects.filter(pk=usuario_id(request)).update(token_version=F("token_version") + 1)
+    with transaction.atomic():
+        Usuario.objects.filter(pk=usuario_id(request)).update(token_version=F("token_version") + 1)
+        publicar_al_confirmar("sesiones_cerradas", {"usuario_id": str(usuario_id(request))})
     registrar_evento("logout_todo", request)
 
 
@@ -297,8 +302,10 @@ def verificar_correo(token: str) -> bool:
         raise _enlace_de_verificacion_invalido()
     if usuario.email_verificado:
         return True
-    usuario.email_verificado = True
-    usuario.save(update_fields=["email_verificado"])
+    with transaction.atomic():
+        usuario.email_verificado = True
+        usuario.save(update_fields=["email_verificado"])
+        publicar_al_confirmar("correo_verificado", {"usuario_id": str(usuario.pk), "via": "enlace"})
     return False
 
 
@@ -317,7 +324,7 @@ def reenviar_verificacion(request, email: str) -> None:
     registrar_evento("verificacion_reenviada", request, email=email, se_envio=usuario is not None)
     if usuario is not None:
         with transaction.atomic():
-            _en_commit(correos.enviar_verificacion, usuario)
+            _solicitar_correo(usuario, "verificacion")
 
 
 # --- Recuperación de contraseña (sección 6) -------------------------------------------
@@ -330,9 +337,11 @@ def solicitar_recuperacion(request, email: str) -> None:
     registrar_evento(
         "recuperacion_solicitada", request, email=email, cuenta_existe=usuario is not None
     )
+    # Con un correo que no existe no se publica nada; la respuesta es la misma y, como el
+    # correo ya no se envía dentro de la petición, también tarda lo mismo (riesgo B5).
     if usuario is not None:
         with transaction.atomic():
-            _en_commit(correos.enviar_recuperacion, usuario)
+            _solicitar_correo(usuario, "recuperacion")
 
 
 def restablecer_password(request, uid: str, token: str, password: str, confirmacion: str) -> None:
@@ -346,11 +355,19 @@ def restablecer_password(request, uid: str, token: str, password: str, confirmac
         )
     validar_password_nueva(password, confirmacion, usuario)
     with transaction.atomic():
+        estaba_verificado = usuario.email_verificado
         usuario.set_password(password)
         usuario.token_version += 1  # cierra las sesiones abiertas
         usuario.email_verificado = True  # abrir el enlace prueba que el correo es suyo
         usuario.save(update_fields=["password", "token_version", "email_verificado"])
-        _en_commit(correos.enviar_aviso_password, usuario)
+        _solicitar_correo(usuario, "aviso_password")
+        publicar_al_confirmar(
+            "password_cambiada", {"usuario_id": str(usuario.pk), "motivo": "recuperacion"}
+        )
+        if not estaba_verificado:
+            publicar_al_confirmar(
+                "correo_verificado", {"usuario_id": str(usuario.pk), "via": "recuperacion"}
+            )
     registrar_evento("password_restablecida", request, usuario_id=str(usuario.pk))
 
 
@@ -378,7 +395,10 @@ def cambiar_password(request, usuario: Usuario, actual: str, nueva: str, confirm
         usuario.set_password(nueva)
         usuario.token_version += 1
         usuario.save(update_fields=["password", "token_version"])
-        _en_commit(correos.enviar_aviso_password, usuario)
+        _solicitar_correo(usuario, "aviso_password")
+        publicar_al_confirmar(
+            "password_cambiada", {"usuario_id": str(usuario.pk), "motivo": "cambio"}
+        )
     registrar_evento("password_cambiada", request)
     return tokens.emitir_par(usuario)
 
@@ -410,6 +430,15 @@ def cambiar_rol(request, usuario_pk, rol_nuevo: str) -> Usuario:
             rol_anterior=anterior,
             rol_nuevo=rol_nuevo,
             cambiado_por=Usuario.objects.filter(pk=id_admin).first(),
+        )
+        publicar_al_confirmar(
+            "rol_cambiado",
+            {
+                "usuario_id": str(usuario.pk),
+                "rol_anterior": anterior,
+                "rol_nuevo": rol_nuevo,
+                "cambiado_por": str(id_admin),
+            },
         )
     registrar_evento(
         "rol_cambiado",

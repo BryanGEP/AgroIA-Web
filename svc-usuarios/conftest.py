@@ -24,6 +24,25 @@ def redis_de_eventos():
     conexion_eventos.usar(None)
 
 
+@pytest.fixture
+def entregar_correos(redis_de_eventos):
+    """Corre el consumidor de correos (el mismo de svc-usuarios-eventos) hasta vaciar la
+    cola: las acciones ya no envían el correo, publican correo_solicitado."""
+    from agroia_comun.eventos import Consumidor
+    from apps.usuarios.eventos import GRUPO, MANEJADORES
+
+    consumidor = Consumidor(GRUPO, MANEJADORES, cliente=redis_de_eventos, bloqueo_ms=10)
+    consumidor.preparar()
+
+    def entregar() -> int:
+        total = 0
+        while atendidos := consumidor.una_vuelta():
+            total += atendidos
+        return total
+
+    return entregar
+
+
 @pytest.fixture(autouse=True)
 def limite_de_intentos_limpio():
     """Cada prueba empieza con los contadores del límite de intentos en cero."""

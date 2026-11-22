@@ -314,10 +314,13 @@ def test_logout_todo_cierra_las_demas_sesiones(usuario_cliente):
 # --- Verificación de correo (sección 2) ------------------------------------------------
 
 
-def test_el_registro_envia_un_correo_de_verificacion(anonimo, django_capture_on_commit_callbacks):
+def test_el_registro_envia_un_correo_de_verificacion(
+    anonimo, django_capture_on_commit_callbacks, entregar_correos
+):
     with django_capture_on_commit_callbacks(execute=True):
         respuesta = anonimo.post(f"{AUTH}registro/", REGISTRO, format="json")
 
+    entregar_correos()
     assert respuesta.status_code == 201
     assert len(mail.outbox) == 1
     correo = mail.outbox[0]
@@ -356,11 +359,14 @@ def test_token_de_verificacion_valido(usuario_cliente):
     assert usuario_cliente.email_verificado is True
 
 
-def test_el_enlace_del_correo_verifica(anonimo, django_capture_on_commit_callbacks):
+def test_el_enlace_del_correo_verifica(
+    anonimo, django_capture_on_commit_callbacks, entregar_correos
+):
     from urllib.parse import parse_qs, urlparse
 
     with django_capture_on_commit_callbacks(execute=True):
         anonimo.post(f"{AUTH}registro/", REGISTRO, format="json")
+    entregar_correos()
     token = parse_qs(urlparse(enlace_del_correo(mail.outbox[0])).query)["token"][0]
 
     assert verificar(token).status_code == 200
@@ -409,19 +415,20 @@ def reenviar(email: str, **extra):
 
 
 def test_reenvio_con_correo_inexistente_responde_igual_que_uno_real(
-    usuario_cliente, django_capture_on_commit_callbacks
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
 ):
     with django_capture_on_commit_callbacks(execute=True):
         real = reenviar("cliente@example.com")
         inexistente = reenviar("nadie@example.com")
 
+    entregar_correos()
     assert real.status_code == inexistente.status_code == 200
     assert real.json() == inexistente.json()
     assert [c.to for c in mail.outbox] == [["cliente@example.com"]]
 
 
 def test_reenvio_a_cuenta_ya_verificada_no_envia(
-    usuario_cliente, django_capture_on_commit_callbacks
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
 ):
     usuario_cliente.email_verificado = True
     usuario_cliente.save()
@@ -429,6 +436,7 @@ def test_reenvio_a_cuenta_ya_verificada_no_envia(
     with django_capture_on_commit_callbacks(execute=True):
         assert reenviar("cliente@example.com").status_code == 200
 
+    entregar_correos()
     assert mail.outbox == []
 
 
@@ -452,12 +460,13 @@ def datos_del_enlace(usuario) -> tuple[str, str]:
 
 
 def test_recuperar_con_correo_inexistente_responde_igual_que_uno_real(
-    usuario_cliente, django_capture_on_commit_callbacks
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
 ):
     with django_capture_on_commit_callbacks(execute=True):
         real = recuperar("cliente@example.com")
         inexistente = recuperar("nadie@example.com")
 
+    entregar_correos()
     assert real.status_code == inexistente.status_code == 200
     assert real.json() == inexistente.json()
     assert len(mail.outbox) == 1
@@ -467,17 +476,22 @@ def test_recuperar_con_correo_inexistente_responde_igual_que_uno_real(
     assert enlace_del_correo(correo).startswith("http://localhost:8000/restablecer/")
 
 
-def test_recuperar_cuenta_desactivada_no_envia(usuario_cliente, django_capture_on_commit_callbacks):
+def test_recuperar_cuenta_desactivada_no_envia(
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
+):
     usuario_cliente.is_active = False
     usuario_cliente.save()
 
     with django_capture_on_commit_callbacks(execute=True):
         assert recuperar("cliente@example.com").status_code == 200
 
+    entregar_correos()
     assert mail.outbox == []
 
 
-def test_restablecimiento_correcto(usuario_cliente, django_capture_on_commit_callbacks):
+def test_restablecimiento_correcto(
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
+):
     anterior = par()["refresh"]
     usuario_cliente.refresh_from_db()  # el login cambió last_login, que firma el enlace
     uid, token = datos_del_enlace(usuario_cliente)
@@ -485,6 +499,7 @@ def test_restablecimiento_correcto(usuario_cliente, django_capture_on_commit_cal
     with django_capture_on_commit_callbacks(execute=True):
         respuesta = restablecer(uid, token)
 
+    entregar_correos()
     assert respuesta.status_code == 200
     usuario_cliente.refresh_from_db()
     assert usuario_cliente.check_password(NUEVA)
@@ -494,9 +509,12 @@ def test_restablecimiento_correcto(usuario_cliente, django_capture_on_commit_cal
     assert [c.subject for c in mail.outbox] == ["Tu contraseña de AgroIA fue cambiada"]
 
 
-def test_el_enlace_del_correo_restablece(usuario_cliente, django_capture_on_commit_callbacks):
+def test_el_enlace_del_correo_restablece(
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
+):
     with django_capture_on_commit_callbacks(execute=True):
         recuperar("cliente@example.com")
+    entregar_correos()
     uid, token = enlace_del_correo(mail.outbox[0]).rstrip("/").split("/")[-2:]
 
     assert restablecer(uid, token).status_code == 200
@@ -554,13 +572,16 @@ def cambiar(cliente, actual=PASSWORD_DE_PRUEBA, nueva=NUEVA, confirmacion=NUEVA)
     )
 
 
-def test_cambio_de_contrasena_correcto(usuario_cliente, django_capture_on_commit_callbacks):
+def test_cambio_de_contrasena_correcto(
+    usuario_cliente, django_capture_on_commit_callbacks, entregar_correos
+):
     otro_dispositivo = par()
     este = par()
 
     with django_capture_on_commit_callbacks(execute=True):
         respuesta = cambiar(api_con(este["access"]))
 
+    entregar_correos()
     assert respuesta.status_code == 200
     nuevos = respuesta.json()
     assert claims(nuevos["access"])["token_version"] == 1
