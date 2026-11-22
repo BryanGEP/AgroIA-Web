@@ -58,6 +58,12 @@ class FiltroBitacoraSerializer(serializers.Serializer):
     """Filtros de GET /bitacora/. Las fechas son días completos en la zona del servidor."""
 
     tipo = serializers.CharField(required=False, max_length=50)
+    usuario_id = serializers.UUIDField(
+        required=False, help_text="Usuario afectado (el `usuario_id` del evento)."
+    )
+    correlacion_id = serializers.UUIDField(
+        required=False, help_text="Todos los eventos de un mismo flujo (X-Correlacion-Id)."
+    )
     desde = serializers.DateField(required=False, help_text="AAAA-MM-DD, inclusive.")
     hasta = serializers.DateField(required=False, help_text="AAAA-MM-DD, inclusive.")
 

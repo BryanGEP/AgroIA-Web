@@ -60,7 +60,7 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 - Un id mal formado, inexistente o de otro usuario responde **404** (`no_encontrado`), sin revelar si existe.
 - **Mensajes:** `{"rol": "usuario" | "agente", "texto", "fuentes"?}`; `fuentes` solo en mensajes del agente. Una conversación admite **200 mensajes**; al llegar al límite responde **409 `conversacion_llena`** y hay que iniciar otra. El límite se aplica en el mismo `update` de MongoDB, así que se respeta aunque lleguen dos mensajes al mismo tiempo.
 - **Diagnósticos:** `multipart/form-data` con `imagen` (JPG, PNG o WebP, máximo 5 MB, debe ser una imagen real), `clase` (`sano`, `rona`, `antracnosis`), `confianza`, `probabilidades` (texto JSON con las tres clases, que suman 1) y `modelo_version`. `confianza` debe ser igual a la probabilidad de `clase`.
-- **Bitácora:** filtros `tipo`, `desde` y `hasta` (`AAAA-MM-DD`, ambos inclusive). La llenan los eventos de Redis (cada documento trae `evento_id` y `correlacion_id`); el `POST`, solo para administradores, queda para registros manuales.
+- **Bitácora:** filtros `tipo`, `usuario_id`, `correlacion_id` (UUID; todos los eventos de un flujo), `desde` y `hasta` (`AAAA-MM-DD`, ambos inclusive). El consumidor guarda `usuario_registrado`, `correo_verificado`, `rol_cambiado`, `password_cambiada`, `sesiones_cerradas`, `pedido_creado` y `pedido_estado_cambiado`. La llenan los eventos de Redis (cada documento trae `evento_id` y `correlacion_id`); el `POST`, solo para administradores, queda para registros manuales.
 - Listados paginados de 20 en 20 (`?page=`), los más recientes primero.
 
 ## Autenticación

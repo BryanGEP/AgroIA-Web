@@ -96,7 +96,7 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = booleano("EMAIL_USE_TLS", True)
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_TIMEOUT = 10
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or "AgroIA <no-responder@agroia.local>"
 # Los enlaces de los correos apuntan al gateway, que tendrá las pantallas.
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8000").rstrip("/")
@@ -125,6 +125,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Correlación de la petición (X-Correlacion-Id); primero, para que la tengan todos.
+    "agroia_comun.correlacion.CorrelacionMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

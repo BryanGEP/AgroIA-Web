@@ -68,6 +68,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Correlación de la petición (X-Correlacion-Id); primero, para que la tengan todos.
+    "agroia_comun.correlacion.CorrelacionMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

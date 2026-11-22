@@ -113,5 +113,7 @@ def configurar_logging(nivel: str = "INFO") -> dict:
         "loggers": {
             "seguridad": {"handlers": ["seguridad"], "level": nivel, "propagate": False},
             "eventos": {"handlers": ["seguridad"], "level": nivel, "propagate": False},
+            # Una línea por petición del gateway (web/config/peticiones.py).
+            "peticiones": {"handlers": ["seguridad"], "level": nivel, "propagate": False},
         },
     }

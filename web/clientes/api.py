@@ -17,6 +17,8 @@ from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
 from django.http import HttpRequest
 
+from agroia_comun.eventos import correlacion
+from agroia_comun.eventos.sobre import ENCABEZADO_CORRELACION
 from agroia_comun.tokens import TokenInvalido, validar_access
 
 logger = logging.getLogger(__name__)
@@ -93,6 +95,10 @@ class ClienteServicios:
             cabeceras["Authorization"] = f"Bearer {token}"
         if ip:
             cabeceras["X-Forwarded-For"] = ip
+        # La correlación de la petición del navegador (ya validada por CorrelacionMiddleware),
+        # para seguir el flujo en los servicios y en sus eventos.
+        if correlacion.actual():
+            cabeceras[ENCABEZADO_CORRELACION] = correlacion.actual()
         try:
             transporte = self.transport or obtener_transporte()
             with httpx.Client(timeout=datos.timeout, transport=transporte) as http:

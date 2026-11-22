@@ -99,8 +99,8 @@ def test_con_redis_caido_el_registro_responde_201_y_queda_evento_no_publicado(
 
     assert respuesta.status_code == 201
     assert Usuario.objects.filter(email=REGISTRO["email"]).exists()
-    [linea] = [json.loads(r.getMessage()) for r in caplog.records if r.name == "eventos"]
-    assert linea["evento"] == "evento_no_publicado"
-    assert linea["tipo"] == "usuario_registrado"
-    assert "Connection refused" in linea["motivo"]
+    lineas = [json.loads(r.getMessage()) for r in caplog.records if r.name == "eventos"]
+    assert {x["evento"] for x in lineas} == {"evento_no_publicado"}
+    assert {x["tipo"] for x in lineas} == {"usuario_registrado", "correo_solicitado"}
+    assert all("Connection refused" in x["motivo"] for x in lineas)
     assert REGISTRO["email"] not in caplog.text

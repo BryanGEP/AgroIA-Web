@@ -5,6 +5,7 @@ conexión. En SQLite esta prueba no tendría sentido.
 """
 
 import threading
+import uuid
 
 import pytest
 from django.db import connection
@@ -19,7 +20,7 @@ from tests.datos import DIRECCION
 @pytest.mark.django_db(transaction=True)
 def test_dos_pedidos_compiten_por_el_ultimo_producto():
     producto = ProductoFactory(stock=1)
-    usuarios = (20, 21)
+    usuarios = (uuid.uuid4(), uuid.uuid4())
     for usuario in usuarios:
         carrito = Carrito.objects.create(usuario_id=usuario)
         ItemCarrito.objects.create(carrito=carrito, producto=producto, cantidad=1)
@@ -27,7 +28,7 @@ def test_dos_pedidos_compiten_por_el_ultimo_producto():
     barrera = threading.Barrier(len(usuarios))
     resultados: list[str] = []
 
-    def comprar(usuario: int) -> None:
+    def comprar(usuario: uuid.UUID) -> None:
         try:
             barrera.wait(timeout=10)
             servicios.crear_pedido_desde_carrito(usuario, DIRECCION, "tarjeta")

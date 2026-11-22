@@ -26,7 +26,9 @@ RUTAS_PUBLICAS = {
 
 # Lista cerrada: solo estos encabezados del cliente llegan al servicio. Nunca Cookie, Host,
 # los de salto (Connection, Keep-Alive, Transfer-Encoding...) ni un X-Forwarded-For del
-# cliente: ese lo pone el cliente común con la IP real (clientes/api.py).
+# cliente: ese lo pone el cliente común con la IP real (clientes/api.py). Tampoco el
+# X-Correlacion-Id tal cual: el cliente común manda la correlación que validó
+# CorrelacionMiddleware (un UUID; si el cliente mandó otra cosa, una nueva).
 ENCABEZADOS_DE_ENTRADA = ("Authorization", "Content-Type", "Accept", "Accept-Language")
 # Y solo estos vuelven al cliente (sin Set-Cookie, Server ni los de salto).
 ENCABEZADOS_DE_SALIDA = ("Content-Type", "Retry-After", "WWW-Authenticate", "Content-Disposition")

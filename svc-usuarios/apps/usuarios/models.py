@@ -112,3 +112,26 @@ class CambioRol(models.Model):
 
     def __str__(self) -> str:
         return f"{self.usuario}: {self.rol_anterior} → {self.rol_nuevo}"
+
+
+class CorreoEnviado(models.Model):
+    """Idempotencia del consumidor de correos: un evento `correo_solicitado` se envía una
+    sola vez aunque llegue dos veces (ver apps/usuarios/eventos.py y docs/eventos.md).
+
+    No guarda el contenido ni el enlace del correo. `omitido` es True si al procesar ya no
+    tocaba enviarlo (por ejemplo, el correo ya estaba verificado o la cuenta desactivada).
+    """
+
+    evento_id = models.UUIDField(unique=True)
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="correos")
+    tipo_correo = models.CharField(max_length=20)
+    omitido = models.BooleanField(default=False)
+    procesado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-procesado_en", "-id"]
+        verbose_name = "correo enviado"
+        verbose_name_plural = "correos enviados"
+
+    def __str__(self) -> str:
+        return f"{self.tipo_correo} a {self.usuario_id} ({self.procesado_en:%Y-%m-%d %H:%M})"

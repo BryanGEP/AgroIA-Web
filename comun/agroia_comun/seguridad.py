@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 
 from django.conf import settings
 
+from agroia_comun.eventos import correlacion
+
 logger = logging.getLogger("seguridad")
 
 CLAVES_SENSIBLES = (
@@ -67,6 +69,7 @@ def registrar_evento(evento: str, request=None, nivel: int = logging.INFO, **dat
         "evento": evento,
         "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         "servicio": getattr(settings, "NOMBRE_SERVICIO", ""),
+        "correlacion_id": correlacion.actual(),
     }
     if request is not None:
         registro.update(

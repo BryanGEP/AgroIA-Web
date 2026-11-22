@@ -2,6 +2,10 @@
 
 Toda operación que toca stock o dinero corre en transaction.atomic() y bloquea los
 productos con select_for_update(), siempre ordenados por id para evitar deadlocks.
+
+Eventos (docs/eventos.md), siempre después del commit: `pedido_creado` al crear el pedido y
+un solo `pedido_estado_cambiado` por cada transición, también el pago, porque todas pasan
+por `_cambiar_estado_bloqueado`. Validar y descontar stock sigue siendo síncrono.
 """
 
 import uuid
@@ -13,6 +17,7 @@ from django.db.models import F
 from rest_framework import status
 
 from agroia_comun.errores import ErrorDeNegocio
+from agroia_comun.eventos.en_django import publicar_al_confirmar
 from apps.catalogo.models import Producto
 from apps.pedidos.models import Carrito, ItemCarrito, ItemPedido, Pedido
 
@@ -168,10 +173,22 @@ def crear_pedido_desde_carrito(
             producto.stock -= cantidad
             producto.save(update_fields=["stock"])
         carrito.items.all().delete()
+        publicar_al_confirmar(
+            "pedido_creado",
+            {
+                "pedido_id": pedido.pk,
+                "usuario_id": str(usuario_id),
+                "total": str(pedido.total),
+                "productos": len(lineas),
+                "unidades": sum(cantidad for _, cantidad, _ in lineas),
+                "metodo_pago": metodo_pago,
+            },
+        )
     return pedido
 
 
-def _cambiar_estado_bloqueado(pedido: Pedido, nuevo: str) -> Pedido:
+def _cambiar_estado_bloqueado(pedido: Pedido, nuevo: str, actor_id: uuid.UUID) -> Pedido:
+    """Única puerta de las transiciones: aquí, y solo aquí, se publica el evento."""
     if nuevo not in TRANSICIONES[pedido.estado]:
         raise ErrorDeNegocio(
             "transicion_invalida",
@@ -179,8 +196,20 @@ def _cambiar_estado_bloqueado(pedido: Pedido, nuevo: str) -> Pedido:
         )
     if nuevo == Pedido.Estado.CANCELADO:
         _devolver_stock(pedido)
+    anterior = pedido.estado
     pedido.estado = nuevo
     pedido.save(update_fields=["estado"])
+    publicar_al_confirmar(
+        "pedido_estado_cambiado",
+        {
+            "pedido_id": pedido.pk,
+            "usuario_id": str(pedido.usuario_id),
+            "estado_anterior": anterior,
+            "estado_nuevo": nuevo,
+            "total": str(pedido.total),
+            "cambiado_por": str(actor_id),
+        },
+    )
     return pedido
 
 
@@ -192,13 +221,14 @@ def _devolver_stock(pedido: Pedido) -> None:
         Producto.objects.filter(pk=item.producto_id).update(stock=F("stock") + item.cantidad)
 
 
-def cambiar_estado(pedido: Pedido, nuevo: str) -> Pedido:
+def cambiar_estado(pedido: Pedido, nuevo: str, actor_id: uuid.UUID) -> Pedido:
     """Aplica una transición válida (pendiente→pagado→enviado→entregado, o cancelado
-    desde pendiente o pagado). Al cancelar, devuelve el stock.
+    desde pendiente o pagado). Al cancelar, devuelve el stock. `actor_id` es quién lo
+    cambió (el administrador), para el evento.
     """
     with transaction.atomic():
         bloqueado = Pedido.objects.select_for_update().get(pk=pedido.pk)
-        return _cambiar_estado_bloqueado(bloqueado, nuevo)
+        return _cambiar_estado_bloqueado(bloqueado, nuevo, actor_id)
 
 
 def pagar_pedido(pedido: Pedido) -> Pedido:
@@ -211,4 +241,5 @@ def pagar_pedido(pedido: Pedido) -> Pedido:
                 f"Solo se pueden pagar pedidos pendientes; este está "
                 f"{bloqueado.get_estado_display().lower()}.",
             )
-        return _cambiar_estado_bloqueado(bloqueado, Pedido.Estado.PAGADO)
+        # Solo el dueño paga: él es quien lo cambió.
+        return _cambiar_estado_bloqueado(bloqueado, Pedido.Estado.PAGADO, bloqueado.usuario_id)

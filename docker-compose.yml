@@ -1,6 +1,6 @@
-# Entorno local de AgroIA-Web: cinco servicios propios, el consumidor de eventos de
-# svc-contenido, el agente (repo AgroIA) con su base de conocimiento (agente-db) y tres de
-# infraestructura: once contenedores.
+# Entorno local de AgroIA-Web: cinco servicios propios, dos consumidores de eventos
+# (svc-usuarios-eventos y svc-contenido-eventos), el agente (repo AgroIA) con su base de
+# conocimiento (agente-db) y tres de infraestructura: doce contenedores.
 #
 #   docker compose up --build
 #
@@ -79,7 +79,7 @@ services:
     build:
       context: .
       dockerfile: svc-usuarios/Dockerfile
-    environment:
+    environment: &svc-usuarios-env
       <<: [*django-env, *postgres-env, *eventos-env]
       POSTGRES_DB: usuarios_db
       POSTGRES_USER: usuarios
@@ -92,6 +92,7 @@ services:
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
       VERSION_AVISO_PRIVACIDAD: ${VERSION_AVISO_PRIVACIDAD:-2026-10}
@@ -114,12 +115,38 @@ services:
         condition: service_healthy
     networks: [agroia]
 
+  # Consumidor de correos de svc-usuarios: misma imagen, código y variables (también las de
+  # correo), otro comando. Envía los correos que piden los eventos correo_solicitado y
+  # genera el token de cada enlace al enviar. Monta la llave privada en solo lectura porque
+  # la configuración de svc-usuarios no arranca sin ella (es el mismo servicio); este
+  # proceso no firma JWT.
+  svc-usuarios-eventos:
+    build:
+      context: .
+      dockerfile: svc-usuarios/Dockerfile
+    command: ["python", "manage.py", "consumir_eventos"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment: *svc-usuarios-env
+    volumes:
+      - ./svc-usuarios:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+      - ./infra/llaves/publica.pem:/run/secrets/jwt_publica.pem:ro
+      - ./infra/llaves/privada.pem:/run/secrets/jwt_privada.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
   svc-tienda:
     build:
       context: .
       dockerfile: svc-tienda/Dockerfile
     environment:
-      <<: [*django-env, *postgres-env]
+      <<: [*django-env, *postgres-env, *eventos-env]
       POSTGRES_DB: tienda_db
       POSTGRES_USER: tienda
       POSTGRES_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
@@ -136,6 +163,8 @@ services:
       - "127.0.0.1:8002:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks: [agroia]
 

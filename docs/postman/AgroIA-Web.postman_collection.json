@@ -4125,7 +4125,7 @@
                     ""
                   ]
                 },
-                "description": "Registro manual de un evento; en la Entrega 4 lo harán los servicios con eventos por Redis.",
+                "description": "Registro manual de un evento. Los eventos de negocio llegan solos por Redis (consumidor svc-contenido-eventos).",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
@@ -4210,6 +4210,160 @@
               ]
             },
             {
+              "name": "Filtrar por usuario (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?usuario_id={{cliente_id}}",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "usuario_id",
+                      "value": "{{cliente_id}}"
+                    }
+                  ]
+                },
+                "description": "Todos los eventos de un usuario (el afectado): `usuario_id`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Solo eventos de ese usuario\", () => {",
+                      "    const resultados = pm.response.json().results;",
+                      "    pm.expect(resultados.length).to.be.above(0);",
+                      "    resultados.forEach(e => pm.expect(e.usuario_id).to.eql(pm.environment.get(\"cliente_id\")));",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Filtrar por correlación (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?correlacion_id={{$guid}}",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "correlacion_id",
+                      "value": "{{$guid}}"
+                    }
+                  ]
+                },
+                "description": "Todos los eventos de un flujo: `correlacion_id` (el X-Correlacion-Id de la petición que los originó). Con una correlación nueva no hay ninguno.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Una correlación que nadie usó no trae eventos\", () => {",
+                      "    pm.expect(pm.response.json().count).to.eql(0);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Filtro que no es UUID → 400",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?correlacion_id=no-es-uuid",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "correlacion_id",
+                      "value": "no-es-uuid"
+                    }
+                  ]
+                },
+                "description": "`usuario_id` y `correlacion_id` deben ser UUID: si no, 400 `validacion` con el campo.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"Error de validación en correlacion_id\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo.error).to.eql(\"validacion\");",
+                      "    pm.expect(cuerpo.campos).to.have.property(\"correlacion_id\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Consultar como cliente → 403",
               "request": {
                 "method": "GET",
@@ -4256,7 +4410,7 @@
               ]
             }
           ],
-          "description": "Eventos de actividad, solo para el administrador. Filtros `tipo`, `desde` y `hasta` (AAAA-MM-DD)."
+          "description": "Eventos de actividad, solo para el administrador. Los llenan los eventos de Redis (cada uno con `evento_id` y `correlacion_id`). Filtros `tipo`, `usuario_id`, `correlacion_id`, `desde` y `hasta` (AAAA-MM-DD)."
         }
       ]
     },
@@ -5166,7 +5320,7 @@
                   "    pm.expect(cuerpo.fuentes).to.be.an(\"array\");",
                   "});",
                   "// Escapada para insertarla dentro de un texto JSON (comillas y saltos de línea).",
-              "pm.environment.set(\"respuesta_gateway\", JSON.stringify(cuerpo.respuesta).slice(1, -1));",
+                  "pm.environment.set(\"respuesta_gateway\", JSON.stringify(cuerpo.respuesta).slice(1, -1));",
                   "pm.environment.set(\"fuentes_gateway\", JSON.stringify(cuerpo.fuentes));"
                 ]
               }

@@ -19,7 +19,12 @@ from config import mongo
 from config.paginacion import ConsultaMongo
 
 COLECCION = "bitacora"
-INDICES = [[("tipo", ASCENDING), ("fecha", DESCENDING)], [("fecha", DESCENDING)]]
+INDICES = [
+    [("tipo", ASCENDING), ("fecha", DESCENDING)],
+    [("fecha", DESCENDING)],
+    [("usuario_id", ASCENDING), ("fecha", DESCENDING)],
+    [("correlacion_id", ASCENDING)],
+]
 # Un evento se guarda una sola vez aunque llegue dos veces (idempotencia del consumidor).
 # sparse: los eventos registrados a mano con POST no llevan evento_id.
 INDICES_UNICOS = [[("evento_id", ASCENDING)]]
@@ -63,12 +68,21 @@ def registrar_desde_evento(sobre: Sobre) -> bool:
 
 
 def consulta(
-    tipo: str | None = None, desde: datetime | None = None, hasta: datetime | None = None
+    tipo: str | None = None,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+    usuario_id: uuid.UUID | None = None,
+    correlacion_id: uuid.UUID | None = None,
 ) -> ConsultaMongo:
-    """Eventos filtrados por tipo y rango de fechas [desde, hasta), más recientes primero."""
+    """Eventos filtrados por tipo, usuario, correlación y rango de fechas [desde, hasta),
+    más recientes primero."""
     filtro: dict = {}
     if tipo:
         filtro["tipo"] = tipo
+    if usuario_id:
+        filtro["usuario_id"] = str(usuario_id)
+    if correlacion_id:
+        filtro["correlacion_id"] = str(correlacion_id)
     rango = {}
     if desde is not None:
         rango["$gte"] = desde

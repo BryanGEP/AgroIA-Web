@@ -39,7 +39,7 @@ from collections.abc import Callable
 
 import redis
 
-from agroia_comun.eventos import conexion
+from agroia_comun.eventos import conexion, correlacion
 from agroia_comun.eventos.catalogo import PREFIJO, STREAM_FALLIDOS, ErrorEvento, obtener_tipo
 from agroia_comun.eventos.registro import motivo_de, registrar
 from agroia_comun.eventos.sobre import Sobre
@@ -140,7 +140,10 @@ class Consumidor:
             return "duplicado"
 
         try:
-            manejador(sobre)
+            # La correlación del sobre mientras corre el manejador: si publica otro evento,
+            # conserva la cadena. Se limpia al terminar, también si falla.
+            with correlacion.con_correlacion(sobre.correlacion_id):
+                manejador(sobre)
         except Exception as error:  # cualquier error del manejador cuenta como intento
             if entregas > self.max_reintentos:
                 self._a_fallidos(stream, id_mensaje, sobre.a_json(), entregas, error, datos_log)

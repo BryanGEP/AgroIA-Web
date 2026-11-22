@@ -88,3 +88,20 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Fase 2: eventos de negocio (`correo_verificado`, `rol_cambiado`, eventos de pedidos y `correo_solicitado`) y `correlacion_id` generado por el gateway.
 
 **Bloqueos:** Ninguno.
+
+
+## 2026-11-22 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Eventos de negocio: `correo_verificado`, `rol_cambiado`, `password_cambiada` y `sesiones_cerradas` (svc-usuarios); `pedido_creado` y `pedido_estado_cambiado` (svc-tienda). Todos se registran en la bitácora de svc-contenido. El pago es una transición más y publica un solo evento.
+- Correos de verificación, recuperación y aviso de contraseña en segundo plano con `correo_solicitado` y un consumidor propio (`svc-usuarios-eventos`). El token se genera al procesar y nunca viaja en el evento.
+- Riesgo B5 cerrado: la recuperación tarda lo mismo con un correo que existe y con uno que no (15 contra 17 ms; antes, 10 s y 504 contra 57 ms).
+- `correlacion_id` de punta a punta: lo genera el gateway, viaja entre servicios y aparece en logs y en la bitácora. Log por petición en el gateway sin tokens.
+- Filtros de la bitácora por usuario y correlación; prueba de punta a punta ampliada (37 de 37) y 12 contenedores.
+
+**Qué sigue:**
+- Fase 3: IA asíncrona (pregunta y diagnóstico por eventos con svc-ia como worker) y el widget flotante del chat en todas las páginas.
+
+**Bloqueos:** Ninguno.

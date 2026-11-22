@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 PREFIJO = "agroia:"
 STREAM_USUARIOS = f"{PREFIJO}eventos:usuarios"
 STREAM_TIENDA = f"{PREFIJO}eventos:tienda"
+STREAM_CORREOS = f"{PREFIJO}eventos:correos"
 STREAM_IA_SOLICITUDES = f"{PREFIJO}eventos:ia-solicitudes"
 STREAM_IA_RESULTADOS = f"{PREFIJO}eventos:ia-resultados"
 STREAM_FALLIDOS = f"{PREFIJO}eventos:fallidos"
@@ -57,6 +58,8 @@ class TipoEvento:
     campos: dict[str, str]
     opcionales: frozenset[str] = field(default_factory=frozenset)
     no_registrables: frozenset[str] = field(default_factory=frozenset)
+    # campo -> valores permitidos (para los campos de texto que son una lista cerrada).
+    valores: dict[str, frozenset[str]] = field(default_factory=dict)
 
     def validar_datos(self, datos: dict) -> None:
         if not isinstance(datos, dict):
@@ -70,6 +73,10 @@ class TipoEvento:
         for campo, valor in datos.items():
             if not VALIDADORES[self.campos[campo]](valor):
                 raise ErrorEvento(f"{self.nombre}: «{campo}» debe ser {self.campos[campo]}.")
+            if campo in self.valores and valor not in self.valores[campo]:
+                raise ErrorEvento(
+                    f"{self.nombre}: «{campo}» debe ser uno de {sorted(self.valores[campo])}."
+                )
 
     def registrable(self, datos: dict) -> dict:
         """Los datos sin los campos que no se escriben en el log."""
@@ -101,8 +108,11 @@ def streams() -> list[str]:
     return sorted({t.stream for t in CATALOGO.values()})
 
 
+ROLES = frozenset({"cliente", "administrador"})
+ESTADOS_DE_PEDIDO = frozenset({"pendiente", "pagado", "enviado", "entregado", "cancelado"})
+TIPOS_DE_CORREO = frozenset({"verificacion", "recuperacion", "aviso_password"})
+
 # --- Fase 1 ------------------------------------------------------------------------------
-# Los demás tipos de docs/eventos.md se agregan aquí en las fases 2 y 3.
 
 registrar_tipo(
     TipoEvento(
@@ -110,5 +120,97 @@ registrar_tipo(
         version=1,
         stream=STREAM_USUARIOS,
         campos={"usuario_id": "uuid", "rol": "texto"},
+        valores={"rol": ROLES},
+    )
+)
+
+# --- Fase 2: eventos de negocio ----------------------------------------------------------
+# svc-usuarios -> bitácora (svc-contenido)
+
+registrar_tipo(
+    TipoEvento(
+        nombre="correo_verificado",
+        version=1,
+        stream=STREAM_USUARIOS,
+        campos={"usuario_id": "uuid", "via": "texto"},
+        valores={"via": frozenset({"enlace", "recuperacion"})},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="rol_cambiado",
+        version=1,
+        stream=STREAM_USUARIOS,
+        campos={
+            "usuario_id": "uuid",
+            "rol_anterior": "texto",
+            "rol_nuevo": "texto",
+            "cambiado_por": "uuid",
+        },
+        valores={"rol_anterior": ROLES, "rol_nuevo": ROLES},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="password_cambiada",
+        version=1,
+        stream=STREAM_USUARIOS,
+        campos={"usuario_id": "uuid", "motivo": "texto"},
+        valores={"motivo": frozenset({"cambio", "recuperacion"})},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="sesiones_cerradas",
+        version=1,
+        stream=STREAM_USUARIOS,
+        campos={"usuario_id": "uuid"},
+    )
+)
+
+# svc-usuarios -> su propio consumidor de correos. Nunca lleva el token del enlace: lo genera
+# el consumidor al enviar.
+registrar_tipo(
+    TipoEvento(
+        nombre="correo_solicitado",
+        version=1,
+        stream=STREAM_CORREOS,
+        campos={"usuario_id": "uuid", "tipo_correo": "texto"},
+        valores={"tipo_correo": TIPOS_DE_CORREO},
+    )
+)
+
+# svc-tienda -> bitácora. Cada transición de estado (también el pago) publica un solo
+# pedido_estado_cambiado. Sin dirección ni nombres: `productos` es el número de renglones.
+registrar_tipo(
+    TipoEvento(
+        nombre="pedido_creado",
+        version=1,
+        stream=STREAM_TIENDA,
+        campos={
+            "pedido_id": "entero",
+            "usuario_id": "uuid",
+            "total": "decimal",
+            "productos": "entero",
+            "unidades": "entero",
+            "metodo_pago": "texto",
+        },
+        valores={"metodo_pago": frozenset({"tarjeta", "transferencia", "contra_entrega"})},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="pedido_estado_cambiado",
+        version=1,
+        stream=STREAM_TIENDA,
+        campos={
+            "pedido_id": "entero",
+            "usuario_id": "uuid",
+            "estado_anterior": "texto",
+            "estado_nuevo": "texto",
+            "total": "decimal",
+            "cambiado_por": "uuid",
+        },
+        valores={"estado_anterior": ESTADOS_DE_PEDIDO, "estado_nuevo": ESTADOS_DE_PEDIDO},
     )
 )

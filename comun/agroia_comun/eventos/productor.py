@@ -15,7 +15,7 @@ import logging
 
 import redis
 
-from agroia_comun.eventos import conexion
+from agroia_comun.eventos import conexion, correlacion
 from agroia_comun.eventos.catalogo import MAXLEN, STREAM_FALLIDOS, obtener_tipo
 from agroia_comun.eventos.registro import motivo_de, registrar
 from agroia_comun.eventos.sobre import Sobre, crear_sobre
@@ -34,7 +34,10 @@ def publicar(
     correlacion_id=None,
     cliente: redis.Redis | None = None,
 ) -> Sobre | None:
-    """Publica y devuelve el sobre, o None si Redis no respondió."""
+    """Publica y devuelve el sobre, o None si Redis no respondió. Sin `correlacion_id`, usa
+    la de la petición o el evento en curso (ver correlacion.py)."""
+    if correlacion_id is None:
+        correlacion_id = correlacion.actual()
     sobre = crear_sobre(tipo, datos, origen, correlacion_id)
     return publicar_sobre(sobre, cliente=cliente)
 
