@@ -31,7 +31,7 @@ Si algo de este archivo contradice esos documentos, gana este archivo; avisa de 
 
 Dentro de Docker cada servicio escucha en el puerto 8000 y se llama por su nombre (`http://svc-tienda:8000`).
 
-Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), `svc-contenido-eventos` (el consumidor de eventos de svc-contenido: misma imagen, otro comando), más `postgres`, `mongo` y `redis`: once contenedores.
+Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), dos consumidores de eventos (misma imagen que su servicio, otro comando): `svc-contenido-eventos` (bitácora) y `svc-usuarios-eventos` (correos), más `postgres`, `mongo` y `redis`: doce contenedores.
 
 ## Estructura
 
@@ -60,7 +60,8 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - Entre servicios no hay ForeignKey: guarda `usuario_id` como UUID (el `id` de svc-usuarios, compatible con ms-usuarios; en MongoDB, como texto). El contrato de los tokens está en `docs/contrato-identidad.md`.
 - Código compartido (autenticación JWT, permisos, formato de errores y eventos) solo en `comun/agroia_comun/`. No lo copies a los servicios.
 - Entre servicios: lo que necesita respuesta inmediata va por HTTP síncrono, siempre con timeout; los avisos y lo lento van por eventos con Redis Streams (`agroia_comun.eventos`, catálogo y reglas en `docs/eventos.md`). No acoples la lógica de negocio al transporte.
-- Eventos: publica después del commit (`publicar_al_confirmar`) y solo con los campos del catálogo, sin tokens ni datos personales innecesarios; todo manejador de eventos debe ser idempotente por sí mismo; cada consumidor corre en su propio contenedor.
+- Eventos: publica después del commit (`publicar_al_confirmar`) y solo con los campos del catálogo, sin tokens ni datos personales innecesarios; todo manejador de eventos debe ser idempotente por sí mismo; cada consumidor corre en su propio contenedor. Los correos se envían por el evento `correo_solicitado` (consumidor de svc-usuarios), nunca dentro de una petición, y el token del enlace lo genera el consumidor.
+- Correlación: cada petición lleva `X-Correlacion-Id` (UUID validado por `CorrelacionMiddleware` de `comun`, en el gateway y en cada servicio); el gateway la reenvía y los eventos la heredan. Los logs del gateway registran la ruta como patrón, nunca la ruta real ni la query string (pueden llevar tokens).
 - `svc-ia` responde siempre con `id` y `estado`, aunque hoy siempre sea `"listo"`. No guarda nada: las imágenes y resultados de diagnóstico los guarda `svc-contenido`.
 - `svc-ia` valida el JWT con PyJWT (las clases de DRF de `comun/` no le sirven) e instala solo el núcleo de `comun` (sin Django ni DRF), para los eventos.
 - La ficha técnica variable del producto es un `JSONField` en PostgreSQL. MongoDB solo guarda conversaciones, diagnósticos y bitácora.

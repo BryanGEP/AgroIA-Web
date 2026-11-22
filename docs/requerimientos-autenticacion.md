@@ -341,6 +341,7 @@ Un solo módulo (`usuarios/correos.py`) envía todos los correos; se construye p
    - Correos: verificación, recuperación, contraseña cambiada, 2FA desactivado y, si se hace, inicio de sesión desde dispositivo nuevo.
    - Envolver el envío en `try/except`, registrar el error en el log y no romper la petición del usuario.
    - Opcional: enviar en segundo plano con Celery para que la respuesta no espere al servidor de correo.
+   - *Nota de implementación (Entrega 4):* se envían en segundo plano con Redis Streams, no con Celery: las acciones publican `correo_solicitado` y el consumidor de svc-usuarios envía y genera el token (ver [`eventos.md`](eventos.md#correos-en-segundo-plano)). Un error del servidor de correo ya no está en la petición: se reintenta y, si se agota, el evento queda en fallidos para reprocesarlo.
 
 **Pruebas mínimas:** cada flujo deja exactamente un correo en `mail.outbox` con el destinatario y asunto correctos y el enlace válido; un error del servidor SMTP no rompe el registro.
 

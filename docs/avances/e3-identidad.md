@@ -212,7 +212,7 @@ Revisión del 19 de noviembre de 2026 sobre svc-usuarios, comun y svc-ia (autent
 | B2 | Baja | El log de un login fallido guardaba el campo del correo tal cual: si alguien escribía ahí su contraseña, quedaba en el log | insecure-defaults | Corregido |
 | B3 | Baja | El registro no limitaba el largo de la contraseña (los demás endpoints, 128) | Revisión manual | Corregido |
 | B4 | Baja | `X-Forwarded-For` se puede falsificar desde la red interna o un puerto directo y esquivar el límite por IP y el bloqueo de axes | Revisión manual | Aceptado, con condición para el gateway |
-| B5 | Baja | Se puede saber si un correo está registrado: el registro responde `email_registrado` y, con SMTP real, recuperar tardaría más si la cuenta existe | Revisión manual | Aceptado |
+| B5 | Baja | Se puede saber si un correo está registrado: el registro responde `email_registrado` y, con SMTP real, recuperar tardaría más si la cuenta existe | Revisión manual | Aceptado; el tiempo, cerrado en la Entrega 4 |
 | B6 | Baja | Sin HSTS, redirección a HTTPS ni cookies `Secure` (W004, W008, W012 y W016) | `check --deploy` | Aceptado |
 | B7 | Baja | Un access sirve hasta 15 minutos tras logout o cambio de rol, y el token no lleva `aud` | Revisión manual | Aceptado |
 | B8 | Baja | `.env.example` trae `DJANGO_DEBUG=True` y contraseñas de ejemplo que compose acepta | insecure-defaults | Comentario agregado; se acepta como plantilla de desarrollo |
@@ -255,7 +255,7 @@ Revisión del 19 de noviembre de 2026 sobre svc-usuarios, comun y svc-ia (autent
 - **M3. Root y servidores de desarrollo:** son imágenes de desarrollo con el código montado y recarga automática. Se corrige al preparar el despliegue (Entrega 5).
 - **B1. Redis y MongoDB sin contraseña ni TLS:** viven en la red interna de Docker y sus puertos solo se publican en `127.0.0.1`. Contraseña y TLS van al despliegue (Entrega 5).
 - **B4. `X-Forwarded-For`:** los servicios confían en un proxy, y los puertos directos solo existen en `127.0.0.1`, como dice el contrato de identidad. **Condición para la fase del gateway:** el gateway debe poner en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y no reenviar el que mande el cliente. Quedó escrita en el plan de la definición técnica y en el contrato.
-- **B5. Saber si un correo está registrado:** el registro tiene que avisar que el correo ya existe (lo pide el documento de requerimientos) y está limitado a 5 por hora por IP. El envío de correos en segundo plano, que iguala los tiempos de recuperar, llega con los eventos de la Entrega 4.
+- **B5. Saber si un correo está registrado:** el registro tiene que avisar que el correo ya existe (lo pide el documento de requerimientos) y está limitado a 5 por hora por IP. El envío de correos en segundo plano, que iguala los tiempos de recuperar, llegó con los eventos de la Entrega 4 ([avance](e4-eventos-negocio.md)): con un servidor de correo que no responde, recuperar con un correo que existe respondía **504 en 10 016 ms** y con uno que no, 200 en 57 ms; después, 200 en 15 ms y 200 en 17 ms (`infra/medir_recuperacion.py`).
 - **B6. HTTPS y cookies seguras:** hoy no hay HTTPS y svc-usuarios no se expone; solo afecta al admin de Django. Va al despliegue (Entrega 5).
 - **B7. Revocación y `aud`:** es por diseño y está en los límites conocidos del contrato. Revocar antes requeriría consultar Redis en cada petición (Entrega 4).
 

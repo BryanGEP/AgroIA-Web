@@ -1,6 +1,6 @@
 # Eventos entre servicios
 
-Noviembre de 2026 · Entrega 4
+Noviembre de 2026 · Entrega 4 (fase 1: base; fase 2: eventos de negocio)
 
 Qué operaciones se comunican de forma asíncrona, con qué mecanismo y con qué reglas. El código está en [`comun/agroia_comun/eventos/`](../comun/agroia_comun/eventos/); los avances, en [`avances/e4-eventos-base.md`](avances/e4-eventos-base.md).
 
@@ -67,7 +67,20 @@ Todos los eventos viajan en el mismo sobre, guardado como un solo campo `sobre` 
 - Nunca llevan tokens, contraseñas ni datos personales que no hagan falta (correo, nombre, teléfono, dirección): se identifica al usuario por `usuario_id`. El catálogo rechaza cualquier campo que no esté declarado, así que no se cuela un dato por accidente.
 - Un tipo puede marcar campos como **no registrables**: viajan en el stream, pero ningún log los escribe (ni `evento_publicado`, ni `evento_no_publicado`, ni ningún otro). Hoy no hay ninguno; en la fase 3 lo serán `pregunta` e `historial`.
 
-**`correlacion_id`:** el gateway la pone en el encabezado `X-Correlacion-Id` de cada petición a los servicios, y los servicios la copian al sobre. **Solo se acepta si es un UUID válido; si no, se genera uno nuevo** (en el gateway y en cada servicio: `correlacion_valida()`). Hoy los servicios ya la validan; que el gateway la genere y la reenvía es de la fase 2 (el proxy `/api/` todavía no la pasa).
+**`correlacion_id`: un flujo de punta a punta.**
+
+1. **El gateway la crea:** `CorrelacionMiddleware` (en `comun`) toma la del navegador o cliente de API (`X-Correlacion-Id`) **solo si es un UUID válido**; si no, genera una. Queda en una `ContextVar` mientras dura la petición y se restablece al terminar, también si hubo un error, así que no se arrastra a la siguiente.
+2. **El gateway la reenvía validada:** en cada llamada interna (pantallas y proxy `/api/`) la pone en `X-Correlacion-Id`. El proxy no reenvía el valor crudo del cliente.
+3. **Cada servicio la vuelve a validar** con el mismo middleware y la usa al publicar: `publicar_al_confirmar` la toma de la `ContextVar`.
+4. **El consumidor la pone** con la `correlacion_id` del sobre mientras corre el manejador y la limpia al terminar. Si un manejador publica otro evento, conserva la cadena.
+5. **Respuesta:** el gateway devuelve la correlación en `X-Correlacion-Id`, expuesta en CORS.
+6. **En los logs:**
+   - el gateway escribe una línea `peticion` por petición (logger `peticiones`), con la correlación y la ruta como **patrón**, nunca la ruta real ni la query string, porque hay rutas con tokens (`/restablecer/<uid>/<token>/`, `/verificar-correo/?token=`);
+   - el log de seguridad y el de eventos la llevan en todos los servicios;
+   - el log de runserver (`django.server`) se descarta en el gateway, y `django.request` escribe el patrón en lugar de la ruta.
+7. **En la bitácora:** se puede filtrar por `correlacion_id` para ver todo lo que causó una petición.
+
+svc-ia recibe el encabezado, pero leerlo queda para la fase 3.
 
 ## Streams y grupos
 
@@ -75,7 +88,8 @@ Todo en la **base lógica 1** de Redis (`EVENTOS_REDIS_URL`), separada de la cac
 
 | Stream | Productor | Grupos (consumidores) | Recorte |
 | --- | --- | --- | --- |
-| `agroia:eventos:usuarios` | svc-usuarios | `svc-contenido` (bitácora); en la fase 2, `svc-usuarios` (correos) | ~10 000 mensajes |
+| `agroia:eventos:usuarios` | svc-usuarios | `svc-contenido` (bitácora) | ~10 000 mensajes |
+| `agroia:eventos:correos` | svc-usuarios | `svc-usuarios` (consumidor de correos, contenedor `svc-usuarios-eventos`): una cola de trabajo interna, que la bitácora no lee | ~10 000 |
 | `agroia:eventos:tienda` | svc-tienda | `svc-contenido` (bitácora) | ~10 000 |
 | `agroia:eventos:ia-solicitudes` | web | `svc-ia` (worker) | ~10 000 |
 | `agroia:eventos:ia-resultados` | svc-ia | `svc-contenido` (guarda) | ~10 000 |
@@ -88,19 +102,51 @@ El de fallidos no se recorta: cada fallido es un problema que alguien tiene que 
 | Evento | Fase | Productor → consumidores | Datos | Si falla |
 | --- | --- | --- | --- | --- |
 | `usuario_registrado` | **1 (hecho)** | svc-usuarios → svc-contenido | `usuario_id`, `rol` | El registro ya respondió 201. El consumidor reintenta; si se agotan los reintentos, va a fallidos y se reprocesa |
-| `correo_verificado` | 2 | svc-usuarios → svc-contenido | `usuario_id` | Igual: solo afecta la bitácora |
-| `rol_cambiado` | 2 | svc-usuarios → svc-contenido | `usuario_id`, `rol_anterior`, `rol_nuevo`, `cambiado_por` | Igual. El rol ya cambió (y `CambioRol` lo registra en svc-usuarios) |
-| `correo_solicitado` | 2 | svc-usuarios → svc-usuarios (su propio consumidor de correos) | `usuario_id`, `tipo_correo` (`verificacion`, `recuperacion`, `password_cambiada`) | Reintenta el envío; si se agota, va a fallidos y el usuario puede pedir reenvío |
-| `pedido_creado` | 2 | svc-tienda → svc-contenido | `pedido_id`, `usuario_id`, `total` (texto decimal), `productos` (cantidad) | El pedido ya existe; solo afecta la bitácora |
-| `pedido_pagado` | 2 | svc-tienda → svc-contenido | `pedido_id`, `usuario_id`, `total` | Igual |
-| `pedido_estado_cambiado` | 2 | svc-tienda → svc-contenido | `pedido_id`, `usuario_id`, `estado_anterior`, `estado_nuevo` | Igual |
+| `correo_verificado` | **2 (hecho)** | svc-usuarios → svc-contenido | `usuario_id`, `via` (`enlace` o `recuperacion`: restablecer la contraseña también verifica). Solo si pasó de no verificado a verificado | Igual: solo afecta la bitácora |
+| `rol_cambiado` | **2 (hecho)** | svc-usuarios → svc-contenido | `usuario_id`, `rol_anterior`, `rol_nuevo`, `cambiado_por` (UUID del administrador). Nada si el rol no cambió | Igual. El rol ya cambió (y `CambioRol` lo registra en svc-usuarios) |
+| `password_cambiada` | **2 (hecho)** | svc-usuarios → svc-contenido | `usuario_id`, `motivo` (`cambio` o `recuperacion`). Nunca la contraseña | Igual |
+| `sesiones_cerradas` | **2 (hecho)** | svc-usuarios → svc-contenido | `usuario_id` (por `logout-todo`) | Igual |
+| `correo_solicitado` | **2 (hecho)** | svc-usuarios → svc-usuarios (consumidor de correos), stream `correos` | `usuario_id`, `tipo_correo` (`verificacion`, `recuperacion` o `aviso_password`) | Reintenta el envío; si se agota, va a fallidos y se reprocesa (con un token nuevo). Ver «Correos en segundo plano» |
+| `pedido_creado` | **2 (hecho)** | svc-tienda → svc-contenido | `pedido_id`, `usuario_id`, `total` (texto decimal), `productos` (número de renglones), `unidades` (suma de cantidades), `metodo_pago`. Sin dirección ni nombres | El pedido ya existe; solo afecta la bitácora |
+| `pedido_estado_cambiado` | **2 (hecho)** | svc-tienda → svc-contenido | `pedido_id`, `usuario_id`, `estado_anterior`, `estado_nuevo`, `total`, `cambiado_por` (el cliente al pagar, el administrador en las demás) | Igual |
 | `ia_pregunta_solicitada` | 3 | web → svc-ia | `solicitud_id`, `usuario_id`, `conversacion_id`, `pregunta`, `historial` (últimas 10). **`pregunta` e `historial` no registrables** | svc-ia reintenta; al agotarse, publica `ia_respuesta_fallida` y el chat ofrece «Reintentar» |
 | `ia_respuesta_generada` | 3 | svc-ia → svc-contenido | `solicitud_id`, `conversacion_id`, `usuario_id`, `respuesta`, `fuentes`. **`respuesta` no registrable** | Reintenta guardarla; si se agota, va a fallidos y se reprocesa |
 | `ia_respuesta_fallida` | 3 | svc-ia → svc-contenido | `solicitud_id`, `conversacion_id`, `usuario_id`, `codigo` (`agente_no_disponible`…) | Queda el estado de error de la solicitud |
 | `diagnostico_solicitado` | 3 | web → svc-ia | `solicitud_id`, `usuario_id` y una **referencia** a la imagen, nunca la imagen | Hoy el modelo no existe y se responde 503 |
 | `diagnostico_generado` | 3 | svc-ia → svc-contenido | `solicitud_id`, `usuario_id`, `clase`, `confianza`, `probabilidades`, `modelo_version`, referencia a la imagen | Reintenta guardarlo; si se agota, va a fallidos |
 
-**`correo_solicitado`: los tokens de los enlaces nunca viajan en el evento.** El evento lleva solo el `usuario_id` y el tipo de correo; el consumidor de svc-usuarios genera el token de verificación o de recuperación al enviar, a partir del usuario. En la recuperación con un correo que no existe **no se publica nada**, pero la respuesta es la misma y tarda lo mismo (ya no depende de mandar el correo).
+**Cada valor de texto que es una lista cerrada** (rol, estado, tipo de correo, método de pago, `via`, `motivo`) se valida en el catálogo: un valor fuera de la lista no se publica.
+
+**El pago no es un evento aparte.** Es la transición `pendiente → pagado` y publica un `pedido_estado_cambiado` más. Todas las transiciones (pagar, y los cambios del administrador) pasan por una sola función de svc-tienda, `_cambiar_estado_bloqueado`, que es el único lugar que publica. Así una transición nunca publica dos eventos, por el camino que sea. Los consumidores filtran por `estado_nuevo`.
+
+**Lo síncrono sigue síncrono:** crear el pedido valida y descuenta stock en su transacción, y cancelar devuelve el stock en la suya; los eventos se publican después del commit.
+
+### Correos en segundo plano
+
+Correos que envía svc-usuarios, todos por evento:
+
+| Correo | Cuándo | Token |
+| --- | --- | --- |
+| Verificación | Registro y «reenviar verificación» (solo si la cuenta existe, está activa y sin verificar) | `TimestampSigner`, 24 h |
+| Recuperación | «Recuperar contraseña» (solo si la cuenta existe y está activa) | `default_token_generator`, 1 h, de un solo uso |
+| Aviso de contraseña cambiada | Restablecer y cambiar contraseña | — |
+
+No hay ningún correo síncrono: el login con 2FA responde 501, y la sección 12 de los requerimientos usa TOTP con una app, no un código por correo.
+
+- **Los tokens nunca viajan en el evento.** El evento lleva solo `usuario_id` y `tipo_correo`; el consumidor genera el token al enviar. Si el evento se reprocesa más tarde, el token es nuevo y vigente.
+- **El consumidor revisa antes de enviar** si todavía toca: la verificación no sale si el correo ya está verificado, y ningún correo sale a una cuenta desactivada. El aviso usa la fecha del sobre (cuándo cambió la contraseña), no la del envío.
+- **Si el envío falla,** se lanza `ErrorDeEnvio`, que nombra solo la clase del error y no el destinatario. El consumidor reintenta y, al agotar los reintentos, el evento va a fallidos y se puede reprocesar.
+- **Idempotencia:** la tabla `CorreoEnviado` de svc-usuarios guarda el `evento_id` de cada correo procesado, enviado u omitido. El mismo evento dos veces no manda dos correos.
+- **El hueco de SMTP:** si el proceso muere después de que el servidor de correo aceptó el mensaje y antes de guardar `CorreoEnviado`, al reentregarse el evento el correo sale otra vez. Con SMTP no se puede cerrar: no hay forma de saber si el servidor lo aceptó sin guardar algo después. Un correo repetido es molesto pero inofensivo, porque el token anterior sigue sirviendo o vence solo.
+- **En desarrollo, el log del consumidor muestra los correos completos:** con el backend de consola, el correo (con su enlace) se imprime en el log de `svc-usuarios-eventos`, como antes en el de svc-usuarios. Así se copia el enlace al probar. Con `DJANGO_DEBUG=False` svc-usuarios no arranca con ese backend (corrección M1 de la Entrega 3).
+- **Recuperación con un correo que no existe:** no se publica nada y la respuesta es la misma. Como el correo ya no se envía dentro de la petición, también tarda lo mismo, y con eso se cierra el riesgo B5 de la Entrega 3. Lo midió `infra/medir_recuperacion.py` con un servidor de correo que no responde:
+
+  | | Correo que existe | Correo que no existe |
+  | --- | --- | --- |
+  | Antes (envío en la petición) | **504**, 10 016 ms (el gateway corta esperando al SMTP) | 200, 57 ms |
+  | Después (envío por evento) | 200, 15 ms | 200, 17 ms |
+
+  Medianas, cada una de 3 peticiones antes y de 5 después. Después se usó una conexión nueva por petición y se alternó cuál iba primero, porque al reutilizar la conexión una de las dos sumaba unos 40 ms que no tenían que ver con la cuenta.
 
 ## Diagrama del flujo de eventos
 
@@ -115,6 +161,7 @@ flowchart LR
 
     subgraph redis["Redis · base 1 · Streams"]
         sU[["agroia:eventos:usuarios"]]
+        sC[["agroia:eventos:correos"]]
         sT[["agroia:eventos:tienda"]]
         sS[["agroia:eventos:ia-solicitudes"]]
         sR[["agroia:eventos:ia-resultados"]]
@@ -123,20 +170,22 @@ flowchart LR
 
     subgraph consumidores["Grupos de consumidores"]
         cC["svc-contenido-eventos<br/>grupo svc-contenido"]
-        cU["svc-usuarios (correos)<br/>grupo svc-usuarios · fase 2"]
+        cU["svc-usuarios-eventos<br/>grupo svc-usuarios (correos)"]
         cI["svc-ia-worker<br/>grupo svc-ia · fase 3"]
     end
 
     mongo[("MongoDB<br/>bitácora · conversaciones · diagnósticos")]
     op(["python -m agroia_comun.eventos<br/>estado · reprocesar"])
 
-    usu -- "usuario_registrado (fase 1)<br/>correo_verificado · rol_cambiado<br/>correo_solicitado" --> sU
-    tie -- "pedido_creado · pedido_pagado<br/>pedido_estado_cambiado" --> sT
+    usu -- "usuario_registrado · correo_verificado<br/>rol_cambiado · password_cambiada<br/>sesiones_cerradas" --> sU
+    usu -- "correo_solicitado" --> sC
+    tie -- "pedido_creado<br/>pedido_estado_cambiado" --> sT
     web -- "ia_pregunta_solicitada<br/>diagnostico_solicitado" --> sS
     iaP -- "ia_respuesta_generada · ia_respuesta_fallida<br/>diagnostico_generado" --> sR
 
     sU --> cC
-    sU -.-> cU
+    sC --> cU
+    cU -- "SMTP" --> smtp([Servidor de correo])
     sT --> cC
     sS -.-> cI
     sR --> cC
@@ -144,13 +193,13 @@ flowchart LR
     cC --> mongo
 
     cC -- "agotó sus reintentos" --> sF
-    cU -.-> sF
+    cU --> sF
     cI -.-> sF
     sF --> op
-    op -- "reprocesar (mismo id)" --> sU & sT & sS & sR
+    op -- "reprocesar (mismo id)" --> sU & sC & sT & sS & sR
 ```
 
-En la fase 1 solo existe la línea de `usuario_registrado` hasta la bitácora, con su stream de fallidos y el reproceso; lo punteado llega en las fases 2 y 3.
+Lo continuo ya funciona: fase 1 (`usuario_registrado`) y fase 2 (eventos de negocio y correos). Lo punteado es la IA asíncrona de la fase 3.
 
 ## Publicar
 
@@ -191,8 +240,9 @@ Cada servicio escribe una línea JSON por suceso en el logger `eventos`: `evento
 
 - **Redis con persistencia:** `--appendonly yes --appendfsync everysec` y el volumen `redis_datos`. Los eventos sobreviven a un reinicio (se pierde a lo más el último segundo).
 - **`maxmemory-policy noeviction`, explícita:** si la memoria se llena, Redis rechaza las escrituras en lugar de borrar llaves. Con otra política (por ejemplo `allkeys-lru`) podría borrar eventos sin procesar, porque comparten instancia con la caché del límite de intentos. Rechazar una escritura se nota (`evento_no_publicado`); perder un evento en silencio, no.
-- **Un contenedor por consumidor:** misma imagen y código que su servicio, otro comando, con `restart: unless-stopped`. Hoy: `svc-contenido-eventos` (`python manage.py consumir_eventos`). En la fase 3 se suma `svc-ia-worker`.
-- **Variables:** `EVENTOS_REDIS_URL` (`redis://redis:6379/1`), `EVENTOS_MAX_REINTENTOS` (5), `EVENTOS_ESPERA_BASE` (2 s), `EVENTOS_REDIS_TIMEOUT` (2 s) y `EVENTOS_BLOQUEO_MS` (5000).
+- **Un contenedor por consumidor:** misma imagen y código que su servicio, otro comando (`python manage.py consumir_eventos`), con `restart: unless-stopped`. Hoy son dos: `svc-contenido-eventos` (bitácora) y `svc-usuarios-eventos` (correos). En la fase 3 se suma `svc-ia-worker`.
+- **`svc-usuarios-eventos` monta la llave privada JWT en solo lectura (`:ro`):** la configuración de svc-usuarios no arranca sin ella, porque es el mismo servicio, pero este proceso no firma tokens.
+- **Variables:** `EVENTOS_REDIS_URL` (`redis://redis:6379/1`), `EVENTOS_MAX_REINTENTOS` (5), `EVENTOS_ESPERA_BASE` (2 s), `EVENTOS_REDIS_TIMEOUT` (2 s) y `EVENTOS_BLOQUEO_MS` (5000). Para los correos, `EMAIL_TIMEOUT` (10 s).
 
 ## Operación
 
@@ -204,13 +254,24 @@ docker compose exec svc-contenido python -m agroia_comun.eventos estado
 docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --id 1795366848980-0
 docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --todos
 
-# Prueba de punta a punta (registro → bitácora, consumidor caído, apagado, fallido y reproceso)
+# Prueba de punta a punta: registro → bitácora, consumidor caído, apagado, fallido y
+# reproceso, el flujo de negocio con su correlación y un correo que falla y se reprocesa
 python infra/prueba_eventos.py
+
+# Tiempo de «recuperar contraseña» con un correo que existe y con uno que no (riesgo B5)
+python infra/medir_recuperacion.py
 ```
+
+**La bitácora** se consulta con `GET /api/v1/bitacora/` (solo administrador), con los filtros `tipo`, `usuario_id`, `correlacion_id`, `desde` y `hasta`.
 
 Los comandos funcionan en cualquier contenedor que tenga `comun`, también en svc-ia.
 
-## Pendientes para la fase 3
+## Pendientes
+
+- **Pantalla de bitácora en el panel de administración (opcional, fase 4):** hoy se consulta solo por la API.
+- **Consumidores viejos en `estado`:** cada contenedor recreado se registra con otro nombre (su *hostname*) y el anterior queda listado, siempre sin pendientes. Se podría quitar al arrancar a los que llevan mucho tiempo inactivos y sin pendientes.
+
+### Para la fase 3
 
 - **Cómo se entera web del resultado de la IA.** Un grupo de consumidores en web entrega cada mensaje a un solo proceso, pero el usuario puede estar esperando en otro proceso del gateway. Alternativas:
   1. web consulta el estado de la solicitud en svc-contenido (que ya guarda el resultado);

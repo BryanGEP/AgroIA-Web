@@ -17,7 +17,7 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT), `emitir_token.py` (tokens solo para pruebas), `matriz_seguridad.py` ([matriz de accesos](#matriz-de-accesos)) y `prueba_eventos.py` ([prueba de los eventos](#eventos-entre-servicios)). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
-Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector), y **`svc-contenido-eventos`**, el consumidor de eventos de svc-contenido (misma imagen, otro comando). En total, once contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
+Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector), y dos consumidores de eventos con la misma imagen que su servicio y otro comando: **`svc-contenido-eventos`** (bitácora) y **`svc-usuarios-eventos`** (correos). En total, doce contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
 
 ## Requisitos
 
@@ -117,7 +117,7 @@ Para tener cuentas listas en desarrollo:
 docker compose exec svc-usuarios python manage.py cargar_usuarios_demo
 ```
 
-Crea `cliente@demo.agroia.test` (verificado), `sin-verificar@demo.agroia.test` y `admin@demo.agroia.test` con la contraseña `solo-demo-no-usar-en-produccion`. **Esas cuentas no deben existir fuera de desarrollo**: el comando se niega a correr con `DJANGO_DEBUG=False`. Los correos (verificación, recuperación) se imprimen en `docker compose logs -f svc-usuarios`.
+Crea `cliente@demo.agroia.test` (verificado), `sin-verificar@demo.agroia.test` y `admin@demo.agroia.test` con la contraseña `solo-demo-no-usar-en-produccion`. **Esas cuentas no deben existir fuera de desarrollo**: el comando se niega a correr con `DJANGO_DEBUG=False`. Los correos (verificación, recuperación) se imprimen en `docker compose logs -f svc-usuarios-eventos`, el consumidor que los envía.
 
 `infra/emitir_token.py` se conserva **solo para pruebas y desarrollo**, para lo que el login no cubre: un token vencido (`--vencido`), un usuario que no existe o probar un servicio sin levantar svc-usuarios. Firma con la llave privada local.
 
@@ -153,7 +153,11 @@ python infra/matriz_seguridad.py --omitir-limites   # sin los casos de exceso de
 
 ### Eventos entre servicios
 
-Desde la Entrega 4 los servicios se avisan por **eventos con Redis Streams** (base lógica 1 de Redis, con persistencia). Hoy funciona `usuario_registrado`: svc-usuarios lo publica al registrarse alguien y el contenedor `svc-contenido-eventos` lo guarda en la bitácora. El catálogo completo, el sobre común, los reintentos, el stream de fallidos y el diagrama están en [`docs/eventos.md`](docs/eventos.md).
+Desde la Entrega 4 los servicios se avisan por **eventos con Redis Streams** (base lógica 1 de Redis, con persistencia). Hoy funcionan:
+- **Bitácora:** los eventos de cuenta (registro, verificación, cambio de rol y de contraseña, cierre de sesiones) y de pedidos (creado y cada cambio de estado, también el pago) llegan a la bitácora de svc-contenido por el contenedor `svc-contenido-eventos`.
+- **Correos:** se envían en segundo plano por `svc-usuarios-eventos`, que genera el token de cada enlace al enviar.
+
+Cada petición lleva un `X-Correlacion-Id` que el gateway reenvía a los servicios; la bitácora se puede filtrar por correlación y por usuario (`GET /api/contenido/bitacora/?correlacion_id=…`). El catálogo completo, el sobre común, los reintentos, el stream de fallidos y el diagrama están en [`docs/eventos.md`](docs/eventos.md).
 
 ```powershell
 # Estado: streams, grupos, pendientes, consumidores y los últimos fallidos
@@ -164,8 +168,10 @@ docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --id
 docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --todos
 
 # Ver lo que hace el consumidor
-docker compose logs -f svc-contenido-eventos
+docker compose logs -f svc-contenido-eventos svc-usuarios-eventos
 ```
+
+**Los correos en desarrollo** (backend de consola) se imprimen en `docker compose logs svc-usuarios-eventos`: el enlace de verificación o de recuperación se copia de ahí.
 
 **Prueba de punta a punta:** [`infra/prueba_eventos.py`](infra/prueba_eventos.py) comprueba, con el sistema levantado, cuatro cosas:
 1. un registro por el gateway llega a la bitácora;
@@ -194,7 +200,8 @@ Postman y la matriz usan las cuentas de demostración, gastan los límites de in
 Orden recomendado, desde la raíz en PowerShell, con el venv activo:
 
 ```powershell
-# 1. Límites en cero
+# 1. Stock del catálogo de demostración (Postman compra en cada corrida) y límites en cero
+docker compose exec svc-tienda python manage.py cargar_datos_demo
 docker compose exec svc-usuarios python manage.py reiniciar_limites
 
 # 2. Postman
