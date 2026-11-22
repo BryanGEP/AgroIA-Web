@@ -24,8 +24,9 @@ class BitacoraViewSet(viewsets.GenericViewSet):
     @extend_schema(
         summary="Consultar la bitácora",
         description=(
-            "Solo administrador. Filtros: `tipo`, `desde` y `hasta` (AAAA-MM-DD, ambos "
-            "inclusive). Paginado de 20 en 20, los más recientes primero."
+            "Solo administrador. Filtros: `tipo`, `usuario_id` (usuario afectado), "
+            "`correlacion_id` (todos los eventos de un flujo), `desde` y `hasta` (AAAA-MM-DD, "
+            "ambos inclusive). Paginado de 20 en 20, los más recientes primero."
         ),
         parameters=[FiltroBitacoraSerializer],
         responses={200: EventoSerializer(many=True), **ERRORES_ADMIN},
