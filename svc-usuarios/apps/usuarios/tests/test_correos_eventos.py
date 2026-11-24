@@ -151,7 +151,10 @@ class FallaUnaVez(BaseEmailBackend):
 
 
 def consumidor(redis, **opciones) -> Consumidor:
-    c = Consumidor(GRUPO, MANEJADORES, cliente=redis, bloqueo_ms=10, espera_base=0.02, **opciones)
+    c = Consumidor(
+        GRUPO, MANEJADORES, cliente=redis, bloqueo_ms=10, espera_base=0.02, latido=0.005,
+        **opciones,
+    )  # fmt: skip
     c.preparar()
     return c
 
