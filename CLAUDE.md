@@ -31,7 +31,7 @@ Si algo de este archivo contradice esos documentos, gana este archivo; avisa de 
 
 Dentro de Docker cada servicio escucha en el puerto 8000 y se llama por su nombre (`http://svc-tienda:8000`).
 
-Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), dos consumidores de eventos (misma imagen que su servicio, otro comando): `svc-contenido-eventos` (bitácora) y `svc-usuarios-eventos` (correos), más `postgres`, `mongo` y `redis`: doce contenedores.
+Además corren `agente` (el agente del repo BryanGEP/AgroIA, construido desde GitHub; svc-ia lo llama por HTTP) y `agente-db` (su base de conocimiento, PostgreSQL con pgvector, que solo usa el agente), tres procesos de eventos (misma imagen que su servicio, otro comando): `svc-contenido-eventos` (bitácora y resultados de la IA), `svc-usuarios-eventos` (correos) y `svc-ia-worker` (atiende las solicitudes de IA y llama al agente), más `postgres`, `mongo` y `redis`: trece contenedores.
 
 ## Estructura
 
@@ -62,7 +62,9 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - Entre servicios: lo que necesita respuesta inmediata va por HTTP síncrono, siempre con timeout; los avisos y lo lento van por eventos con Redis Streams (`agroia_comun.eventos`, catálogo y reglas en `docs/eventos.md`). No acoples la lógica de negocio al transporte.
 - Eventos: publica después del commit (`publicar_al_confirmar`) y solo con los campos del catálogo, sin tokens ni datos personales innecesarios; todo manejador de eventos debe ser idempotente por sí mismo; cada consumidor corre en su propio contenedor. Los correos se envían por el evento `correo_solicitado` (consumidor de svc-usuarios), nunca dentro de una petición, y el token del enlace lo genera el consumidor.
 - Correlación: cada petición lleva `X-Correlacion-Id` (UUID validado por `CorrelacionMiddleware` de `comun`, en el gateway y en cada servicio); el gateway la reenvía y los eventos la heredan. Los logs del gateway registran la ruta como patrón, nunca la ruta real ni la query string (pueden llevar tokens).
-- `svc-ia` responde siempre con `id` y `estado`, aunque hoy siempre sea `"listo"`. No guarda nada: las imágenes y resultados de diagnóstico los guarda `svc-contenido`.
+- La IA es asíncrona: el chat y el diagnóstico piden a `svc-contenido` (202), que guarda la solicitud y publica el evento; `svc-ia-worker` responde por evento y la pantalla consulta el estado con polling de HTMX. El gateway no toca Redis. Detalle en `docs/eventos.md` («IA asíncrona»).
+- Los endpoints síncronos de `svc-ia` (`/agente/preguntar/`, `/diagnostico/`) quedan por compatibilidad y responden siempre con `id` y `estado`. `svc-ia` no guarda nada: las imágenes y resultados de diagnóstico los guarda `svc-contenido`.
+- Nunca presentes un diagnóstico inventado como real: el clasificador de prueba (`IA_CLASIFICADOR_PRUEBA`) solo funciona con `DEBUG=True` y todo lo que da va marcado como prueba.
 - `svc-ia` valida el JWT con PyJWT (las clases de DRF de `comun/` no le sirven) e instala solo el núcleo de `comun` (sin Django ni DRF), para los eventos.
 - La ficha técnica variable del producto es un `JSONField` en PostgreSQL. MongoDB solo guarda conversaciones, diagnósticos y bitácora.
 - Archivos (imágenes de productos y diagnósticos) siempre con `STORAGES` / `default_storage` de Django, nunca rutas a mano: en la Entrega 5 se pasarán a Cloud Storage cambiando solo la configuración.

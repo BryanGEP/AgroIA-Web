@@ -17,7 +17,7 @@ Proyecto académico (Ingeniería en Sistemas Computacionales — TecNM Jiquilpan
 | `infra/` | `postgres/init.sql` (bases y usuarios), `generar_llaves.py` (llaves JWT), `emitir_token.py` (tokens solo para pruebas), `matriz_seguridad.py` ([matriz de accesos](#matriz-de-accesos)) y `prueba_eventos.py` ([prueba de los eventos](#eventos-entre-servicios)). | — | — | — |
 | `docs/` | Definición técnica, requerimientos y entregables. | — | — | ver [Documentación](#documentación) |
 
-Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector), y dos consumidores de eventos con la misma imagen que su servicio y otro comando: **`svc-contenido-eventos`** (bitácora) y **`svc-usuarios-eventos`** (correos). En total, doce contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
+Además corren tres contenedores de infraestructura, `postgres` (16), `mongo` (7) y `redis` (7), el contenedor **`agente`**, que es el agente conversacional del repo [BryanGEP/AgroIA](https://github.com/BryanGEP/AgroIA) construido directamente desde GitHub (carpeta `svc-agente`, rama `main`), **`agente-db`**, su base de conocimiento (PostgreSQL con pgvector), y tres procesos de eventos con la misma imagen que su servicio y otro comando: **`svc-contenido-eventos`** (bitácora y resultados de la IA), **`svc-usuarios-eventos`** (correos) y **`svc-ia-worker`** (atiende las preguntas y los diagnósticos y llama al agente). En total, trece contenedores. El agente solo está en la red interna y se publica en `127.0.0.1:8005` para pruebas; `agente-db` no se publica.
 
 ## Requisitos
 
@@ -75,12 +75,13 @@ La llave solo llega al contenedor `agente`, no a svc-ia. Sin llave el sistema ar
 
 ### Tiempo de respuesta del agente
 
-El agente tarda normalmente de 2 a 6 segundos, pero el LLM a veces se toma de 20 a 30 segundos en cualquier pregunta, no solo en la primera. Por eso svc-ia espera hasta `AGENTE_TIMEOUT=45` segundos y el gateway hasta `IA_TIMEOUT=50`; si se pasa, la pantalla del chat ofrece «Reintentar».
+El agente tarda normalmente de 2 a 6 segundos, pero el LLM a veces se toma de 20 a 30 segundos en cualquier pregunta, no solo en la primera. Por eso la pregunta va por eventos: svc-contenido la acepta al momento (202), `svc-ia-worker` espera al agente hasta `AGENTE_TIMEOUT=45` segundos (con 2 reintentos) y la pantalla muestra «AgroIA está escribiendo…» y consulta el estado cada 2 s (cada 5 s después de 20 s). Si la solicitud falla o pasa de `IA_SOLICITUD_VENCE_SEGUNDOS=180`, el chat ofrece «Reintentar». `IA_TIMEOUT=50` sigue siendo el límite del gateway para los endpoints síncronos de svc-ia, que quedan por compatibilidad.
 
 - **Medición del 20 de noviembre de 2026** (agente recién reiniciado, tres preguntas seguidas, dos veces): primeras preguntas de 5,2 s y 5,9 s; las más lentas, 21,0 s y 29,3 s, fueron la tercera y la segunda.
 - **Arranque:** la primera pregunta carga el modelo de embeddings desde el volumen `modelos_hf`, lo que toma menos de un segundo. Si el volumen está vacío, primero lo descarga (unos 471 MB, ver arriba).
 - **Antes de una demo:** haz una pregunta de prueba en http://localhost:8000/agroia/. Así se carga el modelo y confirmas que la llave de Groq funciona.
-- **Si tu `.env` ya tenía** `AGENTE_TIMEOUT=30` o `IA_TIMEOUT=35`, cámbialos a `45` y `50` (`.env.example` ya los trae así) y reinicia con `docker compose up -d svc-ia web`.
+- **Si tu `.env` ya tenía** `AGENTE_TIMEOUT=30` o `IA_TIMEOUT=35`, cámbialos a `45` y `50` (`.env.example` ya los trae así) y reinicia con `docker compose up -d svc-ia svc-ia-worker web`.
+- **Límite de la llave gratuita de Groq:** con 3 llamadas a la vez, Groq rechaza algunas (`RateLimitError`) y el agente tarda de 11 a 39 s en responder 503. Por eso `svc-ia-worker` atiende 2 a la vez (`IA_WORKER_HILOS=2`); con una llave de pago se puede subir. Si Groq rechaza una llamada, el worker reintenta a los 5 s y la respuesta llega, pero más tarde. Si pasa de 180 s, «Reintentar». Para que un solo usuario no agote el límite, svc-contenido limita las preguntas por usuario (ver «Eventos entre servicios»). Medición del 22 de noviembre de 2026 en [`docs/avances/e4-ia-asincrona.md`](docs/avances/e4-ia-asincrona.md).
 
 Cuando todo esté arriba, cada servicio responde `{"estado": "ok"}` en `GET /salud/` y tiene su documentación en `/api/docs/`:
 
@@ -138,24 +139,27 @@ La carpeta «Seguridad» agota el límite de 10 logins por minuto: entre dos cor
 
 ### Matriz de accesos
 
-[`infra/matriz_seguridad.py`](infra/matriz_seguridad.py) prueba quién puede hacer qué **a través del gateway** (`http://127.0.0.1:8000/api/`): ocho actores (anónimo, cliente sin verificar, cliente verificado, administrador, token vencido, token de otra llave, refresh en la blacklist y origen no permitido) contra endpoints de los cuatro servicios, más el bloqueo por intentos fallidos y el exceso de logins y de recuperaciones. Compara el código HTTP y el código de error de cada respuesta con lo esperado y escribe [`docs/entregable-3/matriz-accesos.md`](docs/entregable-3/matriz-accesos.md). Termina con código 1 si algún caso no coincide.
+[`infra/matriz_seguridad.py`](infra/matriz_seguridad.py) prueba quién puede hacer qué **a través del gateway** (`http://127.0.0.1:8000/api/`): ocho actores (anónimo, cliente sin verificar, cliente verificado, administrador, token vencido, token de otra llave, refresh en la blacklist y origen no permitido) contra endpoints de los cuatro servicios, más el bloqueo por intentos fallidos y el exceso de logins y de recuperaciones. Compara el código HTTP y el código de error de cada respuesta con lo esperado y escribe [`docs/entregable-4/matriz-accesos.md`](docs/entregable-4/matriz-accesos.md) (el reporte de la Entrega 3, [`docs/entregable-3/matriz-accesos.md`](docs/entregable-3/matriz-accesos.md), queda como se entregó). Termina con código 1 si algún caso no coincide.
 
 Con el sistema levantado, `cargar_datos_demo` y `cargar_usuarios_demo`, y el venv de la raíz activo, desde la raíz:
 
 ```powershell
 python infra/matriz_seguridad.py                    # completa, unos 2 minutos
 python infra/matriz_seguridad.py --omitir-limites   # sin los casos de exceso de intentos
+python infra/matriz_seguridad.py --salida docs/entregable-3/matriz-accesos.md   # otra ruta
 ```
 
-- **Usa las cuentas de demostración** y crea lo que necesita: un producto, un pedido, y una conversación y un diagnóstico por cuenta. Al terminar lo borra (el pedido, el producto y los diagnósticos con el `manage.py` de su servicio, porque la API no los borra), restaura el carrito del cliente y cierra sus sesiones. Necesita `docker` en el PATH para esa limpieza.
+- **Usa las cuentas de demostración** y crea lo que necesita: un producto, un pedido, y una conversación y dos diagnósticos por cuenta (uno por eventos). Al terminar lo borra (el pedido, el producto y los diagnósticos con el `manage.py` de su servicio, porque la API no los borra), restaura el carrito del cliente y cierra sus sesiones. Necesita `docker` en el PATH para esa limpieza.
 - **Respeta los límites, sin subirlos:** antes de los casos de login espera 61 s. La recuperación permite 3 por hora por IP y la matriz la agota: si corres Postman después, «Pedir recuperación» responde 429 hasta que pase una hora o hasta correr `reiniciar_limites`. Por eso Postman va primero y la matriz al final.
-- **Llama al agente** tres veces (una por cuenta), así que necesita la llave de Groq.
+- **Llama al agente** seis veces (por cuenta, una directa a svc-ia y una pregunta por eventos), así que necesita la llave de Groq.
 
 ### Eventos entre servicios
 
 Desde la Entrega 4 los servicios se avisan por **eventos con Redis Streams** (base lógica 1 de Redis, con persistencia). Hoy funcionan:
 - **Bitácora:** los eventos de cuenta (registro, verificación, cambio de rol y de contraseña, cierre de sesiones) y de pedidos (creado y cada cambio de estado, también el pago) llegan a la bitácora de svc-contenido por el contenedor `svc-contenido-eventos`.
 - **Correos:** se envían en segundo plano por `svc-usuarios-eventos`, que genera el token de cada enlace al enviar.
+- **Límite de preguntas por usuario:** preguntar, reintentar y solicitar un diagnóstico comparten `IA_SOLICITUDES_POR_MINUTO` (10) e `IA_SOLICITUDES_POR_HORA` (30) por usuario; al pasarse, 429 `demasiados_intentos` y la pantalla dice «Hiciste muchas preguntas seguidas». Los GET del polling no cuentan. El límite de tokens del LLM es de toda la aplicación: así un solo usuario no lo agota.
+- **IA asíncrona:** el chat y el diagnóstico piden la respuesta a svc-contenido (202), `svc-ia-worker` la genera y `svc-contenido-eventos` la guarda; la pantalla consulta el estado con HTMX. Para probar el diagnóstico sin modelo hay un clasificador de prueba (`IA_CLASIFICADOR_PRUEBA=1`, solo con `DJANGO_DEBUG=True`), cuyos resultados se marcan «Resultado de prueba: no es un diagnóstico real».
 
 Cada petición lleva un `X-Correlacion-Id` que el gateway reenvía a los servicios; la bitácora se puede filtrar por correlación y por usuario (`GET /api/contenido/bitacora/?correlacion_id=…`). El catálogo completo, el sobre común, los reintentos, el stream de fallidos y el diagrama están en [`docs/eventos.md`](docs/eventos.md).
 
@@ -167,29 +171,41 @@ docker compose exec svc-contenido python -m agroia_comun.eventos estado
 docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --id <id>
 docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --todos
 
-# Ver lo que hace el consumidor
-docker compose logs -f svc-contenido-eventos svc-usuarios-eventos
+# Borrar fallidos ya revisados, sin volver a publicarlos (por ejemplo, los de la IA,
+# que no se pueden reprocesar). --todos pide confirmación; --si la salta en scripts
+docker compose exec svc-contenido python -m agroia_comun.eventos descartar --id <id>
+docker compose exec -it svc-contenido python -m agroia_comun.eventos descartar --todos
+
+# Ver lo que hacen los consumidores y el worker de IA
+docker compose logs -f svc-contenido-eventos svc-usuarios-eventos svc-ia-worker
 ```
 
 **Los correos en desarrollo** (backend de consola) se imprimen en `docker compose logs svc-usuarios-eventos`: el enlace de verificación o de recuperación se copia de ahí.
 
-**Prueba de punta a punta:** [`infra/prueba_eventos.py`](infra/prueba_eventos.py) comprueba, con el sistema levantado, cuatro cosas:
+**Prueba de punta a punta:** [`infra/prueba_eventos.py`](infra/prueba_eventos.py) comprueba, con el sistema levantado:
 1. un registro por el gateway llega a la bitácora;
 2. `docker compose stop` del consumidor sale limpio, con código 0;
 3. lo publicado con el consumidor detenido se procesa al volver;
-4. con MongoDB detenido, el evento agota sus 5 reintentos y llega a fallidos, y al reprocesarlo se guarda una sola vez.
+4. con MongoDB detenido, el evento agota sus 5 reintentos y llega a fallidos, y al reprocesarlo se guarda una sola vez;
+5. y 6. el flujo de negocio completo con su correlación en la bitácora y en los logs;
+7. un correo que falla, llega a fallidos y se reprocesa;
+8. una pregunta a AgroIA por eventos con el agente real, con su correlación en web, svc-contenido, svc-ia-worker y svc-contenido-eventos;
+9. con el agente detenido, los 2 reintentos y la fallida, y «Reintentar» cuando vuelve;
+10. 5 preguntas a la vez, con sus tiempos;
+11. el diagnóstico sin modelo y con el clasificador de prueba.
 
-Imprime cada comprobación con `[ok]` o `[FALLA]` y sirve como evidencia del entregable. Tarda unos 2 minutos porque espera los reintentos reales. Necesita `docker` en el PATH y las cuentas demo. Al empezar corre `reiniciar_limites` y al terminar borra lo que creó con `limpiar_datos_prueba`.
+Imprime cada comprobación con `[ok]` o `[FALLA]` y sirve como evidencia del entregable. Tarda unos 5 minutos porque espera los reintentos reales, y los pasos 8 a 10 gastan tokens de Groq. Necesita `docker` en el PATH y las cuentas demo. Al empezar corre `reiniciar_limites` y al terminar borra lo que creó con `limpiar_datos_prueba`.
 
 ```powershell
 python infra/prueba_eventos.py
+python infra/prueba_eventos.py --solo-ia --pasos=10,11   # solo algunos pasos de la IA
 ```
 
 ### Correr las pruebas de seguridad
 
 Postman y la matriz usan las cuentas de demostración, gastan los límites de intentos y dejan datos de prueba. Dos comandos, que **solo corren con `DJANGO_DEBUG=True`** (con `False` fallan con un mensaje claro), preparan y limpian el entorno sin cambiar los límites ni la lógica de seguridad:
 
-- **`reiniciar_limites`** (svc-usuarios) borra los contadores de intentos de Redis (`throttle_*`: login, registro, recuperación, reenvío y cambio de contraseña) y los bloqueos de django-axes.
+- **`reiniciar_limites`** borra los contadores de intentos de Redis (`throttle_*`). En svc-usuarios: login, registro, recuperación, reenvío y cambio de contraseña, y los bloqueos de django-axes. En svc-contenido: el límite de solicitudes a la IA por usuario. Cada servicio borra solo los suyos, así que se corre en los dos.
 - **`limpiar_datos_prueba`** (svc-usuarios, svc-tienda y svc-contenido) borra lo que crean las pruebas. Se puede correr varias veces y dice cuánto borró:
   - en svc-tienda, los productos y categorías con sufijo de timestamp (los de Postman, como `Fosfito de potasio 1 L 1795210684`) o de la matriz (`matriz-…`), y los pedidos y carritos de las cuentas demo y de prueba;
   - en svc-contenido, las conversaciones, los diagnósticos con su foto y los eventos de bitácora de esas cuentas;
@@ -203,6 +219,7 @@ Orden recomendado, desde la raíz en PowerShell, con el venv activo:
 # 1. Stock del catálogo de demostración (Postman compra en cada corrida) y límites en cero
 docker compose exec svc-tienda python manage.py cargar_datos_demo
 docker compose exec svc-usuarios python manage.py reiniciar_limites
+docker compose exec svc-contenido python manage.py reiniciar_limites
 
 # 2. Postman
 newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var "token_vencido=$(python infra/emitir_token.py --vencido)"
