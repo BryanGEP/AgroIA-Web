@@ -175,6 +175,12 @@ services:
     environment:
       <<: [*django-env, *eventos-env]
       MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+      # Segundos que una solicitud a la IA puede quedar pendiente antes de darse por fallida.
+      IA_SOLICITUD_VENCE_SEGUNDOS: ${IA_SOLICITUD_VENCE_SEGUNDOS:-180}
+      # Límite de solicitudes a la IA por usuario (contadores en la caché de Redis, base 0).
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      IA_SOLICITUDES_POR_MINUTO: ${IA_SOLICITUDES_POR_MINUTO:-10}
+      IA_SOLICITUDES_POR_HORA: ${IA_SOLICITUDES_POR_HORA:-30}
     secrets:
       - source: jwt_publica
         target: jwt_publica.pem
@@ -187,10 +193,13 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks: [agroia]
 
   # Consumidor de eventos de svc-contenido: misma imagen y código, otro comando. Lee los
-  # streams de Redis con el grupo svc-contenido y guarda en la bitácora. Con
+  # streams de Redis con el grupo svc-contenido: guarda en la bitácora y guarda en la
+  # conversación o el diagnóstico lo que responde la IA (ia-resultados). Con
   # `docker compose stop` (SIGTERM) termina el evento en curso y sale; si se cae, Docker lo
   # reinicia y procesa lo que quedó pendiente.
   svc-contenido-eventos:
@@ -203,6 +212,8 @@ services:
     environment:
       <<: [*django-env, *eventos-env]
       MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+      # Segundos que una solicitud a la IA puede quedar pendiente antes de darse por fallida.
+      IA_SOLICITUD_VENCE_SEGUNDOS: ${IA_SOLICITUD_VENCE_SEGUNDOS:-180}
     secrets:
       - source: jwt_publica
         target: jwt_publica.pem
@@ -242,6 +253,42 @@ services:
       - ./ruff.toml:/ruff.toml:ro
     ports:
       - "127.0.0.1:8004:8000"
+    networks: [agroia]
+
+  # Worker de svc-ia: misma imagen y código, otro comando. Atiende las solicitudes de IA
+  # que llegan por eventos (ia-solicitudes): llama al agente o al clasificador y publica el
+  # resultado en ia-resultados. Varios hilos, porque una respuesta tarda hasta 30 s. Con
+  # `docker compose stop` termina lo que tiene en curso (hasta AGENTE_TIMEOUT) y sale.
+  svc-ia-worker:
+    build:
+      context: .
+      dockerfile: svc-ia/Dockerfile
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+      DEBUG: ${DJANGO_DEBUG:-False}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+      JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
+      URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
+      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-45}
+      # 2: con la llave gratuita de Groq, 3 llamadas a la vez provocan RateLimitError y
+      # respuestas de 11 a 39 s. Con una llave de pago se puede subir.
+      IA_WORKER_HILOS: ${IA_WORKER_HILOS:-2}
+      # Solo en desarrollo (exige DEBUG=True): resultados de diagnóstico de prueba.
+      IA_CLASIFICADOR_PRUEBA: ${IA_CLASIFICADOR_PRUEBA:-False}
+      <<: *eventos-env
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-ia:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
     networks: [agroia]
 
   # Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (rama main).

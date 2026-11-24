@@ -66,6 +66,74 @@ class ConversacionResumenSerializer(serializers.Serializer):
     actualizada_en = serializers.DateTimeField(read_only=True)
 
 
+ESTADOS = ["pendiente", "listo", "fallido"]
+
+
+class SolicitudSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    estado = serializers.ChoiceField(choices=ESTADOS, read_only=True)
+    codigo = serializers.CharField(
+        read_only=True,
+        allow_null=True,
+        help_text="En `fallido`: `agente_no_disponible`, `pregunta_invalida`, `vencida`, "
+        "`servicio_no_disponible` o `conversacion_llena`.",
+    )
+    creada_en = serializers.DateTimeField(read_only=True)
+    vence_en = serializers.DateTimeField(read_only=True)
+    actualizada_en = serializers.DateTimeField(read_only=True)
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Pendiente",
+            value={
+                "id": "5b8e2f1c-3d4a-4e6b-9c7d-1a2b3c4d5e6f",
+                "conversacion_id": "6afe7fe1ae4b683f2b9e996f",
+                "estado": "pendiente",
+                "codigo": None,
+                "creada_en": "2026-11-22T12:00:00-06:00",
+                "vence_en": "2026-11-22T12:03:00-06:00",
+                "actualizada_en": "2026-11-22T12:00:00-06:00",
+            },
+            response_only=True,
+        ),
+        OpenApiExample(
+            "Lista, con la respuesta",
+            value={
+                "id": "5b8e2f1c-3d4a-4e6b-9c7d-1a2b3c4d5e6f",
+                "conversacion_id": "6afe7fe1ae4b683f2b9e996f",
+                "estado": "listo",
+                "codigo": None,
+                "creada_en": "2026-11-22T12:00:00-06:00",
+                "vence_en": "2026-11-22T12:03:00-06:00",
+                "actualizada_en": "2026-11-22T12:00:06-06:00",
+                "respuesta": "La roña deja costras corchosas en la cáscara.",
+                "fuentes": ["Manual de enfermedades del aguacate"],
+            },
+            response_only=True,
+        ),
+    ]
+)
+class SolicitudConRespuestaSerializer(SolicitudSerializer):
+    conversacion_id = serializers.CharField(read_only=True)
+    respuesta = serializers.CharField(read_only=True, required=False)
+    fuentes = serializers.ListField(child=serializers.CharField(), read_only=True, required=False)
+
+
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            "Pregunta",
+            value={"texto": "¿Cada cuánto aplico el fungicida cúprico?"},
+            request_only=True,
+        )
+    ]
+)
+class PreguntaSerializer(serializers.Serializer):
+    texto = serializers.CharField(max_length=4000, trim_whitespace=True)
+
+
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
@@ -95,3 +163,9 @@ class ConversacionResumenSerializer(serializers.Serializer):
 )
 class ConversacionSerializer(ConversacionResumenSerializer):
     mensajes = MensajeSerializer(many=True, read_only=True)
+    solicitud = SolicitudSerializer(
+        read_only=True,
+        allow_null=True,
+        required=False,
+        help_text="La última solicitud a la IA de esta conversación (si hay).",
+    )

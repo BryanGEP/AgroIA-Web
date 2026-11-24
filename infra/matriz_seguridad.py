@@ -2,7 +2,9 @@
 
 Corre contra el sistema levantado con `docker compose up` y manda todo por el proxy del
 gateway (http://127.0.0.1:8000/api/). Para cada actor y endpoint compara el código HTTP y el
-código de error del cuerpo con lo esperado, y escribe docs/entregable-3/matriz-accesos.md.
+código de error del cuerpo con lo esperado, y escribe el reporte en
+docs/entregable-4/matriz-accesos.md (otra ruta con --salida; el de la Entrega 3 queda
+como estaba).
 
 Actores: anónimo, cliente sin verificar, cliente verificado, administrador, token vencido,
 token firmado con otra llave, refresh en blacklist (usado como access) y origen no permitido
@@ -20,14 +22,17 @@ Uso, desde la raíz del repo:
 
     python infra/matriz_seguridad.py
     python infra/matriz_seguridad.py --omitir-limites   # sin los casos de exceso de intentos
+    python infra/matriz_seguridad.py --salida /ruta/reporte.md
 
 Límites de intentos (no se suben):
 - Antes de los casos de login espera 61 s, para empezar con la ventana de 10 por minuto libre.
 - La recuperación permite 3 por hora por IP: la matriz la agota, así que la petición
   «Pedir recuperación» de Postman responde 429 hasta que pase una hora.
 
-Recursos que crea y borra al final: un producto, un pedido, una conversación y un diagnóstico
-por cuenta. El carrito del cliente se vacía para el pedido y se restaura después.
+Recursos que crea y borra al final: un producto, un pedido, una conversación y dos
+diagnósticos por cuenta (uno pedido por eventos). Preguntar en la conversación propia llama
+al agente real una vez por cuenta (3 preguntas cortas). El carrito del cliente se vacía para
+el pedido y se restaura después.
 """
 
 import argparse
@@ -47,7 +52,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 RAIZ = Path(__file__).resolve().parent.parent
-SALIDA = RAIZ / "docs" / "entregable-3" / "matriz-accesos.md"
+SALIDA = RAIZ / "docs" / "entregable-4" / "matriz-accesos.md"
 IMAGEN = RAIZ / "docs" / "postman" / "archivos" / "imagen-prueba.png"
 
 # Contraseña pública de las cuentas de demostración (cargar_usuarios_demo, README raíz y
@@ -116,6 +121,7 @@ class Estado:
     carrito_original: list = field(default_factory=list)
     conversaciones: dict = field(default_factory=dict)
     diagnosticos: dict = field(default_factory=dict)
+    diagnosticos_ia: list = field(default_factory=list)
     limpieza: list = field(default_factory=list)
 
 
@@ -480,6 +486,77 @@ class Matriz:
             ruta_de=de_otro(self.e.diagnosticos, foto),
         )
 
+        # IA asíncrona (Entrega 4): la pregunta se acepta con 202 y se consulta su estado.
+        preguntar = "/api/contenido/conversaciones/{}/preguntar/"
+        self.fila(
+            "Preguntar en la conversación propia (IA por eventos)",
+            "POST",
+            preguntar,
+            dict.fromkeys(cuentas, 202),
+            mostrar="/api/contenido/conversaciones/<propia>/preguntar/",
+            ruta_de=propia(self.e.conversaciones, preguntar),
+            json={"texto": "En una frase: ¿qué es la roña del aguacate?"},
+        )
+        self.fila(
+            "Preguntar en una conversación ajena",
+            "POST",
+            preguntar,
+            dict.fromkeys(cuentas, (404, "no_encontrado")),
+            mostrar="/api/contenido/conversaciones/<ajena>/preguntar/",
+            ruta_de=de_otro(self.e.conversaciones, preguntar),
+            json={"texto": "¿Y la antracnosis?"},
+        )
+        solicitud = "/api/contenido/conversaciones/{}/solicitud/"
+        self.fila(
+            "Estado de la solicitud propia",
+            "GET",
+            solicitud,
+            dict.fromkeys(cuentas, 200),
+            mostrar="/api/contenido/conversaciones/<propia>/solicitud/",
+            ruta_de=propia(self.e.conversaciones, solicitud),
+        )
+        self.fila(
+            "Estado de la solicitud de otro usuario",
+            "GET",
+            solicitud,
+            dict.fromkeys(cuentas, (404, "no_encontrado")),
+            mostrar="/api/contenido/conversaciones/<ajena>/solicitud/",
+            ruta_de=de_otro(self.e.conversaciones, solicitud),
+        )
+        with IMAGEN.open("rb") as imagen:
+            contenido_imagen = imagen.read()
+        respuestas = self.fila(
+            "Solicitar un diagnóstico (IA por eventos)",
+            "POST",
+            "/api/contenido/diagnosticos/solicitar/",
+            dict.fromkeys(cuentas, 202),
+            files={"imagen": ("matriz.png", contenido_imagen, "image/png")},
+        )
+        self.e.diagnosticos_ia = [
+            r.json()["id"] for r in respuestas.values() if r is not None and r.status_code == 202
+        ]
+
+        # Límite de solicitudes a la IA por usuario (10 por minuto): cada cuenta pregunta en
+        # su conversación hasta que svc-contenido responde 429; la fila comprueba que la
+        # siguiente también lo es, con `demasiados_intentos`. La limpieza borra los contadores
+        # (`reiniciar_limites` de svc-contenido) para no dejar bloqueadas las cuentas demo.
+        for cuenta in cuentas:
+            ruta = preguntar.format(self.e.conversaciones[cuenta])
+            for _ in range(12):
+                r = self.http.post(ruta, headers=self.encabezados(cuenta), json={"texto": "¿Y?"})
+                if r.status_code == 429:
+                    break
+        self.e.limpieza.append(("limite_ia", "svc-contenido"))
+        self.fila(
+            "Exceso de solicitudes a la IA (límite por usuario)",
+            "POST",
+            preguntar,
+            dict.fromkeys(cuentas, (429, "demasiados_intentos")),
+            mostrar="/api/contenido/conversaciones/<propia>/preguntar/",
+            ruta_de=propia(self.e.conversaciones, preguntar),
+            json={"texto": "Una más"},
+        )
+
     def agente(self):
         self.fila(
             "Pregunta al agente",
@@ -632,8 +709,8 @@ class Matriz:
                     "pedido y producto de la matriz",
                 )
             )
-        if self.e.diagnosticos:
-            ids = list(self.e.diagnosticos.values())
+        if self.e.diagnosticos or self.e.diagnosticos_ia:
+            ids = list(self.e.diagnosticos.values()) + self.e.diagnosticos_ia
             pendientes.append(
                 (
                     "svc-contenido",
@@ -643,7 +720,7 @@ class Matriz:
                         "from apps.diagnosticos.servicios import _coleccion\n"
                         f"for i in {ids!r}:\n"
                         "    d = _coleccion().find_one_and_delete({'_id': ObjectId(i)})\n"
-                        "    if d: default_storage.delete(d['imagen'])\n"
+                        "    if d and d.get('imagen'): default_storage.delete(d['imagen'])\n"
                     ),
                     f"{len(ids)} diagnósticos y sus fotos",
                 )
@@ -656,6 +733,11 @@ class Matriz:
             ("svc-usuarios", ["axes_reset_username", correo], "bloqueo del correo de prueba")
             for tipo, correo in self.e.limpieza
             if tipo == "axes"
+        ]
+        comandos += [
+            (servicio, ["reiniciar_limites"], "contadores del límite de la IA")
+            for tipo, servicio in self.e.limpieza
+            if tipo == "limite_ia"
         ]
         for servicio, argumentos, descripcion in list(comandos):
             if not docker:
@@ -772,7 +854,8 @@ class Matriz:
             "servicio. Las rutas públicas (catálogo, login) también validan el token si viene.",
             "- **Servicio** (segunda capa): el rol (403 `sin_permiso`), el correo verificado "
             "(403 `email_no_verificado`), los recursos de otro usuario (404 `no_encontrado`, "
-            "para no revelar que existen) y los límites de intentos de svc-usuarios.",
+            "para no revelar que existen), los límites de intentos de svc-usuarios y el de "
+            "solicitudes a la IA por usuario de svc-contenido (429 `demasiados_intentos`).",
             "- **Recursos propios y ajenos:** las conversaciones son privadas para todos, "
             "también para el administrador; los diagnósticos los puede ver el administrador.",
             "",
@@ -805,8 +888,10 @@ def main():
         matriz.preparar_identidades()
         matriz.tienda()
         matriz.usuarios()
-        matriz.contenido()
+        # Primero la pregunta síncrona al agente (espera 200) y después las de IA por eventos
+        # (basta el 202): así esas no gastan antes el límite de tokens de la llave de Groq.
         matriz.agente()
+        matriz.contenido()
         if not args.omitir_limites:
             matriz.limites()
     finally:

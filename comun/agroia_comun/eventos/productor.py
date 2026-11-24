@@ -12,18 +12,33 @@
 """
 
 import logging
+import time
 
 import redis
 
 from agroia_comun.eventos import conexion, correlacion
-from agroia_comun.eventos.catalogo import MAXLEN, STREAM_FALLIDOS, obtener_tipo
+from agroia_comun.eventos.catalogo import MAXLEN, STREAM_FALLIDOS, obtener_tipo, politica
 from agroia_comun.eventos.registro import motivo_de, registrar
 from agroia_comun.eventos.sobre import Sobre, crear_sobre
 
 
 def _agregar(cliente: redis.Redis, stream: str, sobre: Sobre) -> str:
-    limite = {} if stream == STREAM_FALLIDOS else {"maxlen": MAXLEN, "approximate": True}
-    return cliente.xadd(stream, {"sobre": sobre.a_json()}, **limite)
+    """XADD con el recorte del stream: por largo (MAXLEN ~) y, si su política tiene
+    retención, también por antigüedad (MINID exacto, los mensajes más viejos que la
+    retención).
+    El de fallidos no se recorta."""
+    if stream == STREAM_FALLIDOS:
+        return cliente.xadd(stream, {"sobre": sobre.a_json()})
+    retencion = politica(stream).retencion_segundos
+    if retencion is None:
+        return cliente.xadd(stream, {"sobre": sobre.a_json()}, maxlen=MAXLEN, approximate=True)
+    minimo = f"{int((time.time() - retencion) * 1000)}-0"
+    transaccion = cliente.pipeline(transaction=True)
+    # Exacto: con «~» Redis solo borra nodos completos (unos 100 mensajes) y en un stream
+    # chico los datos se quedarían más tiempo que la retención.
+    transaccion.xadd(stream, {"sobre": sobre.a_json()}, minid=minimo, approximate=False)
+    transaccion.xtrim(stream, maxlen=MAXLEN, approximate=True)
+    return transaccion.execute()[0]
 
 
 def publicar(

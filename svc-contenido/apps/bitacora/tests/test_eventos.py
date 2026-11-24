@@ -24,7 +24,7 @@ def bitacora() -> list[dict]:
 
 
 def consumidor(redis_de_eventos) -> Consumidor:
-    c = Consumidor(GRUPO, MANEJADORES, cliente=redis_de_eventos, bloqueo_ms=10)
+    c = Consumidor(GRUPO, MANEJADORES, cliente=redis_de_eventos, bloqueo_ms=10, latido=0.005)
     c.preparar()
     return c
 

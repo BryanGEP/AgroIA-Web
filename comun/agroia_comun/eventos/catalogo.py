@@ -9,6 +9,7 @@ usuario en la fase 3). Se guardan en el stream, pero no en `evento_publicado`,
 `evento_no_publicado` ni en ningún otro registro.
 """
 
+import os
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,6 +25,62 @@ STREAM_FALLIDOS = f"{PREFIJO}eventos:fallidos"
 # Largo aproximado de cada stream (XADD MAXLEN ~). El de fallidos no se recorta: se vacía
 # con `reprocesar` o a mano después de revisarlo.
 MAXLEN = 10_000
+
+
+@dataclass(frozen=True)
+class Politica:
+    """Reintentos y retención de un stream.
+
+    - `max_reintentos` y `espera_base`: cuántas veces se reintenta un evento que falla y la
+      espera antes del primer reintento (se duplica en cada uno).
+    - `retencion_segundos`: si no es None, al publicar se recorta también por antigüedad
+      (XADD MINID), además de por largo. Lo usan los streams que guardan datos del usuario
+      (la pregunta, el historial y la respuesta de la IA).
+    """
+
+    max_reintentos: int
+    espera_base: float
+    retencion_segundos: int | None = None
+
+
+def _variable(stream: str, nombre: str) -> str:
+    """EVENTOS_<STREAM>_<NOMBRE>, por ejemplo EVENTOS_IA_SOLICITUDES_MAX_REINTENTOS."""
+    corto = stream.removeprefix(f"{PREFIJO}eventos:").upper().replace("-", "_")
+    return f"EVENTOS_{corto}_{nombre}"
+
+
+# Retención por tiempo de los streams de la IA: 24 horas.
+RETENCION_IA = 24 * 3600
+
+# Valores por stream que no son los generales. Cada uno se puede cambiar por variable de
+# entorno (EVENTOS_<STREAM>_MAX_REINTENTOS, EVENTOS_<STREAM>_ESPERA_BASE). Los generales son
+# EVENTOS_MAX_REINTENTOS (5) y EVENTOS_ESPERA_BASE (2 s).
+POLITICAS_PROPIAS: dict[str, dict] = {
+    # Cada intento cuesta tokens del LLM y el usuario está esperando.
+    STREAM_IA_SOLICITUDES: {
+        "max_reintentos": 2,
+        "espera_base": 5.0,
+        "retencion_segundos": RETENCION_IA,
+    },
+    STREAM_IA_RESULTADOS: {"retencion_segundos": RETENCION_IA},
+}
+
+
+def politica(stream: str) -> Politica:
+    propia = POLITICAS_PROPIAS.get(stream, {})
+    max_reintentos = int(
+        os.environ.get(
+            _variable(stream, "MAX_REINTENTOS"),
+            propia.get("max_reintentos", os.environ.get("EVENTOS_MAX_REINTENTOS", 5)),
+        )
+    )
+    espera_base = float(
+        os.environ.get(
+            _variable(stream, "ESPERA_BASE"),
+            propia.get("espera_base", os.environ.get("EVENTOS_ESPERA_BASE", 2.0)),
+        )
+    )
+    return Politica(max_reintentos, espera_base, propia.get("retencion_segundos"))
 
 
 class ErrorEvento(ValueError):
@@ -46,6 +103,8 @@ VALIDADORES: dict[str, Callable[[object], bool]] = {
     "decimal": lambda v: isinstance(v, str) and v.replace(".", "", 1).lstrip("-").isdigit(),
     "booleano": lambda v: isinstance(v, bool),
     "lista": lambda v: isinstance(v, list),
+    "numero": lambda v: isinstance(v, int | float) and not isinstance(v, bool),
+    "objeto": lambda v: isinstance(v, dict),
 }
 
 
@@ -212,5 +271,117 @@ registrar_tipo(
             "cambiado_por": "uuid",
         },
         valores={"estado_anterior": ESTADOS_DE_PEDIDO, "estado_nuevo": ESTADOS_DE_PEDIDO},
+    )
+)
+
+
+# --- Fase 3: IA asíncrona ----------------------------------------------------------------
+# svc-contenido publica las solicitudes (es dueño de la conversación y del diagnóstico) y
+# las consume el worker de svc-ia; los resultados los consume svc-contenido. La pregunta,
+# el historial y la respuesta no se registran en ningún log ni en fallidos. La imagen del
+# diagnóstico nunca viaja en el evento: va en una llave temporal de Redis
+# (agroia:ia:imagen:<solicitud_id>) que vence con la solicitud.
+
+CODIGOS_IA = frozenset(
+    {"agente_no_disponible", "pregunta_invalida", "vencida", "servicio_no_disponible"}
+)
+CODIGOS_DIAGNOSTICO = frozenset(
+    {
+        "modelo_no_disponible",
+        "imagen_no_disponible",
+        "imagen_invalida",
+        "clasificador_fallo",
+        "vencida",
+        "servicio_no_disponible",
+    }
+)
+
+registrar_tipo(
+    TipoEvento(
+        nombre="ia_pregunta_solicitada",
+        version=1,
+        stream=STREAM_IA_SOLICITUDES,
+        campos={
+            "solicitud_id": "uuid",
+            "usuario_id": "uuid",
+            "conversacion_id": "texto",
+            "pregunta": "texto",
+            "historial": "lista",
+            "vence_en": "texto",
+        },
+        no_registrables=frozenset({"pregunta", "historial"}),
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="ia_respuesta_generada",
+        version=1,
+        stream=STREAM_IA_RESULTADOS,
+        campos={
+            "solicitud_id": "uuid",
+            "usuario_id": "uuid",
+            "conversacion_id": "texto",
+            "respuesta": "texto",
+            "fuentes": "lista",
+        },
+        no_registrables=frozenset({"respuesta"}),
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="ia_respuesta_fallida",
+        version=1,
+        stream=STREAM_IA_RESULTADOS,
+        campos={
+            "solicitud_id": "uuid",
+            "usuario_id": "uuid",
+            "conversacion_id": "texto",
+            "codigo": "texto",
+        },
+        valores={"codigo": CODIGOS_IA},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="diagnostico_solicitado",
+        version=1,
+        stream=STREAM_IA_SOLICITUDES,
+        campos={
+            "solicitud_id": "uuid",
+            "diagnostico_id": "texto",
+            "usuario_id": "uuid",
+            "vence_en": "texto",
+        },
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="diagnostico_generado",
+        version=1,
+        stream=STREAM_IA_RESULTADOS,
+        campos={
+            "solicitud_id": "uuid",
+            "diagnostico_id": "texto",
+            "usuario_id": "uuid",
+            "clase": "texto",
+            "confianza": "numero",
+            "probabilidades": "objeto",
+            "modelo_version": "texto",
+        },
+        valores={"clase": frozenset({"sano", "rona", "antracnosis"})},
+    )
+)
+registrar_tipo(
+    TipoEvento(
+        nombre="diagnostico_fallido",
+        version=1,
+        stream=STREAM_IA_RESULTADOS,
+        campos={
+            "solicitud_id": "uuid",
+            "diagnostico_id": "texto",
+            "usuario_id": "uuid",
+            "codigo": "texto",
+        },
+        valores={"codigo": CODIGOS_DIAGNOSTICO},
     )
 )

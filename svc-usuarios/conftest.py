@@ -31,7 +31,9 @@ def entregar_correos(redis_de_eventos):
     from agroia_comun.eventos import Consumidor
     from apps.usuarios.eventos import GRUPO, MANEJADORES
 
-    consumidor = Consumidor(GRUPO, MANEJADORES, cliente=redis_de_eventos, bloqueo_ms=10)
+    consumidor = Consumidor(
+        GRUPO, MANEJADORES, cliente=redis_de_eventos, bloqueo_ms=10, latido=0.005
+    )
     consumidor.preparar()
 
     def entregar() -> int:

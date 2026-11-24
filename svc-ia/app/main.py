@@ -10,6 +10,8 @@ asíncrona en la Entrega 4.
 from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.openapi.utils import get_openapi
 
+from agroia_comun.eventos import correlacion
+from agroia_comun.eventos.sobre import ENCABEZADO_CORRELACION
 from app import config
 from app.agente import AgenteNoDisponible, ClienteAgente, obtener_agente
 from app.errores import ErrorApi, registrar_manejadores
@@ -34,6 +36,19 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 registrar_manejadores(app)
+
+
+@app.middleware("http")
+async def correlacion_de_la_peticion(request, siguiente):
+    """X-Correlacion-Id solo si es un UUID válido (si no, una nueva), como
+    CorrelacionMiddleware en los servicios Django. Se restablece al terminar."""
+    valor, token = correlacion.establecer(request.headers.get(ENCABEZADO_CORRELACION))
+    try:
+        respuesta = await siguiente(request)
+    finally:
+        correlacion.restablecer(token)
+    respuesta.headers[ENCABEZADO_CORRELACION] = valor
+    return respuesta
 
 
 def _error(codigo: str, detalle: str, **extra) -> dict:

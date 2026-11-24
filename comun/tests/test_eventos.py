@@ -53,7 +53,8 @@ def lineas(caplog) -> list[dict]:
 
 
 def consumidor(r, manejadores, **opciones) -> Consumidor:
-    opciones = {"max_reintentos": 2, "espera_base": 0.02, "bloqueo_ms": 10, **opciones}
+    opciones = {"max_reintentos": 2, "espera_base": 0.02, "bloqueo_ms": 10, "latido": 0.005,
+                **opciones}  # fmt: skip
     c = Consumidor("svc-prueba", manejadores, cliente=r, **opciones)
     c.preparar()
     return c

@@ -1,7 +1,6 @@
-"""Diagnóstico por imagen: svc-ia (sin modelo o con resultado) y svc-contenido simulados."""
+"""Diagnóstico por imagen (asíncrono): svc-contenido y svc-tienda simulados."""
 
 import base64
-import json
 
 import httpx
 import pytest
@@ -24,6 +23,7 @@ RESULTADO = {
     "probabilidades": {"sano": 0.03, "rona": 0.06, "antracnosis": 0.91},
     "modelo_version": "v1",
 }
+RESULTADO_DATOS = {k: v for k, v in RESULTADO.items() if k not in ("id", "estado")}
 FUNGICIDA = {
     "slug": "oxicloruro",
     "nombre": "Oxicloruro de cobre",
@@ -49,29 +49,50 @@ def test_pantalla_con_vista_previa_en_alpine(client, con_sesion):
     assert '<label for="id_imagen"' in html
 
 
+RUTA_SOLICITAR = "/api/v1/diagnosticos/solicitar/"
+RUTA_DIAG = f"/api/v1/diagnosticos/{ID}/"
+
+
+def diagnostico(estado="pendiente", codigo=None, **extra) -> dict:
+    return {"id": ID, "estado": estado, "codigo": codigo, "es_prueba": False,
+            "creado_en": "2026-11-22T10:00:00+00:00", "imagen_url": None, **extra}  # fmt: skip
+
+
+def test_solicitar_manda_la_foto_a_svc_contenido_y_empieza_a_consultar(
+    client, servicios, con_sesion
+):
+    con_sesion()
+    servicios.responder("POST", "svc-contenido", RUTA_SOLICITAR,
+                        httpx.Response(202, json=diagnostico()))  # fmt: skip
+
+    html = client.post("/diagnostico/", {"imagen": foto()}, HTTP_HX_REQUEST="true").content.decode()
+
+    (pedido,) = servicios.de("svc-contenido", RUTA_SOLICITAR)
+    assert b'filename="hoja.png"' in pedido.content and PNG in pedido.content
+    assert servicios.de("svc-ia") == []  # el gateway ya no llama a svc-ia
+    assert "Analizando la foto" in html
+    assert f'hx-get="/diagnostico/{ID}/estado/"' in html and "hx-trigger" in html
+
+
 def test_sin_modelo_muestra_el_aviso_sin_errores_tecnicos(client, servicios, con_sesion):
     con_sesion()
-    servicios.responder(
-        "POST",
-        "svc-ia",
-        "/diagnostico/",
-        error(503, "modelo_no_disponible", "No hay un modelo de visión configurado."),
-    )
+    servicios.responder("GET", "svc-contenido", RUTA_DIAG, httpx.Response(
+        200, json=diagnostico("fallido", "modelo_no_disponible")))  # fmt: skip
 
-    respuesta = client.post("/diagnostico/", {"imagen": foto()}, HTTP_HX_REQUEST="true")
+    html = client.get(f"/diagnostico/{ID}/estado/", HTTP_HX_REQUEST="true").content.decode()
 
-    html = respuesta.content.decode()
-    assert respuesta.status_code == 200
     assert "El diagnóstico por imagen estará disponible pronto." in html
-    assert "modelo_no_disponible" not in html and "modelo de visión configurado" not in html
-    assert servicios.de("svc-contenido") == []  # no se guarda nada
+    assert "modelo_no_disponible" not in html
+    assert "hx-trigger" not in html
 
 
-def test_con_resultado_guarda_en_contenido_y_sugiere_productos(client, servicios, con_sesion):
+def test_con_resultado_muestra_la_clase_y_sugiere_productos(client, servicios, con_sesion):
     con_sesion()
-    servicios.responder("POST", "svc-ia", "/diagnostico/", httpx.Response(200, json=RESULTADO))
     servicios.responder(
-        "POST", "svc-contenido", "/api/v1/diagnosticos/", httpx.Response(201, json={"id": ID})
+        "GET",
+        "svc-contenido",
+        RUTA_DIAG,
+        httpx.Response(200, json=diagnostico("listo", **RESULTADO_DATOS)),
     )
     servicios.responder(
         "GET",
@@ -80,31 +101,48 @@ def test_con_resultado_guarda_en_contenido_y_sugiere_productos(client, servicios
         httpx.Response(200, json={"count": 1, "results": [FUNGICIDA]}),
     )
 
-    html = client.post("/diagnostico/", {"imagen": foto()}, HTTP_HX_REQUEST="true").content.decode()
+    html = client.get(f"/diagnostico/{ID}/estado/", HTTP_HX_REQUEST="true").content.decode()
 
     assert "Antracnosis" in html and "91 %" in html
     assert '<progress class="progress progress-primary w-full" value="91"' in html
     assert "Oxicloruro de cobre" in html
-    (ia,) = servicios.de("svc-ia")
-    assert b'filename="hoja.png"' in ia.content and PNG in ia.content
-    (guardado,) = servicios.de("svc-contenido")
-    assert b'name="clase"' in guardado.content and b"antracnosis" in guardado.content
-    assert json.dumps(RESULTADO["probabilidades"]).encode() in guardado.content
+    assert "Resultado de prueba" not in html and "hx-trigger" not in html
     (sugeridos,) = servicios.de("svc-tienda")
     assert sugeridos.url.params["categoria"] == "fungicidas"
 
 
-def test_si_no_se_guarda_se_muestra_el_resultado_igual(client, servicios, con_sesion):
+def test_un_resultado_de_prueba_lo_dice_claramente(client, servicios, con_sesion):
     con_sesion()
-    servicios.responder(
-        "POST", "svc-ia", "/diagnostico/", httpx.Response(200, json={**RESULTADO, "clase": "sano"})
-    )
-    servicios.caidos.add("svc-contenido")
+    servicios.responder("GET", "svc-contenido", RUTA_DIAG, httpx.Response(200, json=diagnostico(
+        "listo", **{**RESULTADO_DATOS, "clase": "sano",
+                    "modelo_version": "prueba-no-es-un-modelo"}, es_prueba=True)))  # fmt: skip
 
-    html = client.post("/diagnostico/", {"imagen": foto()}, HTTP_HX_REQUEST="true").content.decode()
+    html = client.get(f"/diagnostico/{ID}/estado/", HTTP_HX_REQUEST="true").content.decode()
 
-    assert "Sano" in html
-    assert "No pudimos guardar este diagnóstico en tu historial." in html
+    assert "Resultado de prueba: no es un diagnóstico real." in html
+
+
+def test_pendiente_sigue_consultando_sin_429(client, servicios, con_sesion):
+    con_sesion()
+    servicios.responder("GET", "svc-contenido", RUTA_DIAG, httpx.Response(200, json=diagnostico()))
+
+    estados = set()
+    for _ in range(90):
+        respuesta = client.get(f"/diagnostico/{ID}/estado/", HTTP_HX_REQUEST="true")
+        estados.add(respuesta.status_code)
+        assert "hx-trigger" in respuesta.content.decode()
+
+    assert estados == {200}
+
+
+def test_la_pagina_de_un_diagnostico_pendiente_sigue_consultando(client, servicios, con_sesion):
+    con_sesion()
+    servicios.responder("GET", "svc-contenido", RUTA_DIAG, httpx.Response(200, json=diagnostico()))
+
+    html = client.get(f"/diagnostico/{ID}/").content.decode()
+
+    assert "Analizando la foto" in html and f'hx-get="/diagnostico/{ID}/estado/"' in html
+    assert "Foto analizada" not in html  # sin imagen_url no se pide la foto
 
 
 @pytest.mark.parametrize(
@@ -183,3 +221,14 @@ def test_la_foto_de_otro_usuario_da_404(client, servicios, con_sesion):
 def test_la_foto_pide_sesion(client, servicios):
     assert client.get(f"/diagnostico/{ID}/imagen/").status_code == 302
     assert servicios.peticiones == []
+
+
+def test_muchos_analisis_seguidos_muestra_el_mensaje(client, servicios, con_sesion):
+    con_sesion()
+    servicios.responder("POST", "svc-contenido", RUTA_SOLICITAR,
+                        error(429, "demasiados_intentos", "Demasiados intentos."))  # fmt: skip
+
+    html = client.post("/diagnostico/", {"imagen": foto()}, HTTP_HX_REQUEST="true").content.decode()
+
+    assert "Hiciste muchos análisis seguidos" in html
+    assert "demasiados_intentos" not in html and "hx-trigger" not in html

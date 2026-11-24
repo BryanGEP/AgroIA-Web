@@ -1,0 +1,9 @@
+{% comment %} AgroIA todavía responde: se vuelve a consultar en `intervalo` segundos (2 s al
+   principio, 5 s después de 20 s). Cada respuesta del servidor reemplaza este elemento; la
+   respuesta final (lista o fallida) ya no trae hx-trigger y el polling se detiene solo.
+   Sin scripts en línea: es un atributo de HTMX (CSP). Parámetros: conversacion_id,
+   intervalo. {% endcomment %}
+<li id="espera" class="chat chat-start" role="status"
+    hx-get="{% url 'agroia:solicitud' conversacion_id %}" hx-trigger="load delay:{{ intervalo }}s" hx-swap="outerHTML">
+  <div class="chat-bubble bg-base-200 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
+</li>

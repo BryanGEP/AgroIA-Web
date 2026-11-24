@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}AgroIA{% endblock %}
+{% block cabeza %}{% if solicitud.estado == "pendiente" %}<noscript><meta http-equiv="refresh" content="5"></noscript>{% endif %}{% endblock %}
 {% block contenido %}
 <div class="max-w-6xl mx-auto px-4 py-8 md:py-10">
   <div class="grid gap-6 md:grid-cols-[16rem_1fr]">
@@ -34,6 +35,14 @@
           {% empty %}
             {% if not conversacion %}<li class="opacity-80">Escribe tu primera pregunta para iniciar una conversación.</li>{% endif %}
           {% endfor %}
+          {# La solicitud a la IA de esta conversación: esperando o fallida. #}
+          {% if solicitud.estado == "pendiente" %}
+            {% include "agroia/parciales/_espera.html" %}
+          {% elif mostrar_fallida %}
+            {% include "agroia/parciales/_fallida.html" %}
+          {% elif sin_respuesta_heredada and conversacion %}
+            {% include "agroia/parciales/_reintentar.html" with conversacion_id=conversacion.id %}
+          {% endif %}
         </ol>
         {# La pregunta recién enviada se ve al instante mientras responde AgroIA (Alpine). #}
         <div x-show="enviando" x-cloak class="flex flex-col gap-1">
@@ -41,10 +50,6 @@
         </div>
         <div id="escribiendo" class="htmx-indicator chat chat-start" role="status">
           <div class="chat-bubble bg-base-200 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
-        </div>
-
-        <div id="reintentar">
-          {% if pendiente and conversacion %}{% include "agroia/parciales/_reintentar.html" with conversacion_id=conversacion.id %}{% endif %}
         </div>
 
         {% if conversacion %}

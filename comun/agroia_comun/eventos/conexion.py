@@ -7,6 +7,9 @@ separada de la caché del límite de intentos (base 0).
 - `cliente_de_lectura()`: la lectura bloqueante del consumidor (XREADGROUP BLOCK), con un
   timeout mayor que el bloqueo para que no se corte la espera normal.
 
+- `cliente_binario()`: sin decodificar, para la copia temporal de la imagen de un
+  diagnóstico (`agroia:ia:imagen:<solicitud_id>`).
+
 Las pruebas inyectan un cliente simulado con `usar()`.
 """
 
@@ -26,18 +29,19 @@ BLOQUEO_MS = int(_segundos("EVENTOS_BLOQUEO_MS", 5000))
 
 _clientes: dict[str, redis.Redis] = {}
 _forzado: redis.Redis | None = None
+_forzado_binario: redis.Redis | None = None
 
 
 def url() -> str:
     return os.environ.get("EVENTOS_REDIS_URL") or URL_POR_DEFECTO
 
 
-def _crear(timeout: float) -> redis.Redis:
+def _crear(timeout: float, decodificar: bool = True) -> redis.Redis:
     return redis.Redis.from_url(
         url(),
         socket_timeout=timeout,
         socket_connect_timeout=TIMEOUT,
-        decode_responses=True,
+        decode_responses=decodificar,
         health_check_interval=30,
     )
 
@@ -58,7 +62,17 @@ def cliente_de_lectura() -> redis.Redis:
     return _clientes["lectura"]
 
 
-def usar(cliente_simulado: redis.Redis | None) -> None:
-    """Pruebas: todos los eventos usan este cliente (None vuelve al real)."""
-    global _forzado
+def cliente_binario() -> redis.Redis:
+    if _forzado_binario is not None:
+        return _forzado_binario
+    if "binario" not in _clientes:
+        _clientes["binario"] = _crear(TIMEOUT, decodificar=False)
+    return _clientes["binario"]
+
+
+def usar(cliente_simulado: redis.Redis | None, binario: redis.Redis | None = None) -> None:
+    """Pruebas: todos los eventos usan este cliente (None vuelve al real). `binario` es
+    el mismo servidor simulado sin decodificar (fakeredis.FakeRedis(server=...))."""
+    global _forzado, _forzado_binario
     _forzado = cliente_simulado
+    _forzado_binario = binario

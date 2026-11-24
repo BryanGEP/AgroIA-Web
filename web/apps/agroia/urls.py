@@ -10,5 +10,6 @@ urlpatterns = [
     path("agroia/<str:conversacion_id>/", views.ver, name="ver"),
     path("agroia/<str:conversacion_id>/preguntar/", views.preguntar, name="preguntar"),
     path("agroia/<str:conversacion_id>/reintentar/", views.reintentar, name="reintentar"),
+    path("agroia/<str:conversacion_id>/solicitud/", views.solicitud, name="solicitud"),
     path("agroia/<str:conversacion_id>/borrar/", views.borrar, name="borrar"),
 ]

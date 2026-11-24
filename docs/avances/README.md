@@ -16,3 +16,4 @@ Un documento por fase o avance grande: qué se construyó, decisiones, verificac
 | Cierre · Verificación desde cero, matriz de accesos y documento de la entrega | 2026-11-20 | [entregable-3.md](../entregable-3.md) | Entrega 3 |
 | Entrega 4 · Base de eventos con Redis Streams | 2026-11-22 | [e4-eventos-base.md](e4-eventos-base.md) | Entrega 4 |
 | Entrega 4 · Eventos de negocio y correos en segundo plano | 2026-11-22 | [e4-eventos-negocio.md](e4-eventos-negocio.md) | Entrega 4 |
+| Entrega 4 · IA asíncrona por eventos | 2026-11-22 | [e4-ia-asincrona.md](e4-ia-asincrona.md) | Entrega 4 |

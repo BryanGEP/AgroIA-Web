@@ -20,18 +20,41 @@ usuario_registrado (svc-usuarios -> Redis -> svc-contenido-eventos -> bitácora)
    a fallidos; con el servidor de vuelta, `reprocesar` lo envía con un token nuevo y
    vigente, que sirve para restablecer la contraseña.
 
+8. IA asíncrona con el agente real: preguntar responde 202 al momento, la respuesta llega
+   por svc-ia-worker y queda en la conversación; la correlación en web, svc-contenido,
+   svc-ia-worker y svc-contenido-eventos; ni la pregunta ni la respuesta en los logs.
+9. Agente detenido: 2 reintentos, fallida con `agente_no_disponible` (sin esperar al
+   vencimiento), fallidos sin la pregunta, `reprocesar` que lo rechaza y `descartar` que lo
+   borra; con el agente de
+   vuelta, «Reintentar» trae la respuesta sin repetir la pregunta.
+10. Concurrencia: 5 preguntas a la vez. Por cada una, del log del worker: el hilo, cuándo
+    empezó, cuántas entregas e intentos tuvo y cuánto tardó el agente. Antes espera a que
+    pasen 90 s sin llamadas al agente (límite por minuto de Groq). Se atienden de N en
+    N (N = IA_WORKER_HILOS del worker que corre, 2 por defecto) y ninguna tiene entregas
+    de más (el reclamo no tomó ninguna en curso).
+11. Diagnóstico: sin modelo `modelo_no_disponible` y sin foto guardada; con el
+    clasificador de prueba (recrea svc-ia-worker con IA_CLASIFICADOR_PRUEBA=1 y
+    DEBUG=True, y lo devuelve al terminar), un resultado marcado `es_prueba`; ninguna
+    copia de la imagen queda en Redis.
+
 Uso, desde la raíz con el venv activo (unos 3 minutos; el paso 4 espera los 5 reintentos
 reales con espera creciente; el 7 recrea svc-usuarios-eventos con otro servidor de
 correo y lo devuelve a la consola al terminar):
 
     python infra/prueba_eventos.py
+    python infra/prueba_eventos.py --solo-ia     # solo los pasos 8 a 11
+    python infra/prueba_eventos.py --solo-ia --pasos=10,11
+
+Los pasos 8, 9 y 10 llaman al agente real (gastan tokens de Groq).
 
 Necesita `docker` en el PATH (otra ruta: variable DOCKER) y las cuentas de demostración
-(`cargar_usuarios_demo`). Al empezar corre `reiniciar_limites` (registra 3 usuarios y el
-límite es de 5 por hora por IP) y al terminar borra los usuarios de prueba y sus eventos
+(`cargar_usuarios_demo`). Al empezar corre `reiniciar_limites` en svc-usuarios (registra 4
+usuarios y el límite es de 5 por hora por IP) y en svc-contenido (límite de preguntas a la
+IA), y al terminar borra los usuarios de prueba y sus eventos
 con `limpiar_datos_prueba`. Termina con código 1 si algún paso falla.
 """
 
+import base64
 import json
 import os
 import quopri
@@ -41,6 +64,7 @@ import subprocess
 import sys
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote
@@ -446,6 +470,358 @@ def correo_que_falla(admin: dict, flujo: dict) -> None:
          and eventos[0]["datos"] == {"motivo": "recuperacion"})  # fmt: skip
 
 
+# --- IA asíncrona (fase 3) -----------------------------------------------------------------
+
+WORKER = "svc-ia-worker"
+# PNG de 1x1 píxel (válido: svc-contenido lo abre con Pillow).
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+PREGUNTAS = [
+    "¿Cada cuándo se riega un aguacate Hass en temporada de secas?",
+    "¿Cómo distingo la roña de la antracnosis en el fruto?",
+    "¿Qué fertilizante conviene antes de la floración?",
+    "¿Cómo se poda un árbol de aguacate joven?",
+    "¿Qué hago si las hojas del aguacate se ponen amarillas?",
+    "¿A qué altura se da mejor el aguacate en Michoacán?",
+]
+
+
+def usuario_ia() -> dict:
+    """Un usuario de prueba verificado (registro -> correo -> enlace) para los pasos de la IA.
+    Es @example.com: `limpiar_datos_prueba` borra sus conversaciones y diagnósticos."""
+    desde = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    correo = f"eventos-ia.{int(time.time() * 1000)}@example.com"
+    r = http.post(
+        "/api/usuarios/auth/registro/",
+        json={"nombre": "Prueba", "apellidos": "IA", "email": correo,
+              "password": PASSWORD_FLUJO, "password_confirmacion": PASSWORD_FLUJO,
+              "acepto_privacidad": True},
+    )  # fmt: skip
+    if r.status_code != 201:
+        raise RuntimeError(f"El registro respondió {r.status_code}")
+    texto = correo_en_log(correo, "verificar-correo/?token=", desde)
+    if texto is None:
+        raise RuntimeError("No llegó el correo de verificación del usuario de la IA.")
+    token = re.search(r"verificar-correo/\?token=([^\s\"<>]+)", texto).group(1)
+    http.post("/api/usuarios/auth/verificar-correo/", json={"token": unquote(token)})
+    return {"correo": correo, "id": r.json()["id"]}
+
+
+def sesion(usuario: dict) -> dict:
+    r = http.post("/api/usuarios/auth/login/",
+                  json={"email": usuario["correo"], "password": PASSWORD_FLUJO})  # fmt: skip
+    return {"Authorization": f"Bearer {r.json()['access']}"}
+
+
+def nueva_conversacion(cliente: dict, nombre: str) -> str:
+    r = http.post("/api/contenido/conversaciones/", json={"titulo": nombre}, headers=cliente)
+    return r.json()["id"]
+
+
+def preguntar_ia(cliente: dict, conv: str, texto: str, correlacion: dict | None = None):
+    return http.post(f"/api/contenido/conversaciones/{conv}/preguntar/", json={"texto": texto},
+                     headers={**cliente, **(correlacion or {})})  # fmt: skip
+
+
+def solicitud_ia(cliente: dict, conv: str) -> dict:
+    return http.get(f"/api/contenido/conversaciones/{conv}/solicitud/", headers=cliente).json()
+
+
+def esperar_final(cliente: dict, conv: str, limite: float = 200) -> dict:
+    """Consulta como la pantalla (cada 2 s) hasta `listo` o `fallido`."""
+
+    def terminada():
+        s = solicitud_ia(cliente, conv)
+        return s if s.get("estado") in ("listo", "fallido") else None
+
+    return esperar(terminada, limite, 2) or solicitud_ia(cliente, conv)
+
+
+def lineas_con(servicio: str, desde: str, *marcas: str) -> list[str]:
+    registro = docker("logs", "--no-log-prefix", "--since", desde, servicio)
+    return [linea for linea in registro.splitlines() if all(m in linea for m in marcas)]
+
+
+def mensajes_de(cliente: dict, conv: str) -> list[str]:
+    datos = http.get(f"/api/contenido/conversaciones/{conv}/", headers=cliente).json()
+    return [m["rol"] for m in datos["mensajes"]]
+
+
+def ia_punta_a_punta(cliente: dict) -> None:
+    titulo("8. IA asíncrona: pregunta -> svc-ia-worker -> agente real -> conversación")
+    desde = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    conv = nueva_conversacion(cliente, "Prueba de eventos")
+    c = nueva_correlacion()
+    inicio = time.monotonic()
+    r = preguntar_ia(cliente, conv, PREGUNTAS[0], c)
+    paso("Preguntar responde 202 al momento", r.status_code == 202
+         and r.json()["estado"] == "pendiente",
+         f"{r.elapsed.total_seconds() * 1000:.0f} ms")  # fmt: skip
+    final = esperar_final(cliente, conv)
+    tardanza = time.monotonic() - inicio
+    listo = final.get("estado") == "listo"
+    detalle = (
+        f"en {tardanza:.1f} s, {len(final.get('respuesta') or '')} caracteres, "
+        f"{len(final.get('fuentes') or [])} fuentes"
+        if listo
+        else f"estado {final.get('estado')}, código {final.get('codigo')}"
+    )
+    if not paso("La respuesta del agente llegó", listo, detalle):
+        return
+    paso("Quedó guardada en la conversación", mensajes_de(cliente, conv) == ["usuario", "agente"])
+
+    correlacion = c["X-Correlacion-Id"]
+    print(f"  la correlación {correlacion} en los 4 contenedores:")
+    for servicio, marca in (
+        ("web", '"evento": "peticion"'),
+        ("svc-contenido", '"evento": "evento_publicado"'),
+        (WORKER, '"evento": "evento_procesado"'),
+        (CONSUMIDOR, '"evento": "evento_procesado"'),
+    ):
+        lineas = lineas_con(servicio, desde, correlacion, marca)
+        if lineas:
+            print(f"    {servicio}: {lineas[-1][:220]}")
+        paso(f"  {servicio}: {marca.split(': ')[1]}", bool(lineas))
+    todo = "".join(docker("logs", "--no-log-prefix", "--since", desde, s)
+                   for s in ("web", "svc-contenido", WORKER, CONSUMIDOR))  # fmt: skip
+    paso("Ni la pregunta ni la respuesta aparecen en los logs",
+         PREGUNTAS[0] not in todo and final["respuesta"][:60] not in todo)  # fmt: skip
+
+
+def ia_agente_caido(cliente: dict) -> None:
+    titulo("9. Agente detenido: reintentos -> fallida -> «Reintentar» al volver")
+    desde = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    antes = estado()["fallidos"]["total"]
+    conv = nueva_conversacion(cliente, "Agente caído")
+    docker("stop", "agente")
+    try:
+        inicio = time.monotonic()
+        preguntar_ia(cliente, conv, PREGUNTAS[1])
+        final = esperar_final(cliente, conv, 90)
+        tardanza = time.monotonic() - inicio
+        paso("La solicitud termina en fallida con agente_no_disponible",
+             final.get("estado") == "fallido" and final.get("codigo") == "agente_no_disponible",
+             f"en {tardanza:.1f} s (sin esperar los 180 s del vencimiento)")  # fmt: skip
+        reintentos = lineas_con(WORKER, desde, '"evento": "evento_reintentado"')
+        paso("El worker reintentó 2 veces antes de rendirse", len(reintentos) == 2,
+             f"{len(reintentos)} evento_reintentado")  # fmt: skip
+        datos = estado()["fallidos"]
+        ultimo = datos["ultimos"][0] if datos["total"] > antes else {}
+        paso("En fallidos, sin la pregunta ni el historial",
+             ultimo.get("datos_omitidos") == "historial,pregunta",
+             f"datos_omitidos={ultimo.get('datos_omitidos')}")  # fmt: skip
+        if ultimo:
+            salida = docker("exec", "-T", "svc-contenido", "python", "-m", "agroia_comun.eventos",
+                            "reprocesar", "--id", ultimo["id"])  # fmt: skip
+            paso("reprocesar lo rechaza (datos omitidos)", "datos omitidos" in salida,
+                 salida.strip().splitlines()[-1] if salida.strip() else "")  # fmt: skip
+            # Ya se revisó y el usuario usa «Reintentar»: se descarta, para no dejar residuos.
+            salida = docker("exec", "-T", "svc-contenido", "python", "-m", "agroia_comun.eventos",
+                            "descartar", "--id", ultimo["id"])  # fmt: skip
+            paso("descartar lo borra de fallidos", "Descartados: 1" in salida
+                 and estado()["fallidos"]["total"] == antes)  # fmt: skip
+    finally:
+        docker("start", "agente")
+    esperar(lambda: "healthy" in docker("ps", "agente", "--format", "{{.Health}}"), 120, 2)
+    print("  agente de vuelta")
+    r = http.post(f"/api/contenido/conversaciones/{conv}/reintentar/", headers=cliente)
+    paso("Reintentar responde 202", r.status_code == 202)
+    final = esperar_final(cliente, conv)
+    paso("Al reintentar llega la respuesta", final.get("estado") == "listo",
+         f"estado {final.get('estado')}, código {final.get('codigo')}")  # fmt: skip
+    paso("La pregunta no se repitió", mensajes_de(cliente, conv) == ["usuario", "agente"])
+
+
+def lineas_json(servicio: str, desde: str) -> list[dict]:
+    """Las líneas JSON del log de un contenedor desde `desde`."""
+    salida = []
+    for linea in docker("logs", "--no-log-prefix", "--since", desde, servicio).splitlines():
+        if linea.startswith("{"):
+            try:
+                salida.append(json.loads(linea))
+            except ValueError:
+                continue
+    return salida
+
+
+def momento(texto: str) -> float:
+    return datetime.fromisoformat(texto).timestamp()
+
+
+def ia_concurrencia(cliente: dict) -> None:
+    # Los hilos del worker que está corriendo (IA_WORKER_HILOS), no un número fijo.
+    leer_hilos = "from app.config import settings; print(settings.ia_worker_hilos)"
+    hilos_worker = int(docker("exec", "-T", WORKER, "python", "-c", leer_hilos))
+    titulo(f"10. Concurrencia: 5 preguntas a la vez ({hilos_worker} hilos en el worker)")
+    desde = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    convs = [nueva_conversacion(cliente, f"Concurrencia {n}") for n in range(5)]
+    correlaciones = [str(uuid.uuid4()) for _ in range(5)]
+    cero = time.time()
+
+    def una(n: int) -> tuple:
+        inicio = time.monotonic()
+        r = preguntar_ia(cliente, convs[n], PREGUNTAS[n + 1],
+                         {"X-Correlacion-Id": correlaciones[n]})  # fmt: skip
+        aceptada = time.monotonic() - inicio
+        final = esperar_final(cliente, convs[n])
+        return final.get("estado"), aceptada, time.monotonic() - inicio, r.status_code
+
+    with ThreadPoolExecutor(5) as hilos:
+        tiempos = list(hilos.map(una, range(5)))
+    total = time.time() - cero
+    time.sleep(2)  # que el log del worker termine de escribirse
+
+    registro = [x for x in lineas_json(WORKER, desde) if x.get("correlacion_id") in correlaciones]
+    print("    n | intento | hilo | empieza | entregas | dura   | resultado")
+    bien_entregas, intervalos = True, []
+    for n, correlacion in enumerate(correlaciones):
+        intentos = sorted(
+            (x for x in registro if x["correlacion_id"] == correlacion
+             and x["evento"] in ("evento_procesado", "evento_reintentado", "evento_ocupado",
+                                 "evento_fallido")),
+            key=lambda x: x["inicio"],
+        )  # fmt: skip
+        final, aceptada, tardo, _ = tiempos[n]
+        if not intentos:
+            bien_entregas = False
+        fin_anterior = None
+        for x in intentos:
+            empieza = momento(x["inicio"]) - cero
+            dura = x["duracion_ms"] / 1000
+            intervalos.append((empieza, empieza + dura, x["consumidor"]))
+            # Cada entrega de Redis corresponde a un intento real. Si el reclamo hubiera
+            # tomado el mensaje mientras otro hilo lo procesaba, habría más entregas que
+            # intentos (o un evento_ocupado).
+            bien_entregas &= x["entregas"] == x["intento"] and x["evento"] != "evento_ocupado"
+            resultado = {
+                "evento_procesado": "bien",
+                "evento_fallido": "agotó los reintentos: ",
+            }.get(x["evento"], "") + (
+                "" if x["evento"] == "evento_procesado" else x.get("motivo", "")
+            )
+            espera = f", {empieza - fin_anterior:.1f} s después del fallo" if fin_anterior else ""
+            hilo = x["consumidor"].rsplit("-", 1)[-1]
+            print(f"    {n + 1} | {x['intento']:7} | {hilo:>4} | {empieza:5.1f} s | "
+                  f"{x['entregas']:8} | {dura:4.1f} s | {resultado}{espera}")  # fmt: skip
+            fin_anterior = empieza + dura
+        print(f"      202 en {aceptada * 1000:.0f} ms; {final} a los {tardo:.1f} s")
+
+    # Cuántos hilos estaban ocupados a la vez, como máximo (IA_WORKER_HILOS). Se cuentan hilos
+    # distintos: dos intentos seguidos del mismo hilo pueden «tocarse» por el redondeo a
+    # milisegundos de `inicio`, pero un hilo nunca procesa dos cosas a la vez (se comprueba).
+    maximo, solapados = 0, False
+    for a, _, _hilo in intervalos:
+        ocupados = {h for b, c, h in intervalos if b <= a + 0.001 and c > a + 0.001}
+        maximo = max(maximo, len(ocupados))
+    for a, b, hilo in intervalos:
+        for c, d, otro in intervalos:
+            if hilo == otro and (a, b) != (c, d) and a + 0.01 < d and c + 0.01 < b:
+                solapados = True
+    paso("Las 5 se aceptaron con 202", all(t[3] == 202 for t in tiempos))
+    paso("Las 5 terminaron con respuesta", all(t[0] == "listo" for t in tiempos),
+         ", ".join(t[0] or "?" for t in tiempos))  # fmt: skip
+    paso(f"Se atienden de {hilos_worker} en {hilos_worker}",
+         maximo == hilos_worker and not solapados,
+         f"máximo {maximo} hilos ocupados a la vez")  # fmt: skip
+    paso("Ninguna con entregas de más (una entrega por intento, sin reclamos en curso)",
+         bien_entregas)  # fmt: skip
+    print("  log del agente (solo estado, sin contenido):")
+    for linea in docker(
+        "logs", "--no-log-prefix", "--timestamps", "--since", desde, "agente"
+    ).splitlines():
+        if "RateLimitError" in linea or "POST /chat" in linea:
+            hora, _, resto = linea.partition(" ")
+            cuando = datetime.fromisoformat(hora[:26] + "+00:00").timestamp() - cero
+            texto = "RateLimitError" if "RateLimitError" in resto else resto.split('" ')[-1]
+            print(f"    {cuando:5.1f} s  {texto}")
+    print(f"  en total {total:.1f} s; la más lenta {max(t[2] for t in tiempos):.1f} s")
+
+
+def diagnostico_ia(cliente: dict) -> dict:
+    r = http.post("/api/contenido/diagnosticos/solicitar/", headers=cliente,
+                  files={"imagen": ("hoja.png", PNG_1X1, "image/png")})  # fmt: skip
+    if r.status_code != 202:
+        return {"estado": f"HTTP {r.status_code}"}
+    ident = r.json()["id"]
+
+    def final():
+        d = http.get(f"/api/contenido/diagnosticos/{ident}/", headers=cliente).json()
+        return d if d.get("estado") in ("listo", "fallido") else None
+
+    return esperar(final, 60, 1) or {"estado": "sin_terminar", "id": ident}
+
+
+def copias_de_imagen() -> int:
+    salida = docker("exec", "-T", "redis", "redis-cli", "-n", "1", "--scan", "--pattern",
+                    "agroia:ia:imagen:*")  # fmt: skip
+    return len([linea for linea in salida.splitlines() if linea.strip()])
+
+
+def ia_diagnostico(cliente: dict) -> None:
+    titulo("11. Diagnóstico asíncrono: sin modelo y con el clasificador de prueba")
+    d = diagnostico_ia(cliente)
+    paso("Sin modelo: fallido con modelo_no_disponible",
+         d.get("estado") == "fallido" and d.get("codigo") == "modelo_no_disponible",
+         f"estado {d.get('estado')}, código {d.get('codigo')}")  # fmt: skip
+    paso("Sin modelo no queda la foto", d.get("imagen_url") is None)
+    paso("No quedan copias de la imagen en Redis", copias_de_imagen() == 0)
+    print("  recreo svc-ia-worker con IA_CLASIFICADOR_PRUEBA=1 y DEBUG=True")
+    desde = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    docker("up", "-d", WORKER, entorno={"IA_CLASIFICADOR_PRUEBA": "1", "DJANGO_DEBUG": "True"})
+    try:
+        esperar(lambda: lineas_con(WORKER, desde, '"clasificador_de_prueba": true'), 60, 1)
+        d = diagnostico_ia(cliente)
+        paso("Con el de prueba: listo y marcado es_prueba",
+             d.get("estado") == "listo" and d.get("es_prueba") is True
+             and d.get("modelo_version") == "prueba-no-es-un-modelo",
+             f"clase {d.get('clase')}, confianza {d.get('confianza')}")  # fmt: skip
+        paso("La copia de la imagen se borró al procesarla", copias_de_imagen() == 0)
+    finally:
+        docker("up", "-d", WORKER)
+        print("  svc-ia-worker de vuelta, sin clasificador de prueba")
+
+
+# Segundos sin llamadas al agente antes del paso 10. La llave gratuita de Groq tiene un límite
+# de tokens por minuto: los pasos 8 y 9 lo gastan, y el paso 10 mide la concurrencia del
+# worker, no lo que dejaron los pasos anteriores (como la matriz, que espera 61 s antes de
+# los casos de login). Se espera solo lo que falte desde la última llamada.
+ENFRIAR_GROQ_SEGUNDOS = 90
+
+
+def esperar_cupo_del_agente() -> None:
+    llamadas = [
+        linea.split(" ", 1)[0]
+        for linea in docker("logs", "--no-log-prefix", "--timestamps", "--since", "10m",
+                            "agente").splitlines()
+        if "POST /chat" in linea
+    ]  # fmt: skip
+    if not llamadas:
+        return
+    ultima = datetime.fromisoformat(llamadas[-1][:26] + "+00:00")
+    falta = ENFRIAR_GROQ_SEGUNDOS - (datetime.now(UTC) - ultima).total_seconds()
+    if falta > 0:
+        print()
+        print(f"  espero {falta:.0f} s sin llamadas al agente (límite por minuto de Groq)")
+        time.sleep(falta)
+
+
+def pasos_ia() -> None:
+    try:
+        usuario = usuario_ia()
+    except RuntimeError as error:
+        paso("Usuario de prueba para la IA", False, str(error))
+        return
+    pedidos = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--pasos=")), "")
+    elegidos = {int(n) for n in pedidos.split(",") if n.strip()} or {8, 9, 10, 11}
+    for numero, funcion in ((8, ia_punta_a_punta), (9, ia_agente_caido),
+                            (10, ia_concurrencia), (11, ia_diagnostico)):  # fmt: skip
+        if numero in elegidos:
+            if numero == 10:
+                esperar_cupo_del_agente()
+            funcion(sesion(usuario))
+
+
 def limpiar() -> None:
     titulo("Limpieza")
     ids = manage("svc-usuarios", "limpiar_datos_prueba", "--listar-ids")
@@ -459,11 +835,15 @@ def main() -> None:
         sys.exit("Necesito docker en el PATH (o la variable DOCKER).")
     print(f"Prueba de eventos · {datetime.now():%Y-%m-%d %H:%M} · gateway {BASE}")
     print("  " + manage("svc-usuarios", "reiniciar_limites"))
-    for servicio in ("redis", "mongo", "svc-usuarios", "svc-contenido", CONSUMIDOR):
+    print("  " + manage("svc-contenido", "reiniciar_limites"))
+    for servicio in ("redis", "mongo", "svc-usuarios", "svc-contenido", CONSUMIDOR, WORKER):
         if not corriendo(servicio):
             sys.exit(f"{servicio} no está corriendo. Levanta todo con docker compose up -d.")
     admin = {"Authorization": f"Bearer {token_admin()}"}
     try:
+        if "--solo-ia" in sys.argv:
+            pasos_ia()
+            return
         punta_a_punta(admin)
         apagado_y_consumidor_caido(admin)
         admin = {"Authorization": f"Bearer {token_admin()}"}  # por si venció el access
@@ -471,12 +851,16 @@ def main() -> None:
         admin = {"Authorization": f"Bearer {token_admin()}"}
         flujo = flujo_de_negocio(admin)
         correo_que_falla(admin, flujo)
+        pasos_ia()
     finally:
-        for servicio in ("mongo", CONSUMIDOR, CONSUMIDOR_CORREOS):
+        for servicio in ("mongo", CONSUMIDOR, CONSUMIDOR_CORREOS, "agente", WORKER):
             if not corriendo(servicio):
                 docker("start", servicio, verificar=False)
         limpiar()
+        resumen()
 
+
+def resumen() -> None:
     bien = sum(ok for _, ok, _ in resultados)
     titulo("Resumen")
     print(f"  {bien} de {len(resultados)} comprobaciones correctas "

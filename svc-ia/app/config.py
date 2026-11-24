@@ -32,6 +32,13 @@ class Settings:
     # Contenedor del agente (red interna de Docker).
     url_agente: str = field(default_factory=lambda: os.getenv("URL_AGENTE", "http://agente:8000"))
     agente_timeout: float = field(default_factory=lambda: float(os.getenv("AGENTE_TIMEOUT", "45")))
+    # Worker de eventos (python -m app.worker): cuántas solicitudes atiende a la vez.
+    ia_worker_hilos: int = field(default_factory=lambda: int(os.getenv("IA_WORKER_HILOS", "2")))
+    # Clasificador de prueba: SOLO en desarrollo y solo si se pide explícitamente. Sus
+    # resultados llevan modelo_version "prueba-no-es-un-modelo" y la pantalla lo avisa.
+    clasificador_prueba: bool = field(
+        default_factory=lambda: _booleano(os.getenv("IA_CLASIFICADOR_PRUEBA", "False"))
+    )
 
 
 settings = Settings()
@@ -45,3 +52,10 @@ def validar(config: Settings) -> None:
         raise RuntimeError("JWT_ISSUER no puede estar vacío.")
     if config.agente_timeout <= 0:
         raise RuntimeError("AGENTE_TIMEOUT debe ser mayor que 0.")
+    if config.clasificador_prueba and not config.debug:
+        raise RuntimeError(
+            "IA_CLASIFICADOR_PRUEBA solo se permite con DEBUG=True: sus resultados no son "
+            "diagnósticos reales."
+        )
+    if config.ia_worker_hilos < 1:
+        raise RuntimeError("IA_WORKER_HILOS debe ser al menos 1.")
