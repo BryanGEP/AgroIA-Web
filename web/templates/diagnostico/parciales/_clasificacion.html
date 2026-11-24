@@ -2,6 +2,11 @@
 {% comment %} Clase, confianza, probabilidades y productos sugeridos. Parámetros: diagnostico,
    nombres, sugeridos. Las barras son <progress>: sin estilos en línea (CSP). {% endcomment %}
 <div class="flex flex-col gap-4">
+  {% if diagnostico.es_prueba %}
+    <div class="alert alert-warning" role="alert">
+      <span><strong>Resultado de prueba: no es un diagnóstico real.</strong> Lo dio un clasificador de prueba que no mira la foto; solo sirve para probar el sistema.</span>
+    </div>
+  {% endif %}
   <div>
     <p class="text-sm opacity-80">Resultado</p>
     <p class="font-display text-3xl font-bold">{{ nombres|elegir_clave:diagnostico.clase }}</p>

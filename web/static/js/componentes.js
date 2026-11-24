@@ -44,7 +44,11 @@ document.addEventListener("alpine:init", function () {
         var campo = evento.target.querySelector("textarea");
         if (!campo) return;
         this.enviando = false;
-        if (evento.detail.successful) campo.value = "";
+        // Si la pregunta no entró (por ejemplo, muchas preguntas seguidas), el servidor lo
+        // avisa con X-Conservar-Pregunta y el texto se queda para enviarlo después.
+        var xhr = evento.detail.xhr;
+        var conservar = xhr && xhr.getResponseHeader("X-Conservar-Pregunta");
+        if (evento.detail.successful && !conservar) campo.value = "";
         var mensajes = document.getElementById("mensajes");
         if (mensajes && mensajes.lastElementChild) {
           mensajes.lastElementChild.scrollIntoView({ block: "nearest" });

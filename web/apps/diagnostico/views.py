@@ -2,7 +2,7 @@
 
 from django import forms
 from django.http import Http404, HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.cuentas.decoradores import login_requerido
@@ -10,6 +10,13 @@ from apps.cuentas.servicios import ErrorApi
 from apps.diagnostico import servicios
 
 NO_DISPONIBLE = "El diagnóstico por imagen estará disponible pronto."
+NO_SE_PUDO = "No pudimos analizar la foto. Intenta de nuevo."
+DEMASIADOS = "Hiciste muchos análisis seguidos. Espera un momento y vuelve a intentarlo."
+MENSAJES_DE_FALLO = {
+    "vencida": "El análisis tardó demasiado. Intenta de nuevo.",
+    "imagen_invalida": "No pudimos leer la foto. Prueba con otra.",
+    "servicio_no_disponible": "No pudimos enviar la foto a analizar. Intenta de nuevo.",
+}
 
 
 class Foto(forms.Form):
@@ -41,18 +48,19 @@ def inicio(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         if formulario.is_valid():
             try:
-                contexto["resultado"] = servicios.diagnosticar(
-                    request, formulario.cleaned_data["imagen"]
-                )
+                diagnostico = servicios.solicitar(request, formulario.cleaned_data["imagen"])
             except ErrorApi as error:
-                if error.codigo == "modelo_no_disponible":
-                    contexto["no_disponible"] = NO_DISPONIBLE
-                elif error.codigo == "validacion":
+                if error.codigo == "validacion":
                     formulario.add_error("imagen", "No pudimos leer la foto. Prueba con otra.")
                     status = 400
+                elif error.codigo == "demasiados_intentos":
+                    contexto["error"] = DEMASIADOS
+                    status = 429
                 else:
                     contexto["error"] = error.mensaje
                     status = 503
+            else:
+                contexto.update(_contexto_de_estado(diagnostico))
         else:
             status = 400
     plantilla = (
@@ -60,6 +68,39 @@ def inicio(request: HttpRequest) -> HttpResponse:
     )
     # Con HTMX los errores responden 200: HTMX 2 no reemplaza el contenido con un 4xx.
     return render(request, plantilla, contexto, status=200 if request.htmx else status)
+
+
+def _contexto_de_estado(diagnostico: dict) -> dict:
+    """Qué mostrar según el estado del diagnóstico: esperando, el resultado o el fallo."""
+    estado = diagnostico.get("estado", "listo")
+    if estado == "pendiente":
+        return {"pendiente": diagnostico, "intervalo": servicios.intervalo(diagnostico)}
+    if estado == "fallido":
+        if diagnostico.get("codigo") == "modelo_no_disponible":
+            return {"no_disponible": NO_DISPONIBLE}
+        return {"error": MENSAJES_DE_FALLO.get(diagnostico.get("codigo"), NO_SE_PUDO)}
+    return {
+        "resultado": servicios.Resultado(
+            diagnostico=diagnostico, sugeridos=servicios.sugeridos(diagnostico.get("clase"))
+        )
+    }
+
+
+@login_requerido
+@require_GET
+def estado(request: HttpRequest, diagnostico_id: str) -> HttpResponse:
+    """Lo que consulta el polling. Al llegar a `listo` o `fallido` la respuesta ya no trae
+    `hx-trigger` y el polling se detiene."""
+    if not request.htmx:
+        return redirect("diagnostico:detalle", diagnostico_id=diagnostico_id)
+    try:
+        diagnostico = servicios.detalle(request, diagnostico_id)
+    except ErrorApi as error:
+        if error.estado == 404:
+            raise Http404 from error
+        diagnostico = {"id": diagnostico_id, "estado": "pendiente"}  # se sigue consultando
+    contexto = {"nombres": servicios.NOMBRES, **_contexto_de_estado(diagnostico)}
+    return render(request, "diagnostico/parciales/_resultado.html", contexto)
 
 
 @login_requerido
@@ -93,6 +134,7 @@ def detalle(request: HttpRequest, diagnostico_id: str) -> HttpResponse:
         "diagnostico": datos,
         "nombres": servicios.NOMBRES,
         "sugeridos": servicios.sugeridos(datos.get("clase")),
+        **_contexto_de_estado(datos),
     }
     return render(request, "diagnostico/detalle.html", contexto)
 

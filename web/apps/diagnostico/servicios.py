@@ -1,20 +1,20 @@
-"""Diagnóstico por imagen: el gateway manda la foto a svc-ia y guarda el resultado en
-svc-contenido (síncrono; en la Entrega 4 pasará a eventos, como el chat).
+"""Diagnóstico por imagen, asíncrono (Entrega 4): el gateway manda la foto a svc-contenido
+(`POST diagnosticos/solicitar/`), que la guarda y publica `diagnostico_solicitado`; el worker
+de svc-ia clasifica y publica el resultado, y la pantalla consulta el estado
+(`GET diagnosticos/<id>/`) con HTMX hasta `listo` o `fallido`.
 
-Mientras svc-ia no tenga modelo de visión responde 503 `modelo_no_disponible` y no se guarda
-nada. El flujo completo (clasificar, guardar, sugerir productos) ya está listo para cuando
-devuelva un resultado.
+Mientras no haya modelo de visión, el worker publica `diagnostico_fallido` con
+`modelo_no_disponible`: se muestra «estará disponible pronto» y no queda la foto. Un
+resultado del clasificador de prueba (solo en desarrollo) trae `es_prueba` y la pantalla
+avisa que no es un diagnóstico real.
 """
 
-import json
-import logging
 from dataclasses import dataclass, field
 
 from clientes import tienda
 from django.http import HttpRequest
 
-from agroia_comun.seguridad import registrar_evento
-from apps.cuentas.servicios import ErrorApi, con_sesion, con_sesion_crudo
+from apps.cuentas.servicios import con_sesion, con_sesion_crudo
 
 TAMANO_MAXIMO = 5 * 1024 * 1024
 TIPOS = {"image/jpeg": b"\xff\xd8\xff", "image/png": b"\x89PNG\r\n\x1a\n"}
@@ -63,37 +63,25 @@ def sugeridos(clase: str) -> list[dict]:
         return []
 
 
-def diagnosticar(request: HttpRequest, archivo) -> Resultado:
-    """Lanza ErrorApi 503 `modelo_no_disponible` mientras no haya modelo."""
+def solicitar(request: HttpRequest, archivo) -> dict:
+    """Manda la foto a svc-contenido, que la guarda y pide el diagnóstico al worker de svc-ia
+    por eventos. Devuelve el diagnóstico `pendiente` (o `fallido` si no se pudo pedir)."""
     tipo = _tipo(archivo)
     contenido = archivo.read()
-    nombre = archivo.name or "foto"
-    diagnostico = con_sesion(
-        request, "ia", "POST", "diagnostico/", files={"imagen": (nombre, contenido, tipo)}
+    return con_sesion(
+        request,
+        "contenido",
+        "POST",
+        "diagnosticos/solicitar/",
+        files={"imagen": (archivo.name or "foto", contenido, tipo)},
     )
-    resultado = Resultado(diagnostico=diagnostico, sugeridos=sugeridos(diagnostico.get("clase")))
-    try:
-        guardado = con_sesion(
-            request,
-            "contenido",
-            "POST",
-            "diagnosticos/",
-            files={"imagen": (nombre, contenido, tipo)},
-            data={
-                "clase": diagnostico["clase"],
-                "confianza": str(diagnostico["confianza"]),
-                "probabilidades": json.dumps(diagnostico["probabilidades"]),
-                "modelo_version": diagnostico["modelo_version"],
-            },
-        )
-        resultado.diagnostico = {**diagnostico, "id": guardado.get("id")}
-    except ErrorApi as error:
-        # El resultado existe: se muestra igual, pero no quedó en el historial.
-        resultado.guardado = False
-        registrar_evento(
-            "diagnostico_no_guardado", request, nivel=logging.WARNING, error=error.codigo
-        )
-    return resultado
+
+
+def intervalo(diagnostico: dict) -> int:
+    """Igual que el chat: cada 2 s los primeros 20 s, después cada 5 s."""
+    from apps.agroia.servicios import intervalo as intervalo_del_chat
+
+    return intervalo_del_chat({"creada_en": diagnostico.get("creado_en")})
 
 
 def historial(request: HttpRequest, pagina: int = 1) -> dict:

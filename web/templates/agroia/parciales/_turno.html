@@ -1,29 +1,18 @@
-{% comment %} Lo que se agrega al final de la conversación al preguntar o reintentar (HTMX,
-   hx-swap="beforeend" en #mensajes). Parámetros: turno o error. {% endcomment %}
+{% comment %} Lo que se agrega al final de la conversación al preguntar (HTMX, hx-swap="beforeend"
+   en #mensajes): la pregunta y la espera (o la fallida, si no se pudo enviar). Parámetros:
+   pregunta, solicitud, conversacion_id, intervalo...; o error, o llena. {% endcomment %}
 {% if error %}
   <li class="alert alert-error my-2" role="alert"><span>{{ error }}</span></li>
-{% elif turno %}
-  {% if turno.pregunta and turno.pregunta_guardada %}
-    {% include "componentes/mensaje_chat.html" with rol="usuario" texto=turno.pregunta %}
-  {% endif %}
-  {% if turno.respuesta %}
-    {% if turno.guardada %}
-      {% include "componentes/mensaje_chat.html" with rol="agente" texto=turno.respuesta fuentes=turno.fuentes %}
-    {% else %}
-      {% include "componentes/mensaje_chat.html" with rol="agente" texto=turno.respuesta fuentes=turno.fuentes aviso="No pudimos guardar esta respuesta en tu historial." %}
-    {% endif %}
-  {% endif %}
-  {% if turno.sin_respuesta %}
-    <li class="alert alert-warning my-2" role="alert"><span>AgroIA no pudo responder en este momento. Tu pregunta quedó guardada: puedes reintentar en unos minutos.</span></li>
-  {% endif %}
-  {% if turno.llena %}
-    <li class="alert alert-info my-2" role="status">
-      <span>Esta conversación llegó a su límite de mensajes.</span>
-      <a href="{% url 'agroia:inicio' %}" class="btn btn-sm btn-primary">Iniciar una conversación nueva</a>
-    </li>
+{% elif llena %}
+  <li class="alert alert-info my-2" role="status">
+    <span>Esta conversación llegó a su límite de mensajes.</span>
+    <a href="{% url 'agroia:inicio' %}" class="btn btn-sm btn-primary">Iniciar una conversación nueva</a>
+  </li>
+{% else %}
+  {% include "componentes/mensaje_chat.html" with rol="usuario" texto=pregunta %}
+  {% if solicitud.estado == "pendiente" %}
+    {% include "agroia/parciales/_espera.html" %}
+  {% else %}
+    {% include "agroia/parciales/_fallida.html" %}
   {% endif %}
 {% endif %}
-{# El botón de reintentar se muestra solo si quedó una pregunta sin respuesta. #}
-<div id="reintentar" hx-swap-oob="true">
-  {% if turno.sin_respuesta %}{% include "agroia/parciales/_reintentar.html" %}{% endif %}
-</div>
