@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AgroIA-Web",
-    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`.\n\n**Antes de la primera corrida:** `docker compose exec svc-tienda python manage.py cargar_datos_demo` y `docker compose exec svc-usuarios python manage.py cargar_usuarios_demo` (cuentas de demostración, solo en desarrollo).\n\n**Tokens:** la carpeta «Autenticación» inicia sesión a través del gateway y guarda `token` (cliente verificado) y `token_admin`; svc-usuarios registra una cuenta nueva y guarda `token_usuario` y `token_sin_verificar`. La carpeta «Gateway» recorre el proxy `{{base_gateway}}/api/`. No hay que pegar tokens a mano, salvo `token_vencido` (opcional, para un caso de «Seguridad»): `python infra/emitir_token.py --vencido`.\n\n**Correr la colección completa:** las carpetas están en orden para el Runner. Las peticiones con imagen usan `archivos/imagen-prueba.png`: en *Settings → General → Working directory* elige la carpeta `docs/postman/`. Con Newman, desde la raíz del repo: `newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var token_vencido=$(python infra/emitir_token.py --vencido)`.\n\n**Límites:** una corrida hace 8 logins antes del caso del 429 (sobra el 20 % de los 10 por minuto); «Seguridad» agota el resto, así que espera un minuto antes de otra corrida. Cada corrida usa 2 de los 5 registros por hora por IP y 1 de los 3 correos de recuperación y de reenvío por hora.",
+    "description": "API de AgroIA-Web. Usa el entorno `AgroIA-Web · local`.\n\n**Antes de la primera corrida:** `docker compose exec svc-tienda python manage.py cargar_datos_demo` y `docker compose exec svc-usuarios python manage.py cargar_usuarios_demo` (cuentas de demostración, solo en desarrollo). Antes de cada corrida: `reiniciar_limites` en svc-usuarios y en svc-contenido (la última petición de «Seguridad» gasta el límite de preguntas a la IA del cliente).\n\n**Tokens:** la carpeta «Autenticación» inicia sesión a través del gateway y guarda `token` (cliente verificado) y `token_admin`; svc-usuarios registra una cuenta nueva y guarda `token_usuario` y `token_sin_verificar`. La carpeta «Gateway» recorre el proxy `{{base_gateway}}/api/`. No hay que pegar tokens a mano, salvo `token_vencido` (opcional, para un caso de «Seguridad»): `python infra/emitir_token.py --vencido`.\n\n**Correr la colección completa:** las carpetas están en orden para el Runner. Las peticiones con imagen usan `archivos/imagen-prueba.png`: en *Settings → General → Working directory* elige la carpeta `docs/postman/`. Con Newman, desde la raíz del repo: `newman run docs/postman/AgroIA-Web.postman_collection.json -e docs/postman/local.postman_environment.json --working-dir docs/postman --env-var token_vencido=$(python infra/emitir_token.py --vencido)`.\n\n**Límites:** una corrida hace 8 logins antes del caso del 429 (sobra el 20 % de los 10 por minuto); «Seguridad» agota el resto, así que espera un minuto antes de otra corrida. Cada corrida usa 2 de los 5 registros por hora por IP y 1 de los 3 correos de recuperación y de reenvío por hora.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -3421,6 +3421,219 @@
               ]
             },
             {
+              "name": "Preguntar a AgroIA (por eventos) → 202",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/preguntar/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "preguntar",
+                    ""
+                  ]
+                },
+                "description": "Guarda la pregunta y la manda al worker de svc-ia por eventos (ia_pregunta_solicitada). Responde de inmediato con la solicitud pendiente; la respuesta llega a la conversación.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"texto\": \"En una frase: ¿cada cuándo aplico fungicida contra la antracnosis?\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                      "const s = pm.response.json();",
+                      "pm.test(\"La solicitud queda pendiente\", () => {",
+                      "    pm.expect(s.estado).to.eql(\"pendiente\");",
+                      "    pm.expect(s.id).to.match(/^[0-9a-f-]{36}$/);",
+                      "    pm.expect(s.vence_en).to.be.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Preguntar mientras AgroIA responde → 409",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/preguntar/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "preguntar",
+                    ""
+                  ]
+                },
+                "description": "Una sola solicitud en curso por conversación.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"texto\": \"¿Y contra la roña?\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                      "pm.test(\"Código solicitud_en_curso\", () => pm.expect(pm.response.json().error).to.eql(\"solicitud_en_curso\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado de la solicitud",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/solicitud/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "solicitud",
+                    ""
+                  ]
+                },
+                "description": "Lo que consulta la pantalla (polling cada 2 s y luego cada 5 s): pendiente, listo (con la respuesta y las fuentes) o fallido (con el código).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Trae el estado\", () => pm.expect([\"pendiente\", \"listo\", \"fallido\"]).to.include(pm.response.json().estado));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Solicitud de otro usuario → 404",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_id}}/solicitud/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "conversaciones",
+                    "{{conversacion_id}}",
+                    "solicitud",
+                    ""
+                  ]
+                },
+                "description": "La solicitud es privada como la conversación, también para el administrador.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Mis conversaciones",
               "request": {
                 "method": "GET",
@@ -3789,6 +4002,108 @@
                       "    const cuerpo = pm.response.json();",
                       "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
                       "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Solicitar diagnóstico (por eventos) → 202",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/solicitar/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "solicitar",
+                    ""
+                  ]
+                },
+                "description": "multipart/form-data, solo la foto (JPG o PNG, máx. 5 MB). Se guarda y se manda al worker de svc-ia por eventos (diagnostico_solicitado). Sin modelo de visión termina en fallido con modelo_no_disponible.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "imagen",
+                      "type": "file",
+                      "src": "archivos/imagen-prueba.png",
+                      "description": "Imagen de prueba en docs/postman/archivos/ (JPG o PNG, máx. 5 MB)."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                      "pm.test(\"Queda pendiente\", () => pm.expect(pm.response.json().estado).to.eql(\"pendiente\"));",
+                      "pm.environment.set(\"diagnostico_solicitado_id\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado del diagnóstico solicitado",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/diagnosticos/{{diagnostico_solicitado_id}}/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "diagnosticos",
+                    "{{diagnostico_solicitado_id}}",
+                    ""
+                  ]
+                },
+                "description": "pendiente mientras el worker lo atiende; listo con la clase, o fallido con el código. es_prueba es true si lo dio el clasificador de prueba (solo en desarrollo).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "const d = pm.response.json();",
+                      "pm.test(\"Trae estado y es_prueba\", () => {",
+                      "    pm.expect([\"pendiente\", \"listo\", \"fallido\"]).to.include(d.estado);",
+                      "    pm.expect(d.es_prueba).to.be.a(\"boolean\");",
                       "});"
                     ]
                   }
@@ -5997,6 +6312,97 @@
                   "    });",
                   "    pm.test(\"Error demasiados_intentos\", () => pm.expect(pm.response.json().error).to.eql(\"demasiados_intentos\"));",
                   "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exceso de preguntas a la IA → 429",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_contenido}}/api/v1/conversaciones/{{conversacion_limite_id}}/preguntar/",
+              "host": [
+                "{{base_contenido}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "conversaciones",
+                "{{conversacion_limite_id}}",
+                "preguntar",
+                ""
+              ]
+            },
+            "description": "Límite de solicitudes a la IA por usuario (`IA_SOLICITUDES_POR_MINUTO`, 10; `IA_SOLICITUDES_POR_HORA`, 30): preguntar, reintentar y solicitar un diagnóstico comparten el presupuesto; los GET del polling no cuentan. El script previo gasta las 10 del minuto. Va al final porque deja al cliente sin preguntas por un minuto (`reiniciar_limites` de svc-contenido lo vacía).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"Esta ya no entra\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Gasta el límite de solicitudes a la IA del cliente (10 por minuto): crea una",
+                  "// conversación y pregunta 10 veces (la primera queda pendiente y las demás responden",
+                  "// 409, pero cuentan igual). La petición de abajo es la 11.ª.",
+                  "const base = pm.environment.get(\"base_contenido\");",
+                  "const auth = { key: \"Authorization\", value: \"Bearer \" + pm.environment.get(\"token\") };",
+                  "pm.sendRequest({",
+                  "    url: base + \"/api/v1/conversaciones/\", method: \"POST\",",
+                  "    header: [auth, { key: \"Content-Type\", value: \"application/json\" }],",
+                  "    body: { mode: \"raw\", raw: JSON.stringify({ titulo: \"Límite de la IA\" }) },",
+                  "}, (err, res) => {",
+                  "    const id = res.json().id;",
+                  "    pm.environment.set(\"conversacion_limite_id\", id);",
+                  "    for (let i = 0; i < 10; i++) {",
+                  "        pm.sendRequest({",
+                  "            url: base + \"/api/v1/conversaciones/\" + id + \"/preguntar/\", method: \"POST\",",
+                  "            header: [auth, { key: \"Content-Type\", value: \"application/json\" }],",
+                  "            body: { mode: \"raw\", raw: JSON.stringify({ texto: \"¿Cada cuándo riego?\" }) },",
+                  "        }, () => {});",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 429\", () => pm.response.to.have.status(429));",
+                  "pm.test(\"Código demasiados_intentos con el formato común\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.error).to.eql(\"demasiados_intentos\");",
+                  "    pm.expect(cuerpo.detalle).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Trae Retry-After\", () => pm.response.to.have.header(\"Retry-After\"));"
                 ]
               }
             }
