@@ -65,7 +65,9 @@ def test_el_consumidor_conserva_la_cadena_y_la_limpia(r):
         vista.append(ctx.actual())
         publicar("sesiones_cerradas", {"usuario_id": USUARIO}, origen="svc-prueba", cliente=r)
 
-    c = Consumidor("svc-prueba", {"usuario_registrado": manejador}, cliente=r, bloqueo_ms=10)
+    c = Consumidor(
+        "svc-prueba", {"usuario_registrado": manejador}, cliente=r, bloqueo_ms=10, latido=0.005
+    )
     c.preparar()
     c.una_vuelta()
 

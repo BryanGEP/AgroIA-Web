@@ -14,7 +14,7 @@ Código que comparten los servicios. Tiene dos partes:
 | `errores.py` | Manejador de excepciones con el formato común y `ErrorDeNegocio` para las reglas de negocio |
 | `openapi.py` | Hook de drf-spectacular `documentar_errores`: agrega a cada respuesta de error de Swagger el esquema común y un ejemplo por código |
 | `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` (con `usuario_id` UUID y `emisor=`) |
-| `eventos/` (núcleo) | Eventos con Redis Streams (ver [`docs/eventos.md`](../docs/eventos.md)): `catalogo.py` (tipos, streams y campos permitidos), `sobre.py` (sobre común y `correlacion_valida`), `productor.py` (`publicar`, sin romper si Redis no responde), `consumidor.py` (`Consumidor`: grupos, reintentos con espera creciente, fallidos, idempotencia y apagado limpio), `operacion.py` y `python -m agroia_comun.eventos estado\|reprocesar`, `conexion.py` (clientes con timeout) y `registro.py` (logger `eventos`) |
+| `eventos/` (núcleo) | Eventos con Redis Streams (ver [`docs/eventos.md`](../docs/eventos.md)): `catalogo.py` (tipos, streams y campos permitidos), `sobre.py` (sobre común y `correlacion_valida`), `productor.py` (`publicar`, sin romper si Redis no responde), `consumidor.py` (`Consumidor`: grupos, reintentos con espera creciente y política por stream, latido, fallidos, idempotencia, varios hilos y apagado limpio), `operacion.py` y `python -m agroia_comun.eventos estado\|reprocesar\|descartar`, `conexion.py` (clientes con timeout) y `registro.py` (logger `eventos`) |
 | `eventos/en_django.py` | `publicar_al_confirmar` (publica con `transaction.on_commit`) y `correlacion_de(request)` |
 
 ## Cómo se usa en un servicio
