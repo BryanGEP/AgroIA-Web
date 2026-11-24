@@ -21,7 +21,7 @@ def test_registrar_usuario_guarda_el_aviso_de_privacidad():
     usuario.refresh_from_db()
     assert usuario.rol == Usuario.Rol.CLIENTE
     assert usuario.email_verificado is False
-    assert usuario.version_privacidad == "2026-10"
+    assert usuario.version_privacidad == "2026-11"
     assert usuario.acepto_privacidad_en >= antes
     assert usuario.check_password("Aguacate-Hass-2026")
 

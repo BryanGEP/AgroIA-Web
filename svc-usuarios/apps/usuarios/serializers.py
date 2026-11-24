@@ -113,7 +113,7 @@ class RegistroRespuestaSerializer(serializers.Serializer):
                 "email_verificado": False,
                 "tiene_2fa": False,
                 "acepto_privacidad_en": "2026-11-18T22:50:07-06:00",
-                "version_privacidad": "2026-10",
+                "version_privacidad": "2026-11",
                 "date_joined": "2026-11-18T22:50:07-06:00",
             },
             response_only=True,

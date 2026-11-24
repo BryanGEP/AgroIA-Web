@@ -105,7 +105,7 @@ PASSWORD_RESET_TIMEOUT = 3600
 
 # Versión vigente del aviso de privacidad; se guarda en cada usuario al registrarse.
 # Si el aviso cambia, se sube aquí y el gateway pedirá aceptar la nueva (Entrega 3).
-VERSION_AVISO_PRIVACIDAD = variable("VERSION_AVISO_PRIVACIDAD", "2026-10")
+VERSION_AVISO_PRIVACIDAD = variable("VERSION_AVISO_PRIVACIDAD", "2026-11")
 
 AUTH_USER_MODEL = "usuarios.Usuario"
 
