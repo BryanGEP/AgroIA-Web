@@ -105,3 +105,21 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Fase 3: IA asíncrona (pregunta y diagnóstico por eventos con svc-ia como worker) y el widget flotante del chat en todas las páginas.
 
 **Bloqueos:** Ninguno.
+
+## 2026-11-24 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- IA asíncrona: la pregunta al agente y el diagnóstico por imagen van por eventos. svc-contenido publica la solicitud, el nuevo `svc-ia-worker` la procesa y svc-contenido guarda el resultado en MongoDB. La página consulta el estado con polling de HTMX.
+- Reintentos según el tipo de error (2 para la IA), vencimiento de 180 s, «Reintentar» en la interfaz y descarte de respuestas tardías.
+- Concurrencia con 2 hilos en el worker y latido en la librería, para que un mensaje no se reclame mientras se procesa. Comprobado con 5 preguntas a la vez, sin entregas de más.
+- Límite de preguntas por usuario (10 por minuto y 30 por hora) con contadores atómicos, para que nadie agote la cuota de Groq de todos.
+- Diagnóstico con copia temporal de la imagen en Redis y clasificador de prueba solo para desarrollo, marcado en la interfaz.
+- Pregunta, historial y respuesta fuera de logs y de fallidos; recorte por tiempo de los streams de IA; comando `descartar`.
+- Matriz de la Entrega 4 en `docs/entregable-4/` (154 de 154) y prueba de punta a punta de 62 de 62.
+
+**Qué sigue:**
+- Fase 3, segunda parte: widget flotante del chat AgroIA en todas las páginas, con invitación a iniciar sesión para visitantes.
+
+**Bloqueos:** La cuota gratuita de Groq limita las pruebas de concurrencia; se resolvió con 2 hilos y pausas en el script.
