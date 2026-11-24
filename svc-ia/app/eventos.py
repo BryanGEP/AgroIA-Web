@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 
 from fastapi import Request
 
+from agroia_comun.eventos import correlacion
+
 logger = logging.getLogger("seguridad")
 if not logger.handlers:  # uvicorn no configura este logger
     _salida = logging.StreamHandler()
@@ -48,6 +50,7 @@ def registrar_evento(evento: str, request: Request | None = None, **datos) -> No
         "evento": evento,
         "fecha": datetime.now(UTC).isoformat(timespec="seconds"),
         "servicio": "svc-ia",
+        "correlacion_id": correlacion.actual(),
     }
     if request is not None:
         registro.update(ip=ip_cliente(request), metodo=request.method, ruta=request.url.path)

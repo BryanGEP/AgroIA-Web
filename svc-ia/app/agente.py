@@ -27,7 +27,18 @@ ROLES = {"usuario": "user", "agente": "assistant"}
 
 
 class AgenteNoDisponible(Exception):
-    """El agente no respondió, falló o tardó más que AGENTE_TIMEOUT."""
+    """El agente no respondió, falló o tardó más que AGENTE_TIMEOUT.
+
+    `reintentable` dice si vale la pena volver a intentarlo: sí ante un tiempo agotado, sin
+    conexión, un 5xx (el agente responde 503 ante cualquier falla del LLM, también el
+    límite de Groq) o un 429; no ante otro 4xx (la petición es inválida) ni ante una
+    respuesta vacía o mal formada (repetirla gasta tokens y daría lo mismo).
+    """
+
+    def __init__(self, motivo: str, reintentable: bool = True):
+        super().__init__(motivo)
+        self.motivo = motivo
+        self.reintentable = reintentable
 
 
 @dataclass
@@ -69,14 +80,17 @@ class ClienteAgente:
 
         if respuesta.status_code != 200:
             logger.warning("El agente respondió %s", respuesta.status_code)
-            raise AgenteNoDisponible("error_del_agente")
+            codigo = respuesta.status_code
+            raise AgenteNoDisponible(
+                f"error_del_agente_{codigo}", reintentable=codigo >= 500 or codigo == 429
+            )
         try:
             datos = respuesta.json()
         except ValueError as error:
-            raise AgenteNoDisponible("respuesta_invalida") from error
+            raise AgenteNoDisponible("respuesta_invalida", reintentable=False) from error
         texto = datos.get("response") if isinstance(datos, dict) else None
         if not isinstance(texto, str) or not texto.strip():
-            raise AgenteNoDisponible("respuesta_vacia")
+            raise AgenteNoDisponible("respuesta_vacia", reintentable=False)
         return RespuestaDelAgente(respuesta=texto, fuentes=leer_fuentes(datos))
 
 

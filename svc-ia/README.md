@@ -7,13 +7,25 @@ Responde preguntas con el agente AgroIA y clasifica imágenes de aguacate (`sano
 - **Documentación de la API:** http://localhost:8004/api/docs/ (Swagger de FastAPI, botón **Authorize**)
 - **Salud:** `GET http://localhost:8004/salud/` → `{"estado": "ok"}`
 
-Todas las respuestas de negocio traen `id` y `estado` (hoy siempre `"listo"`), para volverse asíncronas en la Entrega 4. Hasta la Entrega 3 svc-ia y svc-contenido no se llaman entre sí: el gateway llama a svc-ia y después guarda el resultado en svc-contenido.
+**Desde la Entrega 4 la aplicación usa a svc-ia por eventos**, con el worker `svc-ia-worker` (misma imagen, `python -m app.worker`, [`app/worker.py`](app/worker.py)). La API HTTP sigue igual **por compatibilidad** (Postman, la matriz de accesos y pruebas directas del agente); sus respuestas traen `id` y `estado` (siempre `"listo"`).
 
 ```
-web ──► svc-ia ──HTTP──► agente (repo AgroIA) ──► Groq (LLM)
-                              └──► agente-db (pgvector: base de conocimiento)
-   └──► svc-contenido (guarda conversación o diagnóstico)
+web ──► svc-contenido ──evento ia-solicitudes──► svc-ia-worker ──HTTP──► agente ──► Groq (LLM)
+              ▲                                       │                  └──► agente-db (pgvector)
+              └──── svc-contenido-eventos ◄──evento ia-resultados──┘
 ```
+
+### El worker
+
+- Grupo `svc-ia` sobre `agroia:eventos:ia-solicitudes`, con `IA_WORKER_HILOS` hilos (2): una respuesta tarda hasta 30 s y las preguntas de varios usuarios no se forman en fila. 2 por defecto: con la llave gratuita de Groq, 3 llamadas a la vez provocan `RateLimitError` y respuestas de 11 a 39 s; con una llave de pago se puede subir.
+- `ia_pregunta_solicitada` → llama al agente → publica `ia_respuesta_generada` o `ia_respuesta_fallida`. Reintenta (2 veces, 5 y 10 s) el tiempo agotado, la falta de conexión, los 5xx y el 429; al agotarlos publica la fallida con `agente_no_disponible`. Otro 4xx o una respuesta vacía: la fallida con `pregunta_invalida` al momento.
+- `diagnostico_solicitado` → lee la copia temporal de la foto en Redis (`agroia:ia:imagen:<solicitud_id>`), comprueba la firma y clasifica; hoy publica `diagnostico_fallido` con `modelo_no_disponible`. Borra la copia en cuanto la procesa.
+- **Idempotencia:** candado `agroia:ia:candado:<solicitud_id>` (`procesando` con vencimiento y después `hecho`, 24 h): la misma solicitud no llama dos veces al agente. Una solicitud vencida no se atiende (`vencida`).
+- **Correlación:** hereda la del sobre, así que el resultado sale con la de la petición del navegador. La API valida `X-Correlacion-Id` con un middleware y la incluye en el log `seguridad`.
+- **Logs:** nunca la pregunta, el historial ni la respuesta; solo ids, tipos y motivos.
+- **Clasificador de prueba:** `IA_CLASIFICADOR_PRUEBA=1`, solo con `DEBUG=True` (si no, no arranca). Resultados deterministas marcados `modelo_version: "prueba-no-es-un-modelo"`; la pantalla dice «Resultado de prueba: no es un diagnóstico real».
+
+El detalle está en [`docs/eventos.md`](../docs/eventos.md#ia-asíncrona).
 
 ## Endpoints × rol
 
@@ -80,6 +92,9 @@ El token sale del login de svc-usuarios (ver el [README raíz](../README.md#inic
 | `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `URL_AGENTE` | Dirección del agente (`http://agente:8000`) |
 | `AGENTE_TIMEOUT` | Segundos máximos de espera por una respuesta del agente (`45`; el LLM a veces tarda de 20 a 30 s en cualquier pregunta, ver el [README raíz](../README.md#tiempo-de-respuesta-del-agente)) |
+| `IA_WORKER_HILOS` | Hilos del worker (`2`; ver arriba por qué) |
+| `IA_CLASIFICADOR_PRUEBA` | Clasificador de prueba para el diagnóstico (`False`); solo se acepta con `DEBUG=True` |
+| `EVENTOS_REDIS_URL` y demás `EVENTOS_*` | Eventos; ver [`docs/eventos.md`](../docs/eventos.md#infraestructura) |
 
 Las variables del LLM (`GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`) ya no son de svc-ia: van al contenedor `agente`.
 
@@ -100,7 +115,7 @@ docker compose exec svc-ia ruff check .
 docker compose exec svc-ia ruff format --check .
 ```
 
-El agente se simula con `httpx.MockTransport` (respuesta correcta, error, timeout y agente caído) y el clasificador con uno falso inyectado con `dependency_overrides`; las pruebas no llaman a Groq ni a otros contenedores. Siempre corren con `AUTH_ACTIVA=True` y un par de llaves generado al vuelo (`conftest.py`, `tests/tokens.py`).
+El agente se simula con `httpx.MockTransport` (respuesta correcta, error, timeout y agente caído) y el clasificador con uno falso inyectado con `dependency_overrides`; las pruebas no llaman a Groq ni a otros contenedores. Las del worker (`tests/test_worker.py`) usan Redis simulado (fakeredis): respuesta correcta, errores que se reintentan y que no, reintentos agotados, idempotencia, vencimiento, que la pregunta y la respuesta no salgan en los logs, varios hilos y el diagnóstico sin modelo y con el clasificador de prueba. Siempre corren con `AUTH_ACTIVA=True` y un par de llaves generado al vuelo (`conftest.py`, `tests/tokens.py`).
 
 ### Entorno virtual local (opcional)
 
