@@ -10,6 +10,21 @@ TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024  # 5 MB
 EXTENSIONES = {"jpg", "jpeg", "png", "webp"}
 
 
+class SolicitarDiagnosticoSerializer(serializers.Serializer):
+    """La foto a diagnosticar (multipart/form-data). Solo JPG o PNG: los que lee svc-ia."""
+
+    imagen = serializers.ImageField(help_text="JPG o PNG, máximo 5 MB.")
+
+    def validate_imagen(self, imagen):
+        if imagen.size > TAMANO_MAXIMO_IMAGEN:
+            raise serializers.ValidationError("La imagen no puede pesar más de 5 MB.")
+        inicio = imagen.read(8)
+        imagen.seek(0)
+        if not inicio.startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")):
+            raise serializers.ValidationError("Solo se aceptan imágenes JPG o PNG.")
+        return imagen
+
+
 class CrearDiagnosticoSerializer(serializers.Serializer):
     """Resultado de svc-ia más la imagen original. Se envía como multipart/form-data."""
 
@@ -81,15 +96,34 @@ class DiagnosticoSerializer(serializers.Serializer):
     id = serializers.CharField(source="_id", read_only=True)
     usuario_id = serializers.UUIDField(read_only=True)
     imagen_url = serializers.SerializerMethodField()
-    clase = serializers.ChoiceField(choices=CLASES, read_only=True)
-    confianza = serializers.FloatField(read_only=True)
-    probabilidades = serializers.DictField(child=serializers.FloatField(), read_only=True)
-    modelo_version = serializers.CharField(read_only=True)
+    clase = serializers.ChoiceField(choices=CLASES, read_only=True, allow_null=True)
+    confianza = serializers.FloatField(read_only=True, allow_null=True)
+    probabilidades = serializers.DictField(
+        child=serializers.FloatField(), read_only=True, allow_null=True
+    )
+    modelo_version = serializers.CharField(read_only=True, allow_null=True)
     creado_en = serializers.DateTimeField(read_only=True)
+    estado = serializers.SerializerMethodField(
+        help_text="`pendiente`, `listo` o `fallido` (los diagnósticos de antes, `listo`)."
+    )
+    codigo = serializers.CharField(read_only=True, allow_null=True, default=None)
+    es_prueba = serializers.SerializerMethodField(
+        help_text="True si lo dio el clasificador de prueba: no es un diagnóstico real."
+    )
 
-    @extend_schema_field(serializers.URLField())
-    def get_imagen_url(self, diagnostico: dict) -> str:
-        """El endpoint protegido de la foto, no la ruta del archivo (son datos personales)."""
+    @extend_schema_field(serializers.ChoiceField(choices=["pendiente", "listo", "fallido"]))
+    def get_estado(self, diagnostico: dict) -> str:
+        return diagnostico.get("estado") or "listo"
+
+    def get_es_prueba(self, diagnostico: dict) -> bool:
+        return str(diagnostico.get("modelo_version") or "").startswith("prueba-")
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_imagen_url(self, diagnostico: dict) -> str | None:
+        """El endpoint protegido de la foto, no la ruta del archivo (son datos personales).
+        None si ya no hay foto (un diagnóstico fallido la borra)."""
+        if not diagnostico.get("imagen"):
+            return None
         url = reverse("diagnostico-imagen", kwargs={"id": str(diagnostico["_id"])})
         request = self.context.get("request")
         return request.build_absolute_uri(url) if request else url

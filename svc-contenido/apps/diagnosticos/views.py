@@ -9,7 +9,12 @@ from rest_framework.response import Response
 
 from agroia_comun.permisos import EsDuenoOAdmin, es_administrador, usuario_id
 from apps.diagnosticos import servicios
-from apps.diagnosticos.serializers import CrearDiagnosticoSerializer, DiagnosticoSerializer
+from apps.diagnosticos.serializers import (
+    CrearDiagnosticoSerializer,
+    DiagnosticoSerializer,
+    SolicitarDiagnosticoSerializer,
+)
+from config.limites import DEMASIADAS, LIMITES_IA
 
 ID = OpenApiParameter("id", OpenApiTypes.STR, OpenApiParameter.PATH, description="ObjectId.")
 SIN_TOKEN = {401: OpenApiResponse(description="Sin token o token inválido.")}
@@ -107,3 +112,37 @@ class DiagnosticoViewSet(viewsets.GenericViewSet):
         respuesta["Cache-Control"] = "private, max-age=3600"
         respuesta["X-Content-Type-Options"] = "nosniff"
         return respuesta
+
+    @extend_schema(
+        summary="Solicitar un diagnóstico (asíncrono)",
+        description=(
+            "Guarda la foto (JPG o PNG, máximo 5 MB) y deja el diagnóstico `pendiente`. Pone una "
+            "copia temporal de la imagen en Redis (vence con la solicitud) y publica "
+            "`diagnostico_solicitado`, que lleva solo los ids. Responde 202 de inmediato; el "
+            "estado se consulta en `GET /diagnosticos/<id>/`. Si el worker de svc-ia no puede "
+            "clasificar (hoy, `modelo_no_disponible`), queda `fallido` y se borra la foto."
+        ),
+        request={"multipart/form-data": SolicitarDiagnosticoSerializer},
+        responses={
+            202: DiagnosticoSerializer,
+            400: OpenApiResponse(description="Imagen inválida (`validacion`)."),
+            **SIN_TOKEN,
+            **SIN_ROL,
+            **DEMASIADAS,
+        },
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="solicitar",
+        url_name="solicitar",
+        throttle_classes=LIMITES_IA,
+    )
+    def solicitar(self, request):
+        datos = SolicitarDiagnosticoSerializer(data=request.data)
+        datos.is_valid(raise_exception=True)
+        diagnostico = servicios.solicitar(usuario_id(request), datos.validated_data["imagen"])
+        return Response(
+            DiagnosticoSerializer(diagnostico, context={"request": request}).data,
+            status=status.HTTP_202_ACCEPTED,
+        )

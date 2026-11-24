@@ -12,7 +12,10 @@ from apps.conversaciones.serializers import (
     ConversacionSerializer,
     CrearConversacionSerializer,
     MensajeSerializer,
+    PreguntaSerializer,
+    SolicitudConRespuestaSerializer,
 )
+from config.limites import DEMASIADAS, LIMITES_IA
 
 ID = OpenApiParameter("id", OpenApiTypes.STR, OpenApiParameter.PATH, description="ObjectId.")
 SIN_TOKEN = {401: OpenApiResponse(description="Sin token o token inválido.")}
@@ -60,7 +63,7 @@ class ConversacionViewSet(viewsets.GenericViewSet):
         responses={200: ConversacionSerializer, **SIN_TOKEN, **SIN_ROL, **NO_ENCONTRADO},
     )
     def retrieve(self, request, id=None):
-        conversacion = servicios.obtener_propia(usuario_id(request), id)
+        conversacion = servicios.vencer_si_toca(servicios.obtener_propia(usuario_id(request), id))
         return Response(ConversacionSerializer(conversacion).data)
 
     @extend_schema(
@@ -102,3 +105,80 @@ class ConversacionViewSet(viewsets.GenericViewSet):
             datos.validated_data.get("fuentes"),
         )
         return Response(ConversacionSerializer(conversacion).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Preguntar a AgroIA (asíncrono)",
+        description=(
+            "Guarda la pregunta en la conversación, deja una solicitud `pendiente` y la "
+            "publica como evento `ia_pregunta_solicitada` (con las últimas 10 entradas del "
+            "historial guardado). Responde 202 de inmediato: la respuesta la guarda el "
+            "consumidor de eventos cuando el worker de svc-ia la publica. Su estado se "
+            "consulta en `GET .../solicitud/`. Una sola solicitud pendiente por conversación; "
+            "vence a los `IA_SOLICITUD_VENCE_SEGUNDOS` (180) y queda `fallido` (`vencida`)."
+        ),
+        parameters=[ID],
+        request=PreguntaSerializer,
+        responses={
+            202: SolicitudConRespuestaSerializer,
+            **INVALIDO,
+            **SIN_TOKEN,
+            **SIN_ROL,
+            **NO_ENCONTRADO,
+            409: OpenApiResponse(description="`conversacion_llena` o `solicitud_en_curso`."),
+            **DEMASIADAS,
+        },
+    )
+    @action(detail=True, methods=["post"], throttle_classes=LIMITES_IA)
+    def preguntar(self, request, id=None):
+        datos = PreguntaSerializer(data=request.data)
+        datos.is_valid(raise_exception=True)
+        solicitud = servicios.preguntar(usuario_id(request), id, datos.validated_data["texto"])
+        return Response(
+            SolicitudConRespuestaSerializer({**solicitud, "conversacion_id": id}).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @extend_schema(
+        summary="Reintentar la última pregunta",
+        description=(
+            "Crea una solicitud nueva para la última pregunta sin respuesta, sin repetirla en "
+            "la conversación. 409 `sin_pregunta_pendiente` si el último mensaje no es del "
+            "usuario, o `solicitud_en_curso` si ya hay una pendiente."
+        ),
+        parameters=[ID],
+        request=None,
+        responses={
+            202: SolicitudConRespuestaSerializer,
+            **SIN_TOKEN,
+            **SIN_ROL,
+            **NO_ENCONTRADO,
+            409: OpenApiResponse(description="`sin_pregunta_pendiente` o `solicitud_en_curso`."),
+            **DEMASIADAS,
+        },
+    )
+    @action(detail=True, methods=["post"], throttle_classes=LIMITES_IA)
+    def reintentar(self, request, id=None):
+        solicitud = servicios.reintentar(usuario_id(request), id)
+        return Response(
+            SolicitudConRespuestaSerializer({**solicitud, "conversacion_id": id}).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @extend_schema(
+        summary="Estado de la solicitud a la IA",
+        description=(
+            "Solo el dueño de la conversación (404 a cualquier otro, también al "
+            "administrador). En `listo` trae la respuesta y sus fuentes. Una solicitud "
+            "pendiente que ya pasó su `vence_en` se marca `fallido` (`vencida`) al leerla. Sin "
+            "límite de peticiones: la pantalla la consulta cada pocos segundos."
+        ),
+        parameters=[ID],
+        responses={200: SolicitudConRespuestaSerializer, **SIN_TOKEN, **SIN_ROL, **NO_ENCONTRADO},
+    )
+    @action(detail=True, methods=["get"])
+    def solicitud(self, request, id=None):
+        return Response(
+            SolicitudConRespuestaSerializer(
+                servicios.solicitud_actual(usuario_id(request), id)
+            ).data
+        )

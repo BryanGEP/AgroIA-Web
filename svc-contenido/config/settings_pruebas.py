@@ -32,5 +32,8 @@ os.environ["JWT_PUBLIC_KEY_PATH"] = str(_RUTA_LLAVE_PUBLICA)
 
 from config.settings import *  # noqa: E402, F403
 
+# Los contadores del límite, en memoria (conftest.py la vacía en cada prueba).
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
 # Las imágenes subidas en pruebas van a una carpeta temporal, no a svc-contenido/media/.
 MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="agroia-media-"))

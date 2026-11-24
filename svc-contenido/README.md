@@ -9,7 +9,7 @@ Conversaciones con el agente, historial de diagnósticos y bitácora de activida
 
 Contratos, modelo de datos y códigos de error en [`docs/definicion-tecnica.md`](../docs/definicion-tecnica.md). Colección de Postman en [`docs/postman/`](../docs/postman/).
 
-Este servicio no llama a nadie por HTTP: el gateway pregunta a svc-ia y después guarda aquí la conversación o el diagnóstico. Desde la Entrega 4 además **consume eventos** de Redis en su propio contenedor, `svc-contenido-eventos` (`python manage.py consumir_eventos`, grupo `svc-contenido`): hoy guarda `usuario_registrado` en la bitácora, una sola vez aunque llegue repetido (índice único de `evento_id`). Ver [`docs/eventos.md`](../docs/eventos.md).
+Este servicio no llama a nadie por HTTP. **Desde la Entrega 4 la IA es asíncrona y pasa por aquí:** el gateway pide la pregunta o el diagnóstico (`preguntar`, `diagnosticos/solicitar`, 202), svc-contenido guarda la solicitud en la conversación o el diagnóstico y publica el evento para `svc-ia-worker`. Su consumidor, `svc-contenido-eventos` (`python manage.py consumir_eventos`, grupo `svc-contenido`), guarda la respuesta o el resultado que llega por `ia-resultados`, y los eventos de negocio en la bitácora (una sola vez aunque lleguen repetidos: índice único de `evento_id`). Ver [`docs/eventos.md`](../docs/eventos.md).
 
 ## Estructura
 
@@ -51,6 +51,9 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 | GET, POST | `/conversaciones/` | ✓ (las propias) | ✓ (las propias) | 401 | 403 (sin rol) |
 | GET, DELETE | `/conversaciones/<id>/` | ✓ (propia) | ✓ (propia) | 401 | 403 (sin rol) |
 | POST | `/conversaciones/<id>/mensajes/` | ✓ (propia) | ✓ (propia) | 401 | 403 (sin rol) |
+| POST | `/conversaciones/<id>/preguntar/`, `/conversaciones/<id>/reintentar/` | ✓ (propia), 202 | ✓ (propia), 202 | 401 | 403 (sin rol) |
+| GET | `/conversaciones/<id>/solicitud/` | ✓ (propia) | ✓ (propia) | 401 | 403 (sin rol) |
+| POST | `/diagnosticos/solicitar/` | ✓, 202 | ✓, 202 | 401 | 403 (sin rol) |
 | GET, POST | `/diagnosticos/` | ✓ (los propios) | ✓ (lista todos) | 401 | 403 (sin rol) |
 | GET | `/diagnosticos/<id>/` | ✓ (propio) | ✓ (todos) | 401 | 403 (sin rol) |
 | GET | `/diagnosticos/<id>/imagen/` | ✓ (propio) | ✓ (todos) | 401 | 403 (sin rol) |
@@ -59,7 +62,9 @@ Todas las rutas van bajo `/api/v1/`. "Rol válido" = token con `rol` `cliente` o
 - **Las conversaciones son privadas**: ni el administrador ve las de otros (responde 404).
 - Un id mal formado, inexistente o de otro usuario responde **404** (`no_encontrado`), sin revelar si existe.
 - **Mensajes:** `{"rol": "usuario" | "agente", "texto", "fuentes"?}`; `fuentes` solo en mensajes del agente. Una conversación admite **200 mensajes**; al llegar al límite responde **409 `conversacion_llena`** y hay que iniciar otra. El límite se aplica en el mismo `update` de MongoDB, así que se respeta aunque lleguen dos mensajes al mismo tiempo.
-- **Diagnósticos:** `multipart/form-data` con `imagen` (JPG, PNG o WebP, máximo 5 MB, debe ser una imagen real), `clase` (`sano`, `rona`, `antracnosis`), `confianza`, `probabilidades` (texto JSON con las tres clases, que suman 1) y `modelo_version`. `confianza` debe ser igual a la probabilidad de `clase`.
+- **IA por eventos:** `preguntar` recibe `{"texto"}`, guarda la pregunta y deja una solicitud `pendiente` en la conversación (una a la vez: 409 `solicitud_en_curso`); `reintentar` pide otra respuesta a la última pregunta sin repetirla (409 `sin_pregunta_pendiente`); `solicitud` devuelve su estado (`pendiente`, `listo` con `respuesta` y `fuentes`, o `fallido` con `codigo`). Vence a los `IA_SOLICITUD_VENCE_SEGUNDOS` (180): al leerla se marca `fallido` con `vencida`, y una respuesta que llegue después se descarta (`respuesta_tardia`). `diagnosticos/solicitar` recibe solo la foto, la guarda, deja el diagnóstico `pendiente` y una copia temporal en Redis para el worker; el diagnóstico trae `estado`, `codigo` y `es_prueba`, y el listado solo muestra los `listo`. Si falla, se borra la foto.
+- **Límite por usuario** ([`config/limites.py`](config/limites.py)): `preguntar`, `reintentar` y `diagnosticos/solicitar` comparten 10 por minuto y 30 por hora por usuario (el `user_id` del token). Al pasarse, **429 `demasiados_intentos`** con `Retry-After`, antes de la vista: no se guarda nada. Los GET no cuentan. Cuenta con contadores atómicos (`incr`) por ventana fija de un minuto y de una hora, así peticiones simultáneas no se pisan; una rechazada devuelve su cuenta (`decr`) y no gasta el presupuesto. `python manage.py reiniciar_limites` vacía los contadores (solo con `DJANGO_DEBUG=True`).
+- **Diagnósticos (guardado directo):** `multipart/form-data` con `imagen` (JPG, PNG o WebP, máximo 5 MB, debe ser una imagen real), `clase` (`sano`, `rona`, `antracnosis`), `confianza`, `probabilidades` (texto JSON con las tres clases, que suman 1) y `modelo_version`. `confianza` debe ser igual a la probabilidad de `clase`.
 - **Bitácora:** filtros `tipo`, `usuario_id`, `correlacion_id` (UUID; todos los eventos de un flujo), `desde` y `hasta` (`AAAA-MM-DD`, ambos inclusive). El consumidor guarda `usuario_registrado`, `correo_verificado`, `rol_cambiado`, `password_cambiada`, `sesiones_cerradas`, `pedido_creado` y `pedido_estado_cambiado`. La llenan los eventos de Redis (cada documento trae `evento_id` y `correlacion_id`); el `POST`, solo para administradores, queda para registros manuales.
 - Listados paginados de 20 en 20 (`?page=`), los más recientes primero.
 
@@ -76,6 +81,9 @@ Usa la autenticación, los permisos y el formato de errores de [`comun`](../comu
 | `JWT_PUBLIC_KEY_PATH` | Llave pública para validar los JWT |
 | `JWT_ISSUER` | Emisor esperado en el claim `iss` (`agroia-usuarios` por defecto; ver `docs/contrato-identidad.md`) |
 | `MONGO_URL` | Conexión a MongoDB, con la base al final (`mongodb://mongo:27017/contenido`) |
+| `IA_SOLICITUD_VENCE_SEGUNDOS` | Segundos que una solicitud a la IA puede quedar pendiente (`180`) |
+| `IA_SOLICITUDES_POR_MINUTO`, `IA_SOLICITUDES_POR_HORA` | Límite de solicitudes a la IA por usuario (`10` y `30`) |
+| `REDIS_URL` | Caché de los contadores del límite (`redis://redis:6379/0`, prefijo `svc-contenido`) |
 
 ## MongoDB y Django
 

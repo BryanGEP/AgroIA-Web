@@ -39,6 +39,27 @@ def lista(nombre: str, defecto: str = "") -> list[str]:
 
 
 NOMBRE_SERVICIO = "svc-contenido"
+
+# Tiempo máximo de una solicitud a la IA (pregunta o diagnóstico). Pasado, se marca fallida
+# con el código `vencida` y una respuesta que llegue después se descarta (docs/eventos.md).
+IA_SOLICITUD_VENCE_SEGUNDOS = int(os.environ.get("IA_SOLICITUD_VENCE_SEGUNDOS", "180"))
+
+# Límite de solicitudes a la IA por usuario (preguntar, reintentar y solicitar un
+# diagnóstico; los GET del polling no cuentan). Un solo usuario no debe agotar el límite
+# de tokens del LLM, que es de toda la aplicación. Ver config/limites.py.
+IA_SOLICITUDES_POR_MINUTO = int(os.environ.get("IA_SOLICITUDES_POR_MINUTO", "10"))
+IA_SOLICITUDES_POR_HORA = int(os.environ.get("IA_SOLICITUDES_POR_HORA", "30"))
+
+# Caché de los contadores del límite: la misma instancia de Redis que el límite de
+# intentos de svc-usuarios (base 0), con su propio prefijo.
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "KEY_PREFIX": "svc-contenido",
+    }
+}
 SECRET_KEY = variable("DJANGO_SECRET_KEY")
 DEBUG = booleano("DJANGO_DEBUG", False)
 # Con DEBUG=False no arranca con la clave de .env.example ni con una débil.
