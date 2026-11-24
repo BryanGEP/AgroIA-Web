@@ -10,8 +10,8 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c6 0 10 8 10 16a10 10 0 0 1-20 0C6 10 10 2 16 2z' fill='%232e5a1c'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%236b4a2b'/%3E%3C/svg%3E">
   {# Aplica el tema elegido antes de pintar, para que no parpadee (sin defer). #}
   <script src="{% static 'js/tema.js' %}"></script>
-  {# CSP: HTMX sin eval y sin inyectar estilos (el indicador está en el CSS). #}
-  <meta name="htmx-config" content='{"allowEval": false, "includeIndicatorStyles": false}'>
+  {# CSP: HTMX sin eval, sin inyectar estilos (el indicador está en el CSS) y sin asentar `style` (lo copiaría en línea). #}
+  <meta name="htmx-config" content='{"allowEval": false, "includeIndicatorStyles": false, "attributesToSettle": ["class", "width", "height"]}'>
   <link rel="preload" href="{% static 'fonts/barlow-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{% static 'fonts/barlow-semi-condensed-latin-700-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   {% tailwind_css %}
@@ -120,10 +120,22 @@
   </main>
 
   <footer class="border-t border-base-300 bg-base-200">
-    <div class="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
+    {# Con el widget, más espacio abajo en celular: la burbuja no tapa lo último de la página. #}
+    <div class="max-w-6xl mx-auto px-4 pt-8 {% if widget_agroia.mostrar %}pb-24 sm:pb-8{% else %}pb-8{% endif %} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
       <p>AgroIA · Insumos y asesoría para productores de aguacate de Michoacán.</p>
       <a href="{% url 'paginas:aviso_privacidad' %}" class="link link-hover font-medium">Aviso de privacidad</a>
     </div>
   </footer>
+
+  {% comment %} Widget flotante de AgroIA (agroia/parciales/_widget.html). Las páginas de error
+     vacían este bloque: una página que ya falló no hace más peticiones. `widget_contexto` lo
+     llena la página que da contexto a las preguntas sugeridas (el detalle de un producto).
+     {% endcomment %}
+  {% block widget_agroia %}
+    {% if widget_agroia.mostrar %}
+      <div id="widget-agroia-contexto" hidden>{% block widget_contexto %}{% endblock %}</div>
+      {% include "agroia/parciales/_widget.html" %}
+    {% endif %}
+  {% endblock %}
 </body>
 </html>

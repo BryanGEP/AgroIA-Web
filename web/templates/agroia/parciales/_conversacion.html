@@ -1,0 +1,14 @@
+{% comment %} Los mensajes de una conversación y el estado de su solicitud a la IA (esperando,
+   fallida o la pregunta heredada sin respuesta). Va dentro de la lista de mensajes; lo
+   comparten /agroia/ y el widget. Contexto: el de `_contexto_de_conversacion` (views.py).
+   {% endcomment %}
+{% for mensaje in mensajes %}
+  {% include "componentes/mensaje_chat.html" with rol=mensaje.rol texto=mensaje.texto fuentes=mensaje.fuentes %}
+{% endfor %}
+{% if solicitud.estado == "pendiente" %}
+  {% include "agroia/parciales/_espera.html" %}
+{% elif mostrar_fallida %}
+  {% include "agroia/parciales/_fallida.html" %}
+{% elif sin_respuesta_heredada and conversacion %}
+  {% include "agroia/parciales/_reintentar.html" with conversacion_id=conversacion.id %}
+{% endif %}

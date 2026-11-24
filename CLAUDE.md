@@ -112,6 +112,8 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - Diseño mobile-first. Cada `input` con `label`, cada imagen con `alt`.
 - HTMX y Alpine se sirven desde `static/vendor/`, no desde CDN. Alpine es la versión CSP (`@alpinejs/csp`): la lógica compleja va en `Alpine.data()` dentro de `static/js/`; sin `hx-on`, sin scripts ni estilos en línea (`style=`, `onclick=`), porque la Content-Security-Policy no permite `unsafe-inline` ni `unsafe-eval`.
 - El proxy `/api/<servicio>/` del gateway solo acepta el token en `Authorization`, nunca el de la sesión.
+- Widget flotante de AgroIA (`templates/agroia/parciales/_widget.html`, componente `widgetAgroia`): está en `base.html` salvo en /agroia/, las pantallas de acceso, el panel de administración y las páginas de error (vacían el bloque `widget_agroia`). Comparte con /agroia/ los parciales del chat y el flujo asíncrono; su conversación vive en la sesión del gateway. Carga diferida: cerrado y sin pregunta pendiente no hace peticiones.
+- Cabeceras del gateway: la CSP estricta y `Permissions-Policy` (el micrófono solo para este sitio, para el dictado por voz del widget, detrás de un aviso). En HTMX, `style` no está en `attributesToSettle`: copiarlo violaría la CSP.
 - No uses Bootstrap, React ni jQuery.
 
 ## Pruebas

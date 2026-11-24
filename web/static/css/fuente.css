@@ -220,3 +220,21 @@
 .htmx-request.htmx-indicator {
   display: inline-flex;
 }
+
+/* Mascota del widget de AgroIA (componentes/mascota.html): parpadea y flota, solo si el
+   sistema no pide menos movimiento. */
+@keyframes mascota-flota {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
+}
+@keyframes mascota-parpadea {
+  0%, 93%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mascota-ojos {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: mascota-parpadea 4.5s infinite;
+  }
+}

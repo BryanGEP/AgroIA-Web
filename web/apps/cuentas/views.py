@@ -2,6 +2,8 @@
 cambio de contraseña. Los enlaces de los correos de svc-usuarios (FRONTEND_URL) llegan a
 /verificar-correo/?token=..., /restablecer/<uid>/<token>/ y /recuperar/."""
 
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -63,6 +65,14 @@ def cerrar_sesion(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def registro(request: HttpRequest) -> HttpResponse:
     formulario = Registro(request.POST or None)
+    # Si viene de otra página (por ejemplo, el widget de AgroIA), el enlace a iniciar sesión
+    # que se muestra al terminar regresa ahí. Solo rutas de este sitio.
+    siguiente = request.POST.get("next") or request.GET.get("next", "")
+    login = reverse("cuentas:iniciar_sesion")
+    if siguiente and _destino_seguro(request, siguiente) == siguiente:
+        login = f"{login}?{urlencode({'next': siguiente})}"
+    else:
+        siguiente = ""
     if request.method == "POST" and formulario.is_valid():
         try:
             servicios.registrar(request, **formulario.cleaned_data)
@@ -78,12 +88,12 @@ def registro(request: HttpRequest) -> HttpResponse:
                         f"Te enviamos un enlace a {formulario.cleaned_data['email']} para "
                         "verificar tu cuenta. Mientras tanto ya puedes iniciar sesión."
                     ),
-                    "enlace": reverse("cuentas:iniciar_sesion"),
+                    "enlace": login,
                     "accion": "Iniciar sesión",
                 },
                 status=201,
             )
-    return render(request, "cuentas/registro.html", {"formulario": formulario})
+    return render(request, "cuentas/registro.html", {"formulario": formulario, "next": siguiente})
 
 
 @require_http_methods(["GET"])

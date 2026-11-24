@@ -5,6 +5,37 @@
 // y la lógica que necesita JavaScript completo vive aquí como Alpine.data(). Este archivo
 // se carga con defer antes de Alpine, para registrar los componentes en `alpine:init`.
 
+// Fuera de los datos de Alpine: los objetos del navegador (audio, reconocimiento de voz) no
+// deben envolverse en sus proxies reactivos.
+var audioDelWidget = null;
+var reconocedor = null;
+var ReconocimientoDeVoz = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+var MICROFONO_ACEPTADO = "agroia-microfono-aceptado";
+var ERRORES_DE_VOZ = {
+  "not-allowed": "No diste permiso para usar el micrófono. Puedes activarlo en la configuración del navegador.",
+  "service-not-allowed": "Tu navegador no permite el dictado por voz en este sitio.",
+  "no-speech": "No escuchamos nada. Intenta de nuevo.",
+  "audio-capture": "No encontramos un micrófono.",
+  network: "No hay conexión con el servicio de dictado por voz.",
+  inicio: "No pudimos empezar a escuchar. Intenta de nuevo.",
+};
+
+// localStorage puede fallar (modo privado, bloqueado): nunca rompe el widget.
+function guardado(clave) {
+  try {
+    return window.localStorage.getItem(clave) === "true";
+  } catch (e) {
+    return false;
+  }
+}
+function guardar(clave, valor) {
+  try {
+    window.localStorage.setItem(clave, valor);
+  } catch (e) {
+    /* sin almacenamiento: se volverá a pedir el aviso */
+  }
+}
+
 document.addEventListener("alpine:init", function () {
   // Botón de tema claro u oscuro. Recuerda la elección con $persist; sin elección, sigue
   // la preferencia del sistema.
@@ -28,8 +59,9 @@ document.addEventListener("alpine:init", function () {
     };
   });
 
-  // Chat con AgroIA: muestra al instante la pregunta enviada y desactiva el botón mientras
-  // responde el agente. Solo reacciona a las peticiones del formulario de la pregunta.
+  // Chat con AgroIA, en /agroia/ y en el widget: muestra al instante la pregunta enviada y
+  // desactiva el botón mientras responde el agente. Busca su lista de mensajes
+  // ([data-mensajes]) dentro de su propio componente, no por id.
   Alpine.data("chat", function () {
     return {
       enviando: false,
@@ -40,19 +72,345 @@ document.addEventListener("alpine:init", function () {
         this.pregunta = campo.value.trim();
         this.enviando = true;
       },
+      // Enter envía; Mayús+Enter hace un salto de línea.
+      enviarConEnter(evento) {
+        if (evento.shiftKey || evento.isComposing) return;
+        evento.preventDefault();
+        var formulario = evento.target.form;
+        if (formulario && evento.target.value.trim()) formulario.requestSubmit();
+      },
       terminar(evento) {
-        var campo = evento.target.querySelector("textarea");
-        if (!campo) return;
         this.enviando = false;
+        var campo = evento.target.querySelector("textarea");
         // Si la pregunta no entró (por ejemplo, muchas preguntas seguidas), el servidor lo
         // avisa con X-Conservar-Pregunta y el texto se queda para enviarlo después.
         var xhr = evento.detail.xhr;
         var conservar = xhr && xhr.getResponseHeader("X-Conservar-Pregunta");
-        if (evento.detail.successful && !conservar) campo.value = "";
-        var mensajes = document.getElementById("mensajes");
+        if (campo && evento.detail.successful && !conservar) campo.value = "";
+        // Al tocar una sugerencia, la respuesta quita su formulario: ya no tiene componente.
+        var raiz = this.$root;
+        var mensajes = raiz && raiz.querySelector("[data-mensajes]");
         if (mensajes && mensajes.lastElementChild) {
           mensajes.lastElementChild.scrollIntoView({ block: "nearest" });
         }
+      },
+    };
+  });
+
+  // «Copiar» en cada respuesta de AgroIA: el texto plano (sin HTML ni fuentes) con la
+  // Clipboard API. Si el navegador no la permite (sin contexto seguro), no aparece.
+  Alpine.data("copiar", function () {
+    return {
+      copiado: false,
+      anuncio: "",
+      get disponible() {
+        return Boolean(window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText);
+      },
+      get etiqueta() {
+        return this.copiado ? "Copiado" : "Copiar";
+      },
+      copiar() {
+        var self = this;
+        var texto = this.$refs.respuesta.innerText.trim();
+        navigator.clipboard.writeText(texto).then(
+          function () {
+            self.copiado = true;
+            self.anuncio = "Copiamos la respuesta.";
+            window.setTimeout(function () {
+              self.copiado = false;
+              self.anuncio = "";
+            }, 2000);
+          },
+          function () {
+            self.anuncio = "No se pudo copiar la respuesta.";
+          }
+        );
+      },
+    };
+  });
+
+  // Widget flotante de AgroIA (agroia/parciales/_widget.html).
+  // - Abierto o cerrado se recuerda por pestaña (sessionStorage); el sonido, en el navegador.
+  // - Carga diferida: el contenido se pide (evento `cargar` de HTMX) la primera vez que se
+  //   abre, o al cargar la página si estaba abierto o hay una pregunta pendiente.
+  // - Foco: en celular el panel es modal (pantalla completa, foco atrapado); en escritorio
+  //   flota sin atraparlo. Al abrir entra al campo; al cerrar vuelve a la burbuja.
+  Alpine.data("widgetAgroia", function () {
+    return {
+      abierto: this.$persist(false).as("agroia-widget-abierto").using(sessionStorage),
+      sonido: this.$persist(false).as("agroia-widget-sonido"),
+      nueva: false,
+      cargado: false,
+      celular: false,
+      enfocarAlCargar: false,
+      anuncio: "",
+      init() {
+        var self = this;
+        var consulta = window.matchMedia("(max-width: 639px)");
+        this.celular = consulta.matches;
+        consulta.addEventListener("change", function (evento) {
+          self.celular = evento.matches;
+        });
+        if (this.abierto || this.$el.dataset.pendiente === "true") this.cargar();
+        // Política de reproducción automática: el audio solo arranca con un gesto.
+        ["pointerdown", "keydown"].forEach(function (tipo) {
+          document.addEventListener(tipo, function () { self.prepararAudio(); }, { once: true });
+        });
+      },
+      get cerrado() {
+        return !this.abierto;
+      },
+      get expandido() {
+        return this.abierto ? "true" : "false";
+      },
+      get modal() {
+        return this.celular ? "true" : "false";
+      },
+      get burbujaVisible() {
+        return !(this.abierto && this.celular);
+      },
+      get etiquetaBurbuja() {
+        if (this.abierto) return "Cerrar el chat de AgroIA";
+        return this.nueva ? "Abrir el chat de AgroIA: hay una respuesta nueva" : "Abrir el chat de AgroIA";
+      },
+      get silencio() {
+        return !this.sonido;
+      },
+      get sonidoPulsado() {
+        return this.sonido ? "true" : "false";
+      },
+      get etiquetaSonido() {
+        return this.sonido ? "Silenciar el aviso de respuesta" : "Activar el aviso de respuesta";
+      },
+      // Pide el contenido una sola vez por página. HTMX procesa la página en
+      // DOMContentLoaded, después de que Alpine arranca: si todavía no, se espera.
+      cargar() {
+        if (this.cargado) return;
+        this.cargado = true;
+        var contenido = this.$refs.contenido;
+        var disparar = function () {
+          window.setTimeout(function () { window.htmx.trigger(contenido, "cargar"); }, 0);
+        };
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", disparar, { once: true });
+        } else {
+          disparar();
+        }
+      },
+      alternar() {
+        if (this.abierto) this.cerrar();
+        else this.abrir();
+      },
+      abrir() {
+        var self = this;
+        this.abierto = true;
+        this.nueva = false;
+        this.anuncio = "";
+        this.cargar();
+        this.$nextTick(function () { self.enfocarDentro(); });
+      },
+      cerrar() {
+        if (!this.abierto) return;
+        var self = this;
+        this.abierto = false;
+        window.dispatchEvent(new CustomEvent("agroia-widget-cerrado"));
+        this.$nextTick(function () { self.$refs.burbuja.focus(); });
+      },
+      cerrarConEsc() {
+        this.cerrar();
+      },
+      enfocables() {
+        var selector = "a[href], button:not([disabled]), textarea:not([disabled]), " +
+          "input:not([disabled]):not([type=hidden]), [tabindex]:not([tabindex='-1'])";
+        return Array.from(this.$refs.panel.querySelectorAll(selector)).filter(function (el) {
+          return el.getClientRects().length > 0;
+        });
+      },
+      enfocarDentro() {
+        var campo = this.$refs.panel.querySelector("#widget-pregunta");
+        if (campo) {
+          campo.focus();
+          return;
+        }
+        if (this.$refs.contenido.querySelector("[role=status] .loading")) {
+          // Todavía carga: el foco espera en el panel y pasa al campo al llegar.
+          this.enfocarAlCargar = true;
+          this.$refs.panel.focus();
+          return;
+        }
+        var primero = this.enfocables()[0];
+        if (primero) primero.focus();
+      },
+      // Solo en celular (modal): Tab y Mayús+Tab no salen del panel.
+      atraparFoco(evento) {
+        if (!this.celular) return;
+        var lista = this.enfocables();
+        if (!lista.length) return;
+        var primero = lista[0];
+        var ultimo = lista[lista.length - 1];
+        var activo = document.activeElement;
+        if (evento.shiftKey && (activo === primero || activo === this.$refs.panel)) {
+          evento.preventDefault();
+          ultimo.focus();
+        } else if (!evento.shiftKey && activo === ultimo) {
+          evento.preventDefault();
+          primero.focus();
+        }
+      },
+      // Después de cada cambio de HTMX en el panel: al último mensaje, y el foco al campo
+      // si se abrió mientras cargaba.
+      contenidoListo() {
+        var desplazable = this.$refs.contenido.querySelector("[data-desplazable]");
+        if (desplazable) desplazable.scrollTop = desplazable.scrollHeight;
+        if (this.enfocarAlCargar && this.abierto) {
+          this.enfocarAlCargar = false;
+          this.enfocarDentro();
+        }
+      },
+      // La vista del estado manda HX-Trigger: agroia-respuesta al llegar la respuesta.
+      llegoRespuesta() {
+        if (!this.abierto) {
+          this.nueva = true;
+          this.anuncio = "AgroIA respondió. Abre el chat para ver la respuesta.";
+        }
+        this.sonar();
+      },
+      alternarSonido() {
+        this.sonido = !this.sonido;
+        if (this.sonido) {
+          this.prepararAudio();
+          this.sonar();
+        }
+      },
+      prepararAudio() {
+        if (!this.sonido) return;
+        var Contexto = window.AudioContext || window.webkitAudioContext;
+        if (!Contexto) return;
+        if (!audioDelWidget) audioDelWidget = new Contexto();
+        if (audioDelWidget.state === "suspended") audioDelWidget.resume();
+      },
+      // Un «pop» corto y suave (Web Audio, sin archivos), solo si el audio ya arrancó con
+      // un gesto del usuario.
+      sonar() {
+        if (!this.sonido || !audioDelWidget || audioDelWidget.state !== "running") return;
+        var ahora = audioDelWidget.currentTime;
+        var oscilador = audioDelWidget.createOscillator();
+        var volumen = audioDelWidget.createGain();
+        oscilador.type = "sine";
+        oscilador.frequency.setValueAtTime(660, ahora);
+        oscilador.frequency.exponentialRampToValueAtTime(880, ahora + 0.09);
+        volumen.gain.setValueAtTime(0.0001, ahora);
+        volumen.gain.exponentialRampToValueAtTime(0.05, ahora + 0.015);
+        volumen.gain.exponentialRampToValueAtTime(0.0001, ahora + 0.18);
+        oscilador.connect(volumen).connect(audioDelWidget.destination);
+        oscilador.start(ahora);
+        oscilador.stop(ahora + 0.2);
+      },
+    };
+  });
+
+  // Dictado por voz del widget (Web Speech API). Solo si el navegador la tiene; el primer
+  // uso pide aceptar el aviso (el audio lo procesa el proveedor del navegador). El texto
+  // queda en el campo, sin enviarse solo. Los errores se muestran y se anuncian.
+  Alpine.data("microfono", function () {
+    return {
+      escuchando: false,
+      pidiendoPermiso: false,
+      estado: "",
+      error: false,
+      init() {
+        var self = this;
+        window.addEventListener("agroia-widget-cerrado", function () { self.detener(); });
+      },
+      get disponible() {
+        return Boolean(ReconocimientoDeVoz);
+      },
+      get pulsado() {
+        return this.escuchando ? "true" : "false";
+      },
+      get etiqueta() {
+        return this.escuchando ? "Dejar de escuchar" : "Dictar la pregunta por voz";
+      },
+      get claseBoton() {
+        return this.escuchando ? "btn-error" : "btn-ghost";
+      },
+      get hayEstado() {
+        return this.estado !== "";
+      },
+      get claseEstado() {
+        return this.error ? "text-error" : "";
+      },
+      alternar() {
+        if (this.escuchando) {
+          this.detener();
+          return;
+        }
+        if (!guardado(MICROFONO_ACEPTADO)) {
+          this.pidiendoPermiso = true;
+          return;
+        }
+        this.escuchar();
+      },
+      aceptar() {
+        guardar(MICROFONO_ACEPTADO, "true");
+        this.pidiendoPermiso = false;
+        this.escuchar();
+      },
+      cancelar() {
+        this.pidiendoPermiso = false;
+      },
+      escuchar() {
+        var self = this;
+        var dicto = false;
+        reconocedor = new ReconocimientoDeVoz();
+        reconocedor.lang = "es-MX";
+        reconocedor.interimResults = false;
+        reconocedor.maxAlternatives = 1;
+        reconocedor.onresult = function (evento) {
+          var texto = Array.from(evento.results)
+            .map(function (r) { return r[0].transcript; })
+            .join(" ")
+            .trim();
+          if (texto) {
+            dicto = true;
+            self.agregar(texto);
+          }
+        };
+        reconocedor.onerror = function (evento) {
+          self.fallo(evento.error);
+        };
+        reconocedor.onend = function () {
+          self.escuchando = false;
+          reconocedor = null;
+          if (!self.error) self.estado = dicto ? "Listo: revisa el texto y envíalo." : "";
+        };
+        this.error = false;
+        this.estado = "Escuchando… habla ahora.";
+        this.escuchando = true;
+        try {
+          reconocedor.start();
+        } catch (e) {
+          reconocedor = null;
+          this.fallo("inicio");
+        }
+      },
+      detener() {
+        if (reconocedor) reconocedor.stop();
+      },
+      fallo(codigo) {
+        this.escuchando = false;
+        if (codigo === "aborted") {
+          this.estado = "";
+          return;
+        }
+        this.error = true;
+        this.estado = ERRORES_DE_VOZ[codigo] || "No pudimos usar el micrófono. Intenta de nuevo.";
+      },
+      agregar(texto) {
+        var campo = this.$root.querySelector("textarea");
+        if (!campo) return;
+        campo.value = campo.value ? campo.value + " " + texto : texto;
+        campo.focus();
       },
     };
   });

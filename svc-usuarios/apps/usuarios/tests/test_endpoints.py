@@ -32,7 +32,7 @@ def test_registro_correcto(anonimo):
     assert usuario.nombre == "María"
     assert usuario.rol == "cliente"
     assert usuario.email_verificado is False
-    assert usuario.version_privacidad == "2026-10"
+    assert usuario.version_privacidad == "2026-11"
     assert usuario.acepto_privacidad_en is not None
 
 

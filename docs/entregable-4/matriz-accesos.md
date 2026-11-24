@@ -1,8 +1,8 @@
 # Matriz de accesos
 
-Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-22 16:43 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 79 s.
+Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-24 14:58 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 80 s.
 
-Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas de [`docs/contrato-identidad.md`](../contrato-identidad.md); **coincide** exige el mismo código HTTP y, en las denegadas, el mismo código de error del cuerpo.
+Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas de [`docs/contrato-identidad.md`](../contrato-identidad.md); **coincide** exige el mismo código HTTP y, en las denegadas, el mismo código de error del cuerpo. La matriz prueba el control de acceso, no la disponibilidad del agente: un 503 `agente_no_disponible` o `modelo_no_disponible` donde se esperaba acceso permitido cuenta como coincidencia, marcado como «permitido (servicio externo no disponible)» (✓*).
 
 ## Resumen
 
@@ -12,10 +12,11 @@ Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas d
 | Permitidas (2xx esperado) | 35 |
 | Denegadas (4xx esperado) | 119 |
 | Coinciden con lo esperado | **154 de 154 (100 %)** |
+| De ellas, permitido (servicio externo no disponible) | 3 |
 
 ## Matriz
 
-Código obtenido por actor; ✓ coincide con lo esperado, ✗ no coincide, — no aplica.
+Código obtenido por actor; ✓ coincide con lo esperado, ✓* permitido (servicio externo no disponible), ✗ no coincide, — no aplica.
 
 | Endpoint | Anónimo | Cliente sin verificar | Cliente verificado | Administrador | Token vencido | Token de otra llave | Refresh en blacklist | Origen no permitido |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -28,7 +29,7 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✗ no coincide, — n
 | Cambiar estado de un pedido (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Listar usuarios (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Cambiar rol (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
-| Pregunta al agente | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Pregunta al agente | 401 ✓ | 503 ✓* | 503 ✓* | 503 ✓* | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Conversación propia | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Conversación ajena | 401 ✓ | 404 ✓ | 404 ✓ | 404 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Foto de diagnóstico propia | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
@@ -176,9 +177,9 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✗ no coincide, — n
 | Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
 | --- | --- | --- | --- | --- | --- |
 | Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
-| Cliente sin verificar | 200 | 200 | — | sí |  |
-| Cliente verificado | 200 | 200 | — | sí |  |
-| Administrador | 200 | 200 | — | sí |  |
+| Cliente sin verificar | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
+| Cliente verificado | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
+| Administrador | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
 | Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
 | Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
 | Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
@@ -357,7 +358,7 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✗ no coincide, — n
 
 | Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
 | --- | --- | --- | --- | --- | --- |
-| Anónimo | 429 `demasiados_intentos` | 429 | `demasiados_intentos` | sí | aceptadas antes del 429 en esta corrida (200 genérico): 2, Retry-After: 3418 s |
+| Anónimo | 429 `demasiados_intentos` | 429 | `demasiados_intentos` | sí | aceptadas antes del 429 en esta corrida (200 genérico): 3, Retry-After: 3600 s |
 
 ## Qué capa decide
 

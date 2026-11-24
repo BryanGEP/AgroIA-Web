@@ -1,12 +1,19 @@
 {% comment %} Lo que se agrega al final de la conversación al preguntar (HTMX, hx-swap="beforeend"
-   en #mensajes): la pregunta y la espera (o la fallida, si no se pudo enviar). Parámetros:
-   pregunta, solicitud, conversacion_id, intervalo...; o error, o llena. {% endcomment %}
+   en la lista de mensajes): la pregunta y la espera (o la fallida, si no se pudo enviar).
+   Parámetros: pregunta, solicitud, conversacion_id, intervalo...; o error, o llena.
+   en_widget: en el widget, «conversación llena» ofrece reiniciar el widget.
+   quitar_sugerencias: la primera pregunta del widget quita las preguntas sugeridas. {% endcomment %}
 {% if error %}
   <li class="alert alert-error my-2" role="alert"><span>{{ error }}</span></li>
 {% elif llena %}
   <li class="alert alert-info my-2" role="status">
     <span>Esta conversación llegó a su límite de mensajes.</span>
-    <a href="{% url 'agroia:inicio' %}" class="btn btn-sm btn-primary">Iniciar una conversación nueva</a>
+    {% if en_widget %}
+      <button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'agroia:widget_reiniciar' %}"
+              hx-target="#widget-agroia-contenido" hx-include="#widget-agroia-contexto">Empezar una conversación nueva</button>
+    {% else %}
+      <a href="{% url 'agroia:inicio' %}" class="btn btn-sm btn-primary">Iniciar una conversación nueva</a>
+    {% endif %}
   </li>
 {% else %}
   {% include "componentes/mensaje_chat.html" with rol="usuario" texto=pregunta %}
@@ -15,4 +22,5 @@
   {% else %}
     {% include "agroia/parciales/_fallida.html" %}
   {% endif %}
+  {% if quitar_sugerencias %}<div id="widget-sugerencias" hx-swap-oob="delete"></div>{% endif %}
 {% endif %}

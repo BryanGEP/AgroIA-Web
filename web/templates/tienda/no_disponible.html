@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{# Sin el widget de AgroIA: una página que ya falló no hace más peticiones. #}
+{% block widget_agroia %}{% endblock %}
 {% block titulo %}No disponible{% endblock %}
 {% block contenido %}
 <div class="max-w-3xl mx-auto px-4">

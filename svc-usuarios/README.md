@@ -173,7 +173,7 @@ Ver [`docs/eventos.md`](../docs/eventos.md). Cada acción publica su evento desp
 | `REDIS_URL` | Caché de los contadores del límite de intentos |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Envío de correos (consola por defecto) |
 | `FRONTEND_URL` | Base de los enlaces de los correos (el gateway) |
-| `VERSION_AVISO_PRIVACIDAD` | Versión vigente del aviso de privacidad (`2026-10`) |
+| `VERSION_AVISO_PRIVACIDAD` | Versión vigente del aviso de privacidad (`2026-11`). Se guarda solo al registrarse: los usuarios existentes conservan la que aceptaron |
 
 ## Pruebas y estilo
 

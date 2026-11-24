@@ -239,6 +239,8 @@ Todo funciona: fase 1 (`usuario_registrado`), fase 2 (eventos de negocio y corre
 
 **Concurrencia: 2 hilos por defecto.** `IA_WORKER_HILOS` vale 2. Con 3 se midió que la llave gratuita de Groq no aguanta 3 llamadas a la vez: rechaza algunas (`RateLimitError`) y el agente tarda de 11 a 39 s en responder 503, así que la espera crece aunque el worker reintente a los 5 s del fallo. Con 2 hilos, 5 preguntas a la vez se atienden de 2 en 2 y ninguna se entrega de más (ver el paso 10 en [`avances/e4-ia-asincrona.md`](avances/e4-ia-asincrona.md)). **Con una llave de pago se puede subir la variable**: el worker no cambia, solo atiende más a la vez.
 
+**El widget flotante** (en todas las páginas, [avance](avances/e4-widget-agroia.md)) usa exactamente este flujo: pregunta con `POST /agroia/widget/preguntar/` del gateway, que crea la conversación del widget con el primer mensaje y llama al mismo `preguntar` de svc-contenido (con su límite por usuario), y consulta el estado con las mismas vistas y parciales. Una marca en la sesión del gateway (`widget_pendiente`) le dice a cada página que hay una pregunta esperando: el polling sigue al cambiar de página sin pedir nada a svc-contenido mientras no haga falta. La vista del estado manda `HX-Trigger: agroia-respuesta` al llegar la respuesta o la fallida, para el aviso del widget.
+
 ### Diagnóstico por imagen
 
 1. **web → svc-contenido** `POST /api/v1/diagnosticos/solicitar/` con la foto (JPG o PNG, máx. 5 MB, firma comprobada). svc-contenido la guarda con `default_storage`, crea el diagnóstico `pendiente` y deja una **copia temporal de la foto en Redis**, `agroia:ia:imagen:<solicitud_id>`, que vence a los `IA_SOLICITUD_VENCE_SEGUNDOS`. Publica `diagnostico_solicitado` solo con ids y responde **202**.

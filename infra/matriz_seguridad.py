@@ -64,6 +64,10 @@ CUENTAS = {
     "admin": "admin@demo.agroia.test",
 }
 ORIGEN_AJENO = "https://sitio-ajeno.example"
+# Un 503 con estos códigos en una fila que esperaba acceso permitido no es una falla del
+# control de acceso: es el agente o el modelo (ver Caso.servicio_externo).
+CODIGOS_SERVICIO_EXTERNO = {"agente_no_disponible", "modelo_no_disponible"}
+EXTERNO = "permitido (servicio externo no disponible)"
 
 ACTORES = [
     ("anonimo", "Anónimo"),
@@ -90,6 +94,17 @@ DENEGADO_GATEWAY = {
 
 @dataclass
 class Caso:
+    """Un actor contra un endpoint.
+
+    La matriz prueba el control de acceso, no la disponibilidad del agente o del modelo
+    (eso lo cubre infra/prueba_eventos.py). Si se esperaba acceso permitido y la respuesta
+    es 503 con un código de servicio externo (`agente_no_disponible`,
+    `modelo_no_disponible`), el control de acceso dejó pasar la petición: cuenta como
+    coincidencia, marcada aparte como «permitido (servicio externo no disponible)». Un 401
+    o 403 donde se esperaba permitido, o un 503 donde se esperaba 401 o 403, sigue siendo
+    una falla.
+    """
+
     grupo: str
     actor: str
     metodo: str
@@ -101,7 +116,14 @@ class Caso:
     nota: str = ""
 
     @property
+    def servicio_externo(self) -> bool:
+        """Permitido por el control de acceso, pero el servicio externo no estaba."""
+        return self.permitido and self.obtenido == 503 and self.codigo in CODIGOS_SERVICIO_EXTERNO
+
+    @property
     def coincide(self) -> bool:
+        if self.servicio_externo:
+            return True
         if self.obtenido != self.esperado:
             return False
         return self.codigo_esperado is None or self.codigo == self.codigo_esperado
@@ -165,7 +187,7 @@ class Matriz:
             caso.nota = f"sin respuesta: {type(error).__name__}"
             respuesta = None
         self.casos.append(caso)
-        marca = "ok" if caso.coincide else "NO COINCIDE"
+        marca = "externo" if caso.servicio_externo else ("ok" if caso.coincide else "NO COINCIDE")
         print(f"  {marca:11} {NOMBRE_ACTOR[actor]:22} {caso.obtenido} {caso.codigo or ''}")
         return respuesta
 
@@ -773,6 +795,7 @@ class Matriz:
     def reporte(self, inicio: datetime, segundos: float, con_limites: bool) -> str:
         casos = self.casos
         coinciden = sum(c.coincide for c in casos)
+        externos = sum(c.servicio_externo for c in casos)
         permitidos = [c for c in casos if c.permitido]
         denegados = [c for c in casos if not c.permitido]
         grupos = list(dict.fromkeys(c.grupo for c in casos))
@@ -780,7 +803,14 @@ class Matriz:
         def celda(c: Caso | None) -> str:
             if c is None:
                 return "—"
+            if c.servicio_externo:
+                return f"{c.obtenido} ✓*"
             return f"{c.obtenido} {'✓' if c.coincide else '✗'}"
+
+        def coincide(c: Caso) -> str:
+            if c.servicio_externo:
+                return f"sí, {EXTERNO}"
+            return "sí" if c.coincide else "**no**"
 
         def texto(c: Caso) -> str:
             return f"`{c.codigo}`" if c.codigo else "—"
@@ -797,7 +827,10 @@ class Matriz:
             "",
             "Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas de "
             "[`docs/contrato-identidad.md`](../contrato-identidad.md); **coincide** exige el mismo "
-            "código HTTP y, en las denegadas, el mismo código de error del cuerpo.",
+            "código HTTP y, en las denegadas, el mismo código de error del cuerpo. La matriz "
+            "prueba el control de acceso, no la disponibilidad del agente: un 503 "
+            "`agente_no_disponible` o `modelo_no_disponible` donde se esperaba acceso permitido "
+            f"cuenta como coincidencia, marcado como «{EXTERNO}» (✓*).",
             "",
             "## Resumen",
             "",
@@ -808,10 +841,12 @@ class Matriz:
             f"| Denegadas (4xx esperado) | {len(denegados)} |",
             f"| Coinciden con lo esperado | **{coinciden} de {len(casos)} "
             f"({100 * coinciden / len(casos):.0f} %)** |",
+            f"| De ellas, {EXTERNO} | {externos} |",
             "",
             "## Matriz",
             "",
-            "Código obtenido por actor; ✓ coincide con lo esperado, ✗ no coincide, — no aplica.",
+            "Código obtenido por actor; ✓ coincide con lo esperado, ✓* "
+            f"{EXTERNO}, ✗ no coincide, — no aplica.",
             "",
             "| Endpoint | " + " | ".join(n for _, n in ACTORES) + " |",
             "| --- | " + " | ".join("---" for _ in ACTORES) + " |",
@@ -841,7 +876,7 @@ class Matriz:
                 )
                 lineas.append(
                     f"| {NOMBRE_ACTOR[c.actor]} | {esperado} | {c.obtenido} | {texto(c)} | "
-                    f"{'sí' if c.coincide else '**no**'} | {c.nota} |"
+                    f"{coincide(c)} | {c.nota} |"
                 )
             lineas.append("")
 
@@ -905,7 +940,8 @@ def main():
         newline="\n",
     )
     total, bien = len(matriz.casos), sum(c.coincide for c in matriz.casos)
-    print(f"\n{bien} de {total} casos coinciden. Reporte: {args.salida}")
+    externos = sum(c.servicio_externo for c in matriz.casos)
+    print(f"\n{bien} de {total} casos coinciden ({externos} {EXTERNO}). Reporte: {args.salida}")
     sys.exit(0 if bien == total else 1)
 
 

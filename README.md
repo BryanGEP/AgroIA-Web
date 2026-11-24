@@ -152,6 +152,7 @@ python infra/matriz_seguridad.py --salida docs/entregable-3/matriz-accesos.md   
 - **Usa las cuentas de demostración** y crea lo que necesita: un producto, un pedido, y una conversación y dos diagnósticos por cuenta (uno por eventos). Al terminar lo borra (el pedido, el producto y los diagnósticos con el `manage.py` de su servicio, porque la API no los borra), restaura el carrito del cliente y cierra sus sesiones. Necesita `docker` en el PATH para esa limpieza.
 - **Respeta los límites, sin subirlos:** antes de los casos de login espera 61 s. La recuperación permite 3 por hora por IP y la matriz la agota: si corres Postman después, «Pedir recuperación» responde 429 hasta que pase una hora o hasta correr `reiniciar_limites`. Por eso Postman va primero y la matriz al final.
 - **Llama al agente** seis veces (por cuenta, una directa a svc-ia y una pregunta por eventos), así que necesita la llave de Groq.
+- **Prueba el control de acceso, no la disponibilidad del agente** (eso lo cubre `infra/prueba_eventos.py`). Si una fila espera acceso permitido y la respuesta es 503 con `agente_no_disponible` o `modelo_no_disponible` (por ejemplo, porque se acabó la cuota de Groq), el control de acceso dejó pasar la petición: cuenta como coincidencia, marcada «permitido (servicio externo no disponible)» (✓* en la tabla), y el resumen dice cuántas hubo. Un 401 o 403 donde se esperaba permitido sigue siendo una falla, igual que un 503 en una fila que esperaba 401 o 403. La clasificación tiene sus pruebas: `python -m pytest infra/tests`.
 
 ### Eventos entre servicios
 
@@ -249,6 +250,12 @@ docker compose logs -f <servicio>               # ver logs de un servicio
 ```
 
 El código está montado como volumen: los cambios se ven sin reconstruir la imagen. Solo hay que usar `--build` cuando cambian los `requirements*.txt` o un `Dockerfile`.
+
+**En Windows, después de cambiar de rama o hacer `pull`, reinicia los servicios.** Con Docker Desktop en Windows, los volúmenes montados no siempre le avisan al contenedor que un archivo cambió, y el autorreload de Django (y el de uvicorn en svc-ia) puede quedarse con una versión anterior del código. Pasa sobre todo cuando muchos archivos cambian de golpe. **El síntoma típico: una ruta nueva responde 404** aunque esté en el código (por ejemplo, `POST /api/v1/conversaciones/<id>/preguntar/` con la página «Page not found» de Django). Se arregla reiniciando los servicios propios y los procesos de eventos:
+
+```powershell
+docker compose restart web svc-usuarios svc-tienda svc-contenido svc-ia svc-contenido-eventos svc-usuarios-eventos svc-ia-worker
+```
 
 ## Entornos virtuales (opcional)
 

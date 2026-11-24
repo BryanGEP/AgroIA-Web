@@ -41,7 +41,7 @@ os.environ["FRONTEND_URL"] = "http://localhost:8000"
 # pytest-django cambia el backend a locmem (mail.outbox) después de cargar la
 # configuración; SMTP aquí solo evita que validar_backend_de_correo() falle con DEBUG=False.
 os.environ["EMAIL_BACKEND"] = "django.core.mail.backends.smtp.EmailBackend"
-os.environ["VERSION_AVISO_PRIVACIDAD"] = "2026-10"
+os.environ["VERSION_AVISO_PRIVACIDAD"] = "2026-11"
 
 from config.settings import *  # noqa: E402, F403
 

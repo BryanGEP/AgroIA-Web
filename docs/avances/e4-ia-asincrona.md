@@ -317,7 +317,7 @@ Rama `feat/e4-ia-asincrona` desde `develop`. Los commits se proponen al cerrar l
 
 ## Pendientes y siguiente paso
 
-- **Widget flotante del chat:** fuera de esta fase.
+- **Widget flotante del chat:** hecho en la cuarta parte ([avance](e4-widget-agroia.md)).
 - **Límite de tokens del agente:** el límite por usuario evita que uno solo lo agote, pero el de Groq sigue siendo de toda la aplicación: aun con 2 hilos rechaza alguna llamada cuando se piden varias seguidas, y la espera crece. Se resuelve con una llave de pago, y entonces se puede subir `IA_WORKER_HILOS`.
 - **Pantalla de bitácora** en el panel (opcional, fase 4).
 - **AOF:** una pregunta recortada de su stream sigue en el archivo hasta la siguiente reescritura (`BGREWRITEAOF`). Revisar en la Entrega 5 con Memorystore.
