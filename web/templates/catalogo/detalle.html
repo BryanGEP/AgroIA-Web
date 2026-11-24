@@ -2,6 +2,8 @@
 {% load agroia %}
 {% block titulo %}{{ producto.nombre }}{% endblock %}
 {% block descripcion %}{{ producto.descripcion|truncatechars:150 }}{% endblock %}
+{# El nombre del producto para las preguntas sugeridas del widget (el gateway lo recorta). #}
+{% block widget_contexto %}<input type="hidden" name="producto" value="{{ producto.nombre }}">{% endblock %}
 {% block contenido %}
 {% nombre_categoria producto.categoria categorias as nombre_cat %}
 {% with t=producto.categoria|tinte %}

@@ -6,6 +6,7 @@
   {% include "componentes/errores_formulario.html" %}
   <form method="post" action="{% url 'cuentas:registro' %}" class="flex flex-col gap-4" novalidate>
     {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <div class="grid gap-4 sm:grid-cols-2">
       {% include "componentes/campo.html" with campo=formulario.nombre %}
       {% include "componentes/campo.html" with campo=formulario.apellidos %}

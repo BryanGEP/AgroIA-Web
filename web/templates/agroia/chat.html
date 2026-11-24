@@ -29,20 +29,9 @@
       <p class="text-sm opacity-80">AgroIA responde sobre el cultivo del aguacate con su base de conocimiento y cita sus fuentes. Confirma cualquier tratamiento con un técnico.</p>
 
       <div x-data="chat" class="flex flex-1 flex-col gap-4">
-        <ol id="mensajes" class="flex flex-col gap-1" aria-live="polite">
-          {% for mensaje in mensajes %}
-            {% include "componentes/mensaje_chat.html" with rol=mensaje.rol texto=mensaje.texto fuentes=mensaje.fuentes %}
-          {% empty %}
-            {% if not conversacion %}<li class="opacity-80">Escribe tu primera pregunta para iniciar una conversación.</li>{% endif %}
-          {% endfor %}
-          {# La solicitud a la IA de esta conversación: esperando o fallida. #}
-          {% if solicitud.estado == "pendiente" %}
-            {% include "agroia/parciales/_espera.html" %}
-          {% elif mostrar_fallida %}
-            {% include "agroia/parciales/_fallida.html" %}
-          {% elif sin_respuesta_heredada and conversacion %}
-            {% include "agroia/parciales/_reintentar.html" with conversacion_id=conversacion.id %}
-          {% endif %}
+        <ol id="mensajes" data-mensajes class="flex flex-col gap-1" aria-live="polite">
+          {% if not conversacion %}<li class="opacity-80">Escribe tu primera pregunta para iniciar una conversación.</li>{% endif %}
+          {% include "agroia/parciales/_conversacion.html" %}
         </ol>
         {# La pregunta recién enviada se ve al instante mientras responde AgroIA (Alpine). #}
         <div x-show="enviando" x-cloak class="flex flex-col gap-1">
@@ -53,20 +42,12 @@
         </div>
 
         {% if conversacion %}
-          <form method="post" action="{% url 'agroia:preguntar' conversacion.id %}"
-                hx-post="{% url 'agroia:preguntar' conversacion.id %}" hx-target="#mensajes" hx-swap="beforeend"
-                hx-indicator="#escribiendo" @htmx:before-request="enviar" @htmx:after-request="terminar"
-                class="mt-auto flex flex-col gap-2">
+          {% url 'agroia:preguntar' conversacion.id as accion %}
+          {% include "agroia/parciales/_formulario.html" with accion=accion objetivo="#mensajes" indicador="#escribiendo" campo=formulario.pregunta %}
         {% else %}
-          <form method="post" action="{% url 'agroia:nueva' %}" hx-post="{% url 'agroia:nueva' %}" hx-indicator="#escribiendo"
-                @htmx:before-request="enviar" class="mt-auto flex flex-col gap-2">
+          {% url 'agroia:nueva' as accion %}
+          {% include "agroia/parciales/_formulario.html" with accion=accion indicador="#escribiendo" campo=formulario.pregunta %}
         {% endif %}
-            {% csrf_token %}
-            {% include "componentes/campo.html" with campo=formulario.pregunta %}
-            <div class="flex justify-end">
-              <button type="submit" class="btn btn-primary" :disabled="enviando">Enviar</button>
-            </div>
-          </form>
       </div>
     </section>
   </div>

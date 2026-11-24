@@ -120,6 +120,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.cuentas.context_processors.usuario",
+                "apps.agroia.context_processors.widget_agroia",
             ],
         },
     },
@@ -158,6 +159,9 @@ CSP = (
     "font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; "
     "base-uri 'self'; object-src 'none'"
 )
+# Permissions-Policy: el micrófono solo para este sitio (el dictado por voz del widget de
+# AgroIA, detrás de un aviso); nada de cámara, ubicación, pagos ni USB.
+PERMISSIONS_POLICY = "microphone=(self), camera=(), geolocation=(), payment=(), usb=()"
 CSP_DOCS = (
     "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: "

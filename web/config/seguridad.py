@@ -1,6 +1,7 @@
 """Encabezados y reglas de seguridad del gateway.
 
-- PoliticaDeContenidoMiddleware: Content-Security-Policy en todas las respuestas. Sin
+- PoliticaDeContenidoMiddleware: Content-Security-Policy y Permissions-Policy (el
+  micrófono solo para este sitio) en todas las respuestas. Sin
   scripts ni estilos en línea y sin eval: HTMX y Alpine (versión CSP) se sirven desde
   static/vendor/ y la lógica vive en static/js/. /api/docs/ usa una política aparte
   porque Swagger UI carga su código de un CDN.
@@ -25,6 +26,7 @@ class PoliticaDeContenidoMiddleware:
         respuesta = self.get_response(request)
         politica = settings.CSP_DOCS if request.path.startswith(RUTA_DOCS) else settings.CSP
         respuesta.headers.setdefault("Content-Security-Policy", politica)
+        respuesta.headers.setdefault("Permissions-Policy", settings.PERMISSIONS_POLICY)
         return respuesta
 
 

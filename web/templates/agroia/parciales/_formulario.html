@@ -1,0 +1,38 @@
+{% comment %} El formulario de la pregunta, en /agroia/ y en el widget. Va dentro de un
+   x-data="chat" (static/js/componentes.js): muestra al instante la pregunta enviada y
+   conserva el texto si no entró (X-Conservar-Pregunta).
+   Parámetros:
+   - accion: URL del POST.
+   - objetivo: selector de la lista de mensajes donde se agrega la respuesta (sin él, la
+     vista redirige, como al crear una conversación desde /agroia/).
+   - indicador: selector del «AgroIA está escribiendo…».
+   - campo: el campo del formulario de Django (en /agroia/); sin él, un textarea propio
+     con id_campo (en el widget).
+   - microfono: muestra el dictado por voz (solo en el widget, detrás de un aviso).
+   {% endcomment %}
+<form method="post" action="{{ accion }}" hx-post="{{ accion }}"
+      {% if objetivo %}hx-target="{{ objetivo }}" hx-swap="beforeend" @htmx:after-request="terminar"{% endif %}
+      hx-indicator="{{ indicador }}" @htmx:before-request="enviar"
+      class="mt-auto flex flex-col gap-2">
+  {% csrf_token %}
+  {% if campo %}
+    {% include "componentes/campo.html" with campo=campo %}
+    <div class="flex justify-end">
+      <button type="submit" class="btn btn-primary" :disabled="enviando">Enviar</button>
+    </div>
+  {% else %}
+    <div class="flex flex-col gap-2"{% if microfono %} x-data="microfono"{% endif %}>
+    <label for="{{ id_campo }}" class="sr-only">Tu pregunta</label>
+    <div class="flex items-end gap-2">
+      <textarea id="{{ id_campo }}" name="pregunta" rows="2" maxlength="4000" required
+                placeholder="Escribe tu pregunta sobre el aguacate…" @keydown.enter="enviarConEnter"
+                class="textarea textarea-bordered min-h-0 w-full flex-1 resize-none text-base"></textarea>
+      {% if microfono %}{% include "agroia/parciales/_microfono.html" %}{% endif %}
+      <button type="submit" class="btn btn-primary btn-square" :disabled="enviando" aria-label="Enviar la pregunta">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true" focusable="false"><path class="fill-current" d="M3 20.5v-6l8-2.5-8-2.5v-6l19 8.5-19 8.5z"/></svg>
+      </button>
+    </div>
+    {% if microfono %}{% include "agroia/parciales/_microfono_avisos.html" %}{% endif %}
+    </div>
+  {% endif %}
+</form>
