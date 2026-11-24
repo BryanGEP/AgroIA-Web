@@ -106,6 +106,7 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 
 **Bloqueos:** Ninguno.
 
+
 ## 2026-11-24 · Sprint 4
 
 **Integrante:** Bryan Gael Esquivel Pérez
@@ -123,3 +124,22 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Fase 3, segunda parte: widget flotante del chat AgroIA en todas las páginas, con invitación a iniciar sesión para visitantes.
 
 **Bloqueos:** La cuota gratuita de Groq limita las pruebas de concurrencia; se resolvió con 2 hilos y pausas en el script.
+
+
+## 2026-11-24 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Widget flotante de AgroIA en todas las páginas, basado en el del repo del agente: mascota del aguacate, preguntas sugeridas según la sección, «Reiniciar», «Ver historial completo» y botón «Copiar» (también en /agroia/).
+- Usa el mismo flujo asíncrono del chat (polling, «Reintentar», vencida y límite por usuario), con la conversación del widget guardada en la sesión. El polling continúa al cambiar de página con una pregunta pendiente.
+- Visitantes: saludo e invitación a iniciar sesión o crear cuenta, con regreso a la página de origen.
+- Dictado por voz detrás de un aviso de consentimiento, sonido opcional y cabecera Permissions-Policy.
+- Accesibilidad: foco atrapado solo en móvil (pantalla completa), Esc para cerrar y anuncios con aria-live.
+- Aviso de privacidad 2026-11 con historial de versiones; la nueva aceptación del aviso queda pendiente para la Entrega 5.
+- La matriz de accesos marca aparte las filas en las que el agente no está disponible (cuota de Groq), sin contarlas como falla.
+
+**Qué sigue:**
+- Fase 4: cierre de la Entrega 4 (pruebas de integración finales, evidencia con logs, capturas y video, `docs/entregable-4.md` y release v4.0).
+
+**Bloqueos:** La cuota diaria gratuita de Groq se agota con las corridas completas de pruebas.
