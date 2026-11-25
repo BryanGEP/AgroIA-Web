@@ -1,7 +1,7 @@
 {% extends "cuentas/marco.html" %}
 {% block titulo %}Contraseña nueva{% endblock %}
 {% block encabezado %}Elige una contraseña nueva{% endblock %}
-{% block intro %}<p class="opacity-80">Al guardarla se cerrará la sesión en todos tus dispositivos.</p>{% endblock %}
+{% block intro %}<p class="text-suave">Al guardarla se cerrará la sesión en todos tus dispositivos.</p>{% endblock %}
 {% block formulario %}
   {% include "componentes/errores_formulario.html" %}
   <form method="post" class="flex flex-col gap-4" novalidate>

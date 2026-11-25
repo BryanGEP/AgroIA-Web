@@ -1,7 +1,7 @@
 {% comment %} El análisis todavía no termina: se consulta otra vez en `intervalo` segundos (2 s
    al principio, 5 s después de 20 s). La respuesta final reemplaza este elemento sin
    hx-trigger y el polling se detiene. Parámetros: pendiente, intervalo. {% endcomment %}
-<div id="espera-diagnostico" class="flex items-center gap-3 rounded-box border border-base-300 p-6" role="status"
+<div id="espera-diagnostico" class="flex items-center gap-3 rounded-box border border-base-300 bg-tarjeta p-6" role="status"
      hx-get="{% url 'diagnostico:estado' pendiente.id %}" hx-trigger="load delay:{{ intervalo }}s"
      hx-target="#resultado" hx-swap="innerHTML">
   <span class="loading loading-spinner loading-md" aria-hidden="true"></span>

@@ -1,15 +1,15 @@
 {% load agroia %}
 {% comment %} Clase, confianza, probabilidades y productos sugeridos. Parámetros: diagnostico,
    nombres, sugeridos. Las barras son <progress>: sin estilos en línea (CSP). {% endcomment %}
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
   {% if diagnostico.es_prueba %}
     <div class="alert alert-warning" role="alert">
       <span><strong>Resultado de prueba: no es un diagnóstico real.</strong> Lo dio un clasificador de prueba que no mira la foto; solo sirve para probar el sistema.</span>
     </div>
   {% endif %}
   <div>
-    <p class="text-sm opacity-80">Resultado</p>
-    <p class="font-display text-3xl font-bold">{{ nombres|elegir_clave:diagnostico.clase }}</p>
+    <p class="text-sm text-suave">Resultado</p>
+    <p class="font-display text-[2.4rem] font-bold leading-tight">{{ nombres|elegir_clave:diagnostico.clase }}</p>
     <p>Confianza: {{ diagnostico.confianza|porcentaje }}</p>
   </div>
   <dl class="flex flex-col gap-2">
@@ -24,13 +24,13 @@
     <p class="text-sm">La hoja se ve sana. Sigue revisando tu huerta después de las lluvias, cuando aparecen la roña y la antracnosis.</p>
   {% elif sugeridos %}
     <section aria-labelledby="sugeridos">
-      <h2 id="sugeridos" class="text-xl mb-2">Productos que pueden ayudar</h2>
+      <h2 id="sugeridos" class="mb-2 text-2xl">Productos que pueden ayudar</h2>
       <ul class="flex flex-col gap-2">
         {% for producto in sugeridos %}
-          <li><a href="{% url 'catalogo:detalle' producto.slug %}" class="link">{{ producto.nombre }}</a> <span class="text-sm opacity-80">{{ producto.precio|pesos }}</span></li>
+          <li><a href="{% url 'catalogo:detalle' producto.slug %}" class="link link-primary font-medium">{{ producto.nombre }}</a> <span class="text-sm tabular-nums text-suave">{{ producto.precio|pesos }}</span></li>
         {% endfor %}
       </ul>
-      <p class="mt-2 text-sm opacity-80">Antes de aplicar cualquier producto, confirma la dosis con un técnico.</p>
+      <p class="mt-2 text-sm text-suave">Antes de aplicar cualquier producto, confirma la dosis con un técnico.</p>
     </section>
   {% endif %}
 </div>

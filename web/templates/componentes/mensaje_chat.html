@@ -9,19 +9,20 @@
   </li>
 {% else %}
   <li class="chat chat-start" x-data="copiar">
-    <div class="chat-header mb-1 text-xs opacity-70">AgroIA</div>
-    <div class="chat-bubble bg-base-200 text-base-content">
+    <div class="chat-image"><span class="grid h-9 w-9 place-items-center rounded-full border-2 border-accent bg-bosque">{% include "componentes/mascota.html" with clase="h-6 w-5" %}</span></div>
+    <div class="chat-header mb-1 text-xs text-suave">AgroIA</div>
+    <div class="chat-bubble border border-base-300 bg-base-100 text-base-content">
       <div x-ref="respuesta">{{ texto|markdown_seguro }}</div>
       {% if fuentes %}
         <div class="mt-3 border-t border-base-300 pt-2 text-sm">
           <p class="font-medium">Fuentes</p>
-          <ul class="list-disc pl-5 opacity-90">{% for fuente in fuentes %}<li>{{ fuente }}</li>{% endfor %}</ul>
+          <ul class="list-disc pl-5 text-suave">{% for fuente in fuentes %}<li>{{ fuente }}</li>{% endfor %}</ul>
         </div>
       {% endif %}
     </div>
     <div class="chat-footer mt-1 flex items-center gap-2">
-      {% if aviso %}<span class="text-xs text-warning">{{ aviso }}</span>{% endif %}
-      <button type="button" class="btn btn-ghost btn-xs" x-show="disponible" x-cloak @click="copiar"
+      {% if aviso %}<span class="text-xs text-aviso">{{ aviso }}</span>{% endif %}
+      <button type="button" class="btn btn-ghost btn-sm min-h-9 text-primary" x-show="disponible" x-cloak @click="copiar"
               aria-label="Copiar la respuesta">
         <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true" focusable="false"><path class="fill-current" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
         <span x-text="etiqueta">Copiar</span>

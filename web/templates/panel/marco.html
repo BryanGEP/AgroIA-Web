@@ -1,14 +1,19 @@
 {% extends "base.html" %}
 {% comment %} Marco del panel: título y pestañas. Bloques: encabezado, acciones, panel. {% endcomment %}
 {% block contenido %}
-<div class="max-w-6xl mx-auto px-4 py-8 md:py-10">
-  <p class="text-sm font-medium uppercase tracking-wide opacity-70">Administración</p>
-  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-    <h1 class="text-3xl">{% block encabezado %}{% endblock %}</h1>
+<div class="relative overflow-hidden bg-bosque text-bosque-texto">
+  <span class="curvas absolute inset-0 text-curvas-hero opacity-20" aria-hidden="true"></span>
+  <div class="relative max-w-6xl mx-auto flex flex-wrap items-end justify-between gap-3 px-4 py-6 md:py-8">
+    <div class="min-w-0">
+      <p class="text-bosque-suave">Administración</p>
+      <h1 class="break-words text-[2rem] leading-tight text-white md:text-[2.4rem]">{% block encabezado %}{% endblock %}</h1>
+    </div>
     <div class="flex gap-2">{% block acciones %}{% endblock %}</div>
   </div>
+</div>
+<div class="max-w-6xl mx-auto px-4 py-6 md:py-8">
   {% with nombre=request.resolver_match.url_name %}
-  <nav class="tabs tabs-border mb-6 overflow-x-auto" aria-label="Secciones del panel">
+  <nav class="tabs tabs-border mb-6 overflow-x-auto font-medium" aria-label="Secciones del panel">
     <a href="{% url 'panel:productos' %}" class="tab whitespace-nowrap {% if 'producto' in nombre %}tab-active{% endif %}">Productos</a>
     <a href="{% url 'panel:categorias' %}" class="tab whitespace-nowrap {% if 'categoria' in nombre %}tab-active{% endif %}">Categorías</a>
     <a href="{% url 'panel:pedidos' %}" class="tab whitespace-nowrap {% if 'pedido' in nombre or nombre == 'estado' %}tab-active{% endif %}">Pedidos</a>

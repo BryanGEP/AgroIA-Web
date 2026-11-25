@@ -3,7 +3,7 @@
 {% block encabezado %}{% if producto %}{{ producto.nombre }}{% else %}Nuevo producto{% endif %}{% endblock %}
 {% block panel %}
 <div class="grid gap-8 lg:grid-cols-[1fr_16rem]">
-  <form method="post" enctype="multipart/form-data" class="grid gap-4 sm:grid-cols-2" novalidate>
+  <form method="post" enctype="multipart/form-data" class="grid gap-4 rounded-box border border-base-300 bg-tarjeta p-5 sm:grid-cols-2" novalidate>
     {% csrf_token %}
     <div class="sm:col-span-2">{% include "componentes/errores_formulario.html" %}</div>
     <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.nombre %}</div>
@@ -22,12 +22,12 @@
   </form>
   {% if producto %}
     <aside class="flex flex-col gap-3 self-start">
-      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" class="rounded-box border border-base-300 bg-base-200 object-contain">{% endif %}
-      <a href="{% url 'catalogo:detalle' producto.slug %}" class="link text-sm">Ver en la tienda</a>
+      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" width="400" height="300" loading="lazy" class="aspect-[4/3] w-full rounded-box border border-base-300 bg-base-200 object-cover">{% endif %}
+      <a href="{% url 'catalogo:detalle' producto.slug %}" class="link link-primary">Ver en la tienda</a>
       {% if producto.activo %}
         <form method="post" action="{% url 'panel:desactivar_producto' producto.slug %}" hx-confirm="¿Desactivar este producto? Ya no aparecerá en la tienda.">
           {% csrf_token %}
-          <button type="submit" class="btn btn-outline btn-error btn-sm">Desactivar producto</button>
+          <button type="submit" class="btn btn-outline btn-error">Desactivar producto</button>
         </form>
       {% endif %}
     </aside>

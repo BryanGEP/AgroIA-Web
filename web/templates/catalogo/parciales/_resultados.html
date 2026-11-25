@@ -3,7 +3,7 @@
 {% if pagina_fuera %}
   {% include "componentes/estado_vacio.html" with titulo="Esa página ya no existe" texto="Puede que haya menos productos con estos filtros." enlace=catalogo accion="Volver a la primera página" %}
 {% elif productos %}
-  <p class="mb-4 text-sm">
+  <p class="mb-4 text-sm text-suave">
     {{ total }} producto{{ total|pluralize }}{% if total_paginas > 1 %}, página {{ pagina }} de {{ total_paginas }}{% endif %}
   </p>
   <ul class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">

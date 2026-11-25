@@ -2,7 +2,7 @@
 {% block titulo %}{% if categoria %}Editar categoría{% else %}Nueva categoría{% endif %} · Administración{% endblock %}
 {% block encabezado %}{% if categoria %}{{ categoria.nombre }}{% else %}Nueva categoría{% endif %}{% endblock %}
 {% block panel %}
-<form method="post" class="flex max-w-lg flex-col gap-4" novalidate>
+<form method="post" class="flex max-w-lg flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5" novalidate>
   {% csrf_token %}
   {% include "componentes/errores_formulario.html" %}
   {% include "componentes/campo.html" with campo=formulario.nombre %}

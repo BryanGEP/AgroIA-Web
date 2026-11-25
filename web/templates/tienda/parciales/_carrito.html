@@ -3,14 +3,19 @@
    producto reemplaza este bloque y el contador del menú. {% endcomment %}
 <div id="carrito" class="flex flex-col gap-6">
   {% if carrito.items %}
-    <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300 bg-base-100">
+    <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300 bg-tarjeta">
       {% for item in carrito.items %}
         <li class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
           <div class="flex flex-1 items-center gap-3">
-            {% if item.producto.imagen %}<img src="{{ item.producto.imagen }}" alt="{{ item.producto.nombre }}" width="64" height="64" class="h-16 w-16 rounded object-contain bg-base-200">{% endif %}
-            <div>
-              <a href="{% url 'catalogo:detalle' item.producto.slug %}" class="link link-hover font-medium">{{ item.producto.nombre }}</a>
-              <p class="text-sm opacity-80">{{ item.producto.precio|pesos }} por {{ item.producto.unidad|unidad }}</p>
+            {% with t=item.producto.categoria|tinte %}
+            <div class="tinte-{{ t }} panel-tinte relative h-16 w-20 shrink-0 overflow-hidden rounded-box">
+              {% if item.producto.imagen %}<img src="{{ item.producto.imagen }}" alt="{{ item.producto.nombre }}" width="80" height="64" loading="lazy" class="absolute inset-0 h-full w-full object-cover">
+              {% else %}<span class="curvas absolute inset-0 opacity-20" aria-hidden="true"></span><span class="relative flex h-full items-center justify-center p-2" aria-hidden="true">{% include "componentes/marcador_categoria.html" with tinte=t %}</span>{% endif %}
+            </div>
+            {% endwith %}
+            <div class="min-w-0">
+              <a href="{% url 'catalogo:detalle' item.producto.slug %}" class="link link-hover font-display text-lg font-bold leading-snug">{{ item.producto.nombre }}</a>
+              <p class="text-sm text-suave">{{ item.producto.precio|pesos }} por {{ item.producto.unidad|unidad }}</p>
               {% for clave, mensaje in errores.items %}{% if clave == item.id %}<p class="text-sm text-error" role="alert">{{ mensaje }}</p>{% endif %}{% endfor %}
             </div>
           </div>
@@ -18,26 +23,26 @@
             <form method="post" action="{% url 'tienda:cambiar' item.id %}" hx-post="{% url 'tienda:cambiar' item.id %}" hx-target="#carrito" hx-swap="outerHTML" class="flex items-center gap-2">
               {% csrf_token %}
               <label for="cantidad-{{ item.id }}" class="sr-only">Cantidad de {{ item.producto.nombre }}</label>
-              <input id="cantidad-{{ item.id }}" type="number" name="cantidad" value="{{ item.cantidad }}" min="1" max="999" class="input input-bordered input-sm w-20 tabular-nums">
-              <button type="submit" class="btn btn-ghost btn-sm">Actualizar</button>
+              <input id="cantidad-{{ item.id }}" type="number" name="cantidad" value="{{ item.cantidad }}" min="1" max="999" class="input h-11 w-20 bg-base-100 tabular-nums">
+              <button type="submit" class="btn h-11 border-base-300 bg-tarjeta">Actualizar</button>
             </form>
             <form method="post" action="{% url 'tienda:quitar' item.id %}" hx-post="{% url 'tienda:quitar' item.id %}" hx-target="#carrito" hx-swap="outerHTML">
               {% csrf_token %}
-              <button type="submit" class="btn btn-ghost btn-sm text-error">Quitar<span class="sr-only"> {{ item.producto.nombre }}</span></button>
+              <button type="submit" class="btn btn-ghost h-11 text-error">Quitar<span class="sr-only"> {{ item.producto.nombre }}</span></button>
             </form>
           </div>
-          <p class="font-display text-lg font-bold tabular-nums sm:w-28 sm:text-right">{{ item.importe|pesos }}</p>
+          <p class="font-display text-xl font-bold tabular-nums text-andosol sm:w-28 sm:text-right">{{ item.importe|pesos }}</p>
         </li>
       {% endfor %}
     </ul>
-    <dl class="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-right tabular-nums">
-      <dt class="text-left">Subtotal</dt><dd>{{ carrito.subtotal|pesos }}</dd>
-      <dt class="text-left">Envío</dt><dd>{% if carrito.envio == "0.00" %}Gratis{% else %}{{ carrito.envio|pesos }}{% endif %}</dd>
-      <dt class="text-left font-display text-xl font-bold">Total</dt><dd class="font-display text-xl font-bold">{{ carrito.total|pesos }}</dd>
-    </dl>
-    <div class="flex flex-wrap justify-end gap-3">
-      <a href="{% url 'catalogo:lista' %}" class="btn btn-ghost">Seguir comprando</a>
-      <a href="{% url 'tienda:checkout' %}" class="btn btn-primary">Continuar con el pedido</a>
+    <div class="ml-auto flex w-full flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5 sm:max-w-sm">
+      <dl class="grid grid-cols-2 gap-y-1.5 text-right tabular-nums">
+        <dt class="text-left text-suave">Subtotal</dt><dd>{{ carrito.subtotal|pesos }}</dd>
+        <dt class="text-left text-suave">Envío</dt><dd>{% if carrito.envio == "0.00" %}Gratis{% else %}{{ carrito.envio|pesos }}{% endif %}</dd>
+        <dt class="mt-2 border-t border-base-300 pt-3 text-left font-display text-xl font-bold">Total</dt><dd class="mt-2 border-t border-base-300 pt-3 font-display text-2xl font-bold text-andosol">{{ carrito.total|pesos }}</dd>
+      </dl>
+      <a href="{% url 'tienda:checkout' %}" class="btn btn-primary btn-lg">Continuar con el pedido</a>
+      <a href="{% url 'catalogo:lista' %}" class="btn btn-ghost text-primary">Seguir comprando</a>
     </div>
   {% else %}
     {% url 'catalogo:lista' as catalogo %}

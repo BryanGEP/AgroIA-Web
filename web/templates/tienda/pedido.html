@@ -2,41 +2,41 @@
 {% load agroia %}
 {% block titulo %}Pedido #{{ pedido.id }}{% endblock %}
 {% block contenido %}
-<div class="max-w-4xl mx-auto px-4 py-10 md:py-14">
-  <a href="{% url 'tienda:mis_pedidos' %}" class="link text-sm">Volver a mis pedidos</a>
+<div class="max-w-4xl mx-auto px-4 py-8 md:py-10">
+  <a href="{% url 'tienda:mis_pedidos' %}" class="link link-primary">Volver a mis pedidos</a>
   <div class="mt-3 mb-6 flex flex-wrap items-center gap-3">
-    <h1 class="text-3xl">Pedido #{{ pedido.id }}</h1>
+    <h1 class="text-[2rem] md:text-[2.6rem]">Pedido #{{ pedido.id }}</h1>
     {% include "componentes/estado_pedido.html" with estado=pedido.estado %}
-    <span class="badge badge-outline">Pago simulado</span>
+    <span class="badge badge-outline border-secondary text-secondary">Pago simulado</span>
   </div>
 
   {% if pedido.estado == "pendiente" %}
-    <form method="post" action="{% url 'tienda:pagar' pedido.id %}" class="mb-8 flex flex-wrap items-center gap-3 rounded-box border border-warning/40 bg-warning/10 p-4">
+    <form method="post" action="{% url 'tienda:pagar' pedido.id %}" class="mb-8 flex flex-col gap-3 rounded-box border-2 border-warning bg-tarjeta p-5 sm:flex-row sm:items-center">
       {% csrf_token %}
       <p class="flex-1">Este pedido está pendiente de pago. El pago es simulado: no se cobra nada.</p>
-      <button type="submit" class="btn btn-primary">Pagar {{ pedido.total|pesos }}</button>
+      <button type="submit" class="btn btn-primary btn-lg tabular-nums">Pagar {{ pedido.total|pesos }}</button>
     </form>
   {% endif %}
 
   <div class="grid gap-8 md:grid-cols-[1fr_16rem]">
     <section aria-labelledby="productos">
-      <h2 id="productos" class="text-xl mb-3">Productos</h2>
-      <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300">
+      <h2 id="productos" class="mb-3 text-2xl">Productos</h2>
+      <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300 bg-tarjeta">
         {% for item in pedido.items %}
-          <li class="flex justify-between gap-3 p-3"><span>{{ item.cantidad }} × {{ item.nombre_producto }} <span class="text-sm opacity-70">({{ item.precio_unitario|pesos }})</span></span><span class="tabular-nums">{{ item.importe|pesos }}</span></li>
+          <li class="flex justify-between gap-3 p-4"><span>{{ item.cantidad }} × {{ item.nombre_producto }} <span class="text-sm text-suave">({{ item.precio_unitario|pesos }})</span></span><span class="font-medium tabular-nums text-andosol">{{ item.importe|pesos }}</span></li>
         {% endfor %}
       </ul>
-      <dl class="ml-auto mt-3 grid max-w-xs grid-cols-2 gap-y-1 text-right tabular-nums">
-        <dt class="text-left">Subtotal</dt><dd>{{ pedido.subtotal|pesos }}</dd>
-        <dt class="text-left">Envío</dt><dd>{% if pedido.envio == "0.00" %}Gratis{% else %}{{ pedido.envio|pesos }}{% endif %}</dd>
-        <dt class="text-left font-bold">Total</dt><dd class="font-bold">{{ pedido.total|pesos }}</dd>
+      <dl class="ml-auto mt-4 grid max-w-xs grid-cols-2 gap-y-1.5 text-right tabular-nums">
+        <dt class="text-left text-suave">Subtotal</dt><dd>{{ pedido.subtotal|pesos }}</dd>
+        <dt class="text-left text-suave">Envío</dt><dd>{% if pedido.envio == "0.00" %}Gratis{% else %}{{ pedido.envio|pesos }}{% endif %}</dd>
+        <dt class="mt-2 border-t border-base-300 pt-3 text-left font-display text-xl font-bold">Total</dt><dd class="mt-2 border-t border-base-300 pt-3 font-display text-2xl font-bold text-andosol">{{ pedido.total|pesos }}</dd>
       </dl>
     </section>
-    <section aria-labelledby="envio" class="text-sm">
-      <h2 id="envio" class="text-xl mb-3">Envío</h2>
+    <section aria-labelledby="envio" class="self-start rounded-box border border-base-300 bg-tarjeta p-5 text-sm">
+      <h2 id="envio" class="mb-3 text-2xl">Envío</h2>
       {% with d=pedido.direccion_envio %}
         <p>{% if d.alias %}<span class="font-medium">{{ d.alias }}</span><br>{% endif %}{{ d.calle }} {{ d.numero }}, {{ d.colonia }}<br>{{ d.municipio }}, {{ d.estado }}, C. P. {{ d.codigo_postal }}</p>
-        {% if d.referencias %}<p class="mt-1 opacity-80">{{ d.referencias }}</p>{% endif %}
+        {% if d.referencias %}<p class="mt-1 text-suave">{{ d.referencias }}</p>{% endif %}
       {% endwith %}
       <p class="mt-3">Método de pago: {% if pedido.metodo_pago == "tarjeta" %}Tarjeta{% elif pedido.metodo_pago == "transferencia" %}Transferencia{% else %}Contra entrega{% endif %}</p>
     </section>

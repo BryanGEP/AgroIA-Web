@@ -9,11 +9,26 @@
     </label>
     {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
   </div>
+{% elif campo.field.widget.input_type == "file" %}
+  {% comment %} Selector de archivo en español (el nativo dice «Choose File»): el input queda
+     oculto a la vista pero en el orden de tabulación; la zona es su segunda etiqueta. {% endcomment %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal text-suave">(opcional)</span>{% endif %}</label>
+    <div x-data="selectorArchivo" @change="elegir" class="selector-archivo flex flex-col gap-2 text-sm">
+      {{ campo }}
+      <label for="{{ id }}" class="zona-archivo flex cursor-pointer flex-wrap items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-3 hover:border-primary">
+        <span class="btn btn-sm btn-primary">Elegir un archivo</span>
+        <span class="break-all" x-text="archivoElegido">Ningún archivo elegido</span>
+      </label>
+    </div>
+    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm text-suave">{{ campo.help_text }}</p>{% endif %}
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
 {% else %}
   <div class="flex flex-col gap-1">
-    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal opacity-70">(opcional)</span>{% endif %}</label>
+    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal text-suave">(opcional)</span>{% endif %}</label>
     {{ campo }}
-    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm opacity-80">{{ campo.help_text }}</p>{% endif %}
+    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm text-suave">{{ campo.help_text }}</p>{% endif %}
     {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
   </div>
 {% endif %}

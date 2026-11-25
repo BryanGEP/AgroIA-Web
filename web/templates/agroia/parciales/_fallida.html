@@ -11,11 +11,11 @@
   {% else %}
     <form method="post" action="{% url 'agroia:reintentar' conversacion_id %}"
           hx-post="{% url 'agroia:reintentar' conversacion_id %}" hx-target="closest li" hx-swap="outerHTML"
-          class="flex flex-wrap items-center gap-3 rounded-box border border-warning/40 bg-warning/10 p-3">
+          class="flex flex-wrap items-center gap-3 rounded-box border-2 border-warning bg-base-100 p-3">
       {% csrf_token %}
       <p class="flex-1 text-sm">{{ mensaje_de_fallo }} Tu pregunta quedó guardada.</p>
-      {% if se_puede_reintentar %}<button type="submit" class="btn btn-sm">Reintentar</button>{% endif %}
-      {% if aviso %}<p class="w-full text-sm text-warning" role="alert">{{ aviso }}</p>{% endif %}
+      {% if se_puede_reintentar %}<button type="submit" class="btn btn-primary btn-sm min-h-9">Reintentar</button>{% endif %}
+      {% if aviso %}<p class="w-full text-sm text-aviso" role="alert">{{ aviso }}</p>{% endif %}
     </form>
   {% endif %}
 </li>

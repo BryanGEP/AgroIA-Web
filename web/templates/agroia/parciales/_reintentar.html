@@ -6,6 +6,6 @@
     {% csrf_token %}
     <p class="flex-1 text-sm">Tu última pregunta no tiene respuesta todavía.</p>
     <button type="submit" class="btn btn-sm">Reintentar</button>
-    {% if aviso %}<p class="w-full text-sm text-warning" role="alert">{{ aviso }}</p>{% endif %}
+    {% if aviso %}<p class="w-full text-sm text-aviso" role="alert">{{ aviso }}</p>{% endif %}
   </form>
 </li>

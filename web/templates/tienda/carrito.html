@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block titulo %}Carrito{% endblock %}
 {% block contenido %}
-<div class="max-w-5xl mx-auto px-4 py-10 md:py-14">
-  <h1 class="text-3xl mb-6">Tu carrito</h1>
+{% include "componentes/seccion.html" with titulo="Tu carrito" compacta=True %}
+<div class="max-w-5xl mx-auto px-4 py-8 md:py-10">
   {% include "tienda/parciales/_carrito.html" %}
 </div>
 {% endblock %}

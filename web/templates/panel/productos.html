@@ -1,31 +1,31 @@
 {% extends "panel/marco.html" %}
 {% block titulo %}Productos · Administración{% endblock %}
 {% block encabezado %}Productos{% endblock %}
-{% block acciones %}<a href="{% url 'panel:producto_nuevo' %}" class="btn btn-primary btn-sm">Nuevo producto</a>{% endblock %}
+{% block acciones %}<a href="{% url 'panel:producto_nuevo' %}" class="btn btn-accent">Nuevo producto</a>{% endblock %}
 {% block panel %}
 <form method="get" action="{% url 'panel:productos' %}" hx-get="{% url 'panel:productos' %}" hx-target="#tabla-productos" hx-push-url="true"
       hx-trigger="change, submit, input changed delay:400ms from:#filtro-q" data-quitar-vacios
       class="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem_10rem_auto] sm:items-end">
   <div class="flex flex-col gap-1">
     <label for="filtro-q" class="text-sm font-medium">Buscar</label>
-    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input input-bordered input-sm w-full" placeholder="Nombre o descripción">
+    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input bg-tarjeta w-full" placeholder="Nombre o descripción">
   </div>
   <div class="flex flex-col gap-1">
     <label for="filtro-categoria" class="text-sm font-medium">Categoría</label>
-    <select id="filtro-categoria" name="categoria" class="select select-bordered select-sm w-full">
+    <select id="filtro-categoria" name="categoria" class="select bg-tarjeta w-full">
       <option value="">Todas</option>
       {% for c in categorias %}<option value="{{ c.slug }}" {% if filtros.categoria == c.slug %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
     </select>
   </div>
   <div class="flex flex-col gap-1">
     <label for="filtro-activo" class="text-sm font-medium">Estado</label>
-    <select id="filtro-activo" name="activo" class="select select-bordered select-sm w-full">
+    <select id="filtro-activo" name="activo" class="select bg-tarjeta w-full">
       <option value="">Todos</option>
       <option value="true" {% if filtros.activo == "true" %}selected{% endif %}>Activos</option>
       <option value="false" {% if filtros.activo == "false" %}selected{% endif %}>Desactivados</option>
     </select>
   </div>
-  <button type="submit" class="btn btn-sm">Filtrar</button>
+  <button type="submit" class="btn btn-primary">Filtrar</button>
 </form>
 {% include "panel/parciales/_productos.html" %}
 {% endblock %}

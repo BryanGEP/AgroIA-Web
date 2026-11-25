@@ -78,3 +78,19 @@ def test_pagina_inexistente_404_amable(client, settings):
 
     assert respuesta.status_code == 404
     assert "No encontramos esta página" in respuesta.content.decode()
+
+
+def test_ninguna_plantilla_tiene_comentarios_de_una_linea_en_varias_lineas():
+    # {# … #} solo vale en una línea: partido en varias, Django lo muestra como texto en la
+    # página. Los comentarios largos van con {% comment %}.
+    from pathlib import Path
+
+    from django.conf import settings
+
+    partidos = []
+    for carpeta in settings.TEMPLATES[0]["DIRS"]:
+        for ruta in Path(carpeta).rglob("*.html"):
+            for numero, linea in enumerate(ruta.read_text(encoding="utf-8").splitlines(), 1):
+                if "{#" in linea and "#}" not in linea.split("{#", 1)[1]:
+                    partidos.append(f"{ruta.name}:{numero}")
+    assert not partidos, partidos

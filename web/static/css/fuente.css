@@ -21,18 +21,18 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: #f5f8ef; /* fondo */
-  --color-base-200: #ecf1e2;
-  --color-base-300: #d7decb; /* líneas */
+  --color-base-100: #eff3e8; /* niebla (fondo) */
+  --color-base-200: #e4ebd9;
+  --color-base-300: #ccd6bf; /* líneas */
   --color-base-content: #1f2b1b; /* tinta */
   --color-primary: #2e5a1c; /* cáscara */
   --color-primary-content: #ffffff;
   --color-secondary: #6b4a2b; /* hueso */
   --color-secondary-content: #ffffff;
-  --color-accent: #cbdb6e; /* pulpa */
-  --color-accent-content: #1f2b1b;
-  --color-neutral: #2f3a2a;
-  --color-neutral-content: #f5f8ef;
+  --color-accent: #cbdb6e; /* pulpa: solo como fondo o sobre fondos oscuros, nunca texto sobre claro */
+  --color-accent-content: #1e3b16;
+  --color-neutral: #1e3b16; /* bosque */
+  --color-neutral-content: #eef4e4;
   --color-info: #2f6f8f;
   --color-info-content: #ffffff;
   --color-success: #2e6b34;
@@ -67,7 +67,7 @@
   --color-secondary: #c9a47c;
   --color-secondary-content: #231609;
   --color-accent: #cbdb6e;
-  --color-accent-content: #1f2b1b;
+  --color-accent-content: #1e3b16;
   --color-neutral: #e7ecdf;
   --color-neutral-content: #131a11;
   --color-info: #7cb8d6;
@@ -115,6 +115,51 @@
   src: url("../fonts/barlow-semi-condensed-latin-700-normal.woff2") format("woff2");
 }
 
+/*
+ * Paleta de la dirección «Altura» (curvas de nivel de la Meseta Purépecha). Bosque es el
+ * encabezado, el pie y el hero en los dos temas; los demás cambian con el tema oscuro.
+ * Contrastes comprobados (AA) en docs/avances/diseno-front.md.
+ */
+:root {
+  --bosque: #1e3b16;
+  --bosque-texto: #eef4e4;
+  --bosque-suave: #c9d8b8;
+  --andosol: #3a2e28;
+  --suave: #4d5a46;
+  --tarjeta: #ffffff;
+  --curvas-hero: #8fb85f;
+  --aviso: #7a4b00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bosque: #0f1d0b;
+    --andosol: #e7ecdf;
+    --suave: #b4c0a8;
+    --tarjeta: #1c2618;
+    --curvas-hero: #6f9a45;
+    --aviso: #e8c45e;
+  }
+}
+[data-theme="agroia-oscuro"] {
+  --bosque: #0f1d0b;
+  --andosol: #e7ecdf;
+  --suave: #b4c0a8;
+  --tarjeta: #1c2618;
+  --curvas-hero: #6f9a45;
+  --aviso: #e8c45e;
+}
+
+@theme inline {
+  --color-bosque: var(--bosque);
+  --color-bosque-texto: var(--bosque-texto);
+  --color-bosque-suave: var(--bosque-suave);
+  --color-andosol: var(--andosol);
+  --color-suave: var(--suave);
+  --color-tarjeta: var(--tarjeta);
+  --color-curvas-hero: var(--curvas-hero);
+  --color-aviso: var(--aviso);
+}
+
 @theme {
   --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Barlow Semi Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
@@ -159,12 +204,12 @@
  * ilustración (--panel, --trazo). Las franjas son decorativas; el texto nunca va encima.
  */
 @layer components {
-  .tinte-fungicidas { --franja: #2e5a1c; --panel: #e3ecd6; --trazo: #2e5a1c; }
-  .tinte-fertilizantes { --franja: #9fb02f; --panel: #f0f3d1; --trazo: #5d6a12; }
-  .tinte-herramientas { --franja: #6b4a2b; --panel: #efe6db; --trazo: #6b4a2b; }
-  .tinte-riego { --franja: #3f7f74; --panel: #dcece9; --trazo: #2f6b61; }
-  .tinte-proteccion { --franja: #6e7458; --panel: #e7e9de; --trazo: #555b41; }
-  .tinte-general { --franja: #8a9a7b; --panel: #eef1e8; --trazo: #4f5c43; }
+  .tinte-fungicidas { --franja: #2e5a1c; --panel: #dfe9d3; --trazo: #2e5a1c; --etiqueta: #2e5a1c; }
+  .tinte-fertilizantes { --franja: #9fb02f; --panel: #eef2cf; --trazo: #5d6a12; --etiqueta: #4e5a10; }
+  .tinte-herramientas { --franja: #6b4a2b; --panel: #efe4d8; --trazo: #6b4a2b; --etiqueta: #5c3f24; }
+  .tinte-riego { --franja: #3f7f74; --panel: #d9ebe6; --trazo: #2f6b61; --etiqueta: #1f5752; }
+  .tinte-proteccion { --franja: #6e7458; --panel: #e6e7df; --trazo: #555b41; --etiqueta: #474c3f; }
+  .tinte-general { --franja: #8a9a7b; --panel: #eef1e8; --trazo: #4f5c43; --etiqueta: #3f4a35; }
 
   .etiqueta-producto {
     border-top: 6px solid var(--franja);
@@ -176,26 +221,38 @@
     background-color: var(--panel);
     color: var(--trazo);
   }
+  .etiqueta-tinte {
+    color: var(--etiqueta);
+  }
+
+  /* Curvas de nivel (static/img/curvas.svg) como máscara: toman el color del texto
+     (currentColor) y la opacidad que se les dé. Decorativas: siempre aria-hidden. */
+  .curvas {
+    background-color: currentColor;
+    -webkit-mask: url("../img/curvas.svg") center / cover no-repeat;
+    mask: url("../img/curvas.svg") center / cover no-repeat;
+    pointer-events: none;
+  }
 }
 
 /* En el tema oscuro los paneles bajan de brillo para no deslumbrar. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; }
-    .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; }
-    .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; }
-    .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; }
-    .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; }
-    .tinte-general { --panel: #262b21; --trazo: #b8c4aa; }
+    .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; --etiqueta: #cfe0b4; }
+    .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; --etiqueta: #dfe8a6; }
+    .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; --etiqueta: #e6cfb5; }
+    .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; --etiqueta: #bfe1da; }
+    .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; --etiqueta: #d9dcc8; }
+    .tinte-general { --panel: #262b21; --trazo: #b8c4aa; --etiqueta: #d6dfcb; }
   }
 }
 [data-theme="agroia-oscuro"] {
-  .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; }
-  .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; }
-  .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; }
-  .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; }
-  .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; }
-  .tinte-general { --panel: #262b21; --trazo: #b8c4aa; }
+  .tinte-fungicidas { --panel: #22311b; --trazo: #9cc46a; --etiqueta: #cfe0b4; }
+  .tinte-fertilizantes { --panel: #2c3014; --trazo: #cbdb6e; --etiqueta: #dfe8a6; }
+  .tinte-herramientas { --panel: #31261b; --trazo: #c9a47c; --etiqueta: #e6cfb5; }
+  .tinte-riego { --panel: #1b2f2b; --trazo: #8cc7bc; --etiqueta: #bfe1da; }
+  .tinte-proteccion { --panel: #2a2c22; --trazo: #b9bf9f; --etiqueta: #d9dcc8; }
+  .tinte-general { --panel: #262b21; --trazo: #b8c4aa; --etiqueta: #d6dfcb; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -237,4 +294,94 @@
     transform-origin: center;
     animation: mascota-parpadea 4.5s infinite;
   }
+}
+
+/* Burbuja del widget (componente widgetAgroia): en celular se oculta mientras se baja por
+   la página. Sigue en el orden de tabulación (sin visibility: hidden): al recibir el foco
+   vuelve a aparecer. Sin animación con prefers-reduced-motion. */
+.burbuja-agroia[data-escondida="true"] {
+  transform: translateY(7rem);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .burbuja-agroia {
+    transition: transform 200ms ease, opacity 200ms ease, scale 150ms ease;
+  }
+}
+
+/* Selector de archivo propio (componentes/campo.html): el input nativo sale de la vista pero
+   sigue enfocable; el foco se muestra en la zona. */
+.selector-archivo input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.selector-archivo:has(input[type="file"]:focus-visible) .zona-archivo {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--color-base-content);
+}
+
+/* Tablas del panel: en celular cada fila es una tarjeta y cada celda lleva su encabezado
+   (data-etiqueta). Contenido generado desde la hoja de estilos: la CSP lo permite. */
+@media (max-width: 767px) {
+  .tabla-tarjetas thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .tabla-tarjetas,
+  .tabla-tarjetas tbody,
+  .tabla-tarjetas tr,
+  .tabla-tarjetas td {
+    display: block;
+    width: 100%;
+  }
+  .tabla-tarjetas tr {
+    border-bottom: 1px solid var(--color-base-300);
+    padding: 0.75rem 0.25rem;
+  }
+  .tabla-tarjetas tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla-tarjetas td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    text-align: right;
+  }
+  .tabla-tarjetas td[data-etiqueta]::before {
+    content: attr(data-etiqueta);
+    font-weight: 500;
+    color: var(--suave);
+    text-align: left;
+  }
+  .tabla-tarjetas td.celda-titulo {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-align: left;
+  }
+  .tabla-tarjetas td.celda-acciones {
+    justify-content: flex-start;
+  }
+}
+
+
+/* Pestañas inactivas y encabezados de tabla: daisyUI los aclara con opacidad (no llega a
+   AA sobre Niebla ni blanco); aquí usan el texto secundario del tema. */
+.tabs .tab:not(.tab-active) {
+  color: var(--suave);
+}
+.table thead th {
+  color: var(--suave);
 }
