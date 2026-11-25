@@ -143,3 +143,21 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Fase 4: cierre de la Entrega 4 (pruebas de integración finales, evidencia con logs, capturas y video, `docs/entregable-4.md` y release v4.0).
 
 **Bloqueos:** La cuota diaria gratuita de Groq se agota con las corridas completas de pruebas.
+
+
+## 2026-11-24 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Rediseño del frontend con la dirección «Altura»: curvas de nivel de la Meseta Purépecha como elemento gráfico, paleta Bosque, Cáscara y Pulpa sobre el verde aguacate, y tipografía Barlow con escala definida.
+- Encabezado y pie nuevos (como componentes), inicio con la conversación de AgroIA en el hero y tarjetas de producto con la «parcela» del color de su categoría.
+- Catálogo, detalle, carrito, checkout, pedidos, AgroIA, diagnóstico (selector de foto en español), cuentas y panel de administración (tablas en tarjetas en celular) alineados al diseño.
+- Estados vacíos y páginas de error con la mascota; la burbuja de AgroIA se oculta al bajar en celular.
+- Contraste AA en 50 pares de color (modo claro y oscuro) y espacios preparados para fotos de ambiente, con su documento de créditos.
+
+**Qué sigue:**
+- Mejorar el panel de administración y sus pantallas.
+- Después, la fase 4: cierre de la Entrega 4.
+
+**Bloqueos:** Ninguno.
