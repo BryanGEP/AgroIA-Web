@@ -1,23 +1,23 @@
 {% load agroia %}
 <div id="tabla-productos">
   {% if productos.results %}
-    <div class="overflow-x-auto rounded-box border border-base-300">
-      <table class="table">
+    <div class="overflow-x-auto rounded-box border border-base-300 bg-tarjeta">
+      <table class="table tabla-tarjetas">
         <thead><tr><th>Producto</th><th>Categoría</th><th class="text-right">Precio</th><th class="text-right">Existencias</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
         <tbody>
           {% for p in productos.results %}
             <tr>
-              <td class="font-medium">{{ p.nombre }}</td>
-              <td>{% nombre_categoria p.categoria categorias as nombre_cat %}{{ nombre_cat }}</td>
-              <td class="text-right tabular-nums">{{ p.precio|pesos }}</td>
-              <td class="text-right tabular-nums">{{ p.stock }}</td>
-              <td>{% if p.activo %}<span class="badge badge-success badge-sm">Activo</span>{% else %}<span class="badge badge-ghost badge-sm">Desactivado</span>{% endif %}</td>
-              <td class="flex justify-end gap-1">
-                <a href="{% url 'panel:producto' p.slug %}" class="btn btn-ghost btn-xs">Editar<span class="sr-only"> {{ p.nombre }}</span></a>
+              <td class="font-medium celda-titulo">{{ p.nombre }}</td>
+              <td data-etiqueta="Categoría">{% nombre_categoria p.categoria categorias as nombre_cat %}{{ nombre_cat }}</td>
+              <td class="text-right tabular-nums" data-etiqueta="Precio">{{ p.precio|pesos }}</td>
+              <td class="text-right tabular-nums" data-etiqueta="Existencias">{{ p.stock }}</td>
+              <td data-etiqueta="Estado">{% if p.activo %}<span class="badge badge-success badge-sm">Activo</span>{% else %}<span class="badge badge-ghost badge-sm">Desactivado</span>{% endif %}</td>
+              <td class="flex justify-end gap-1 celda-acciones">
+                <a href="{% url 'panel:producto' p.slug %}" class="btn btn-ghost btn-sm min-h-9 text-primary">Editar<span class="sr-only"> {{ p.nombre }}</span></a>
                 {% if p.activo %}
                   <form method="post" action="{% url 'panel:desactivar_producto' p.slug %}" hx-confirm="¿Desactivar «{{ p.nombre }}»? Ya no aparecerá en la tienda.">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-ghost btn-xs text-error">Desactivar<span class="sr-only"> {{ p.nombre }}</span></button>
+                    <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-error">Desactivar<span class="sr-only"> {{ p.nombre }}</span></button>
                   </form>
                 {% endif %}
               </td>
@@ -26,10 +26,10 @@
         </tbody>
       </table>
     </div>
-    <p class="mt-2 text-sm opacity-70">{{ productos.count }} producto{{ productos.count|pluralize }}.</p>
+    <p class="mt-2 text-sm text-suave">{{ productos.count }} producto{{ productos.count|pluralize }}.</p>
     <nav class="mt-4 flex justify-between" aria-label="Páginas">
-      {% if productos.previous %}<a class="btn btn-ghost btn-sm" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.categoria %}categoria={{ filtros.categoria }}&{% endif %}{% if filtros.activo %}activo={{ filtros.activo }}&{% endif %}page={{ filtros.page|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
-      {% if productos.next %}<a class="btn btn-ghost btn-sm" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.categoria %}categoria={{ filtros.categoria }}&{% endif %}{% if filtros.activo %}activo={{ filtros.activo }}&{% endif %}page={{ filtros.page|add:1 }}">Siguientes</a>{% endif %}
+      {% if productos.previous %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.categoria %}categoria={{ filtros.categoria }}&{% endif %}{% if filtros.activo %}activo={{ filtros.activo }}&{% endif %}page={{ filtros.page|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
+      {% if productos.next %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.categoria %}categoria={{ filtros.categoria }}&{% endif %}{% if filtros.activo %}activo={{ filtros.activo }}&{% endif %}page={{ filtros.page|add:1 }}">Siguientes</a>{% endif %}
     </nav>
   {% else %}
     {% include "componentes/estado_vacio.html" with titulo="No hay productos con esos filtros" %}

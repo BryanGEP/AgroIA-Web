@@ -2,26 +2,26 @@
 {% load agroia %}
 {% block titulo %}Mis diagnósticos{% endblock %}
 {% block contenido %}
-<div class="max-w-5xl mx-auto px-4 py-10 md:py-14">
-  <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-    <h1 class="text-3xl">Mis diagnósticos</h1>
-    <a href="{% url 'diagnostico:inicio' %}" class="btn btn-primary btn-sm">Nuevo diagnóstico</a>
+{% include "componentes/seccion.html" with titulo="Mis diagnósticos" compacta=True %}
+<div class="max-w-5xl mx-auto px-4 py-8 md:py-10">
+  <div class="mb-6 flex justify-end">
+    <a href="{% url 'diagnostico:inicio' %}" class="btn btn-primary">Nuevo diagnóstico</a>
   </div>
   {% if diagnosticos.results %}
     <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {% for d in diagnosticos.results %}
-        <li><a href="{% url 'diagnostico:detalle' d.id %}" class="card border border-base-300 bg-base-100 hover:border-primary">
-          <figure class="aspect-[4/3] bg-base-200"><img src="{% url 'diagnostico:imagen' d.id %}" alt="Foto del diagnóstico del {{ d.creado_en|slice:':10' }}" loading="lazy" class="h-full w-full object-cover"></figure>
+        <li><a href="{% url 'diagnostico:detalle' d.id %}" class="card overflow-hidden rounded-box border border-base-300 bg-tarjeta hover:border-primary">
+          <figure class="aspect-[4/3] bg-base-200"><img src="{% url 'diagnostico:imagen' d.id %}" alt="Foto del diagnóstico del {{ d.creado_en|slice:':10' }}" width="400" height="300" loading="lazy" class="h-full w-full object-cover"></figure>
           <div class="card-body p-4">
             <p class="font-display text-lg font-bold">{{ nombres|elegir_clave:d.clase }}</p>
-            <p class="text-sm opacity-80">{{ d.creado_en|slice:":10" }} · confianza {{ d.confianza|porcentaje }}</p>
+            <p class="text-sm text-suave">{{ d.creado_en|slice:":10" }} · confianza {{ d.confianza|porcentaje }}</p>
           </div>
         </a></li>
       {% endfor %}
     </ul>
     <nav class="mt-6 flex justify-between" aria-label="Páginas">
-      {% if diagnosticos.previous %}<a class="btn btn-ghost btn-sm" href="?page={{ pagina|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
-      {% if diagnosticos.next %}<a class="btn btn-ghost btn-sm" href="?page={{ pagina|add:1 }}">Siguientes</a>{% endif %}
+      {% if diagnosticos.previous %}<a class="btn border-base-300 bg-tarjeta" href="?page={{ pagina|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
+      {% if diagnosticos.next %}<a class="btn border-base-300 bg-tarjeta" href="?page={{ pagina|add:1 }}">Siguientes</a>{% endif %}
     </nav>
   {% else %}
     {% url 'diagnostico:inicio' as nuevo %}

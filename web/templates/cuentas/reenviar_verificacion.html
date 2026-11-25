@@ -1,7 +1,7 @@
 {% extends "cuentas/marco.html" %}
 {% block titulo %}Verificar correo{% endblock %}
 {% block encabezado %}Recibir otro enlace de verificación{% endblock %}
-{% block intro %}<p class="opacity-80">Escribe el correo de tu cuenta y te enviamos un enlace nuevo. Dura 24 horas.</p>{% endblock %}
+{% block intro %}<p class="text-suave">Escribe el correo de tu cuenta y te enviamos un enlace nuevo. Dura 24 horas.</p>{% endblock %}
 {% block formulario %}
   {% include "componentes/errores_formulario.html" %}
   <form method="post" action="{% url 'cuentas:reenviar_verificacion' %}" class="flex flex-col gap-4" novalidate>
@@ -10,4 +10,4 @@
     <button type="submit" class="btn btn-primary mt-2">Enviar enlace</button>
   </form>
 {% endblock %}
-{% block pie %}<a href="{% url 'cuentas:iniciar_sesion' %}" class="link">Volver a iniciar sesión</a>{% endblock %}
+{% block pie %}<a href="{% url 'cuentas:iniciar_sesion' %}" class="link link-primary">Volver a iniciar sesión</a>{% endblock %}

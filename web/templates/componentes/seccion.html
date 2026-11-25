@@ -1,0 +1,12 @@
+{% load agroia %}{% comment %} Cabecera de una sección (banda Bosque con curvas de nivel). Parámetros: titulo,
+   texto (opcional), foto (nombre de la foto de ambiente opcional: static/img/ambiente/<foto>.webp),
+   alt (de la foto), id (del h1; por defecto "titulo-seccion"), compacta (menos alto). {% endcomment %}
+{% if foto %}{% foto_ambiente foto as url_foto %}{% endif %}
+<div class="relative overflow-hidden bg-bosque text-bosque-texto">
+  {% if url_foto %}{% include "componentes/foto_ambiente.html" with foto=url_foto alt=alt prioridad=True %}{% endif %}
+  <span class="curvas absolute inset-0 text-curvas-hero opacity-25" aria-hidden="true"></span>
+  <div class="relative max-w-6xl mx-auto px-4 {% if compacta %}py-7 md:py-9{% else %}py-9 md:py-12{% endif %}">
+    <h1 id="{{ id|default:'titulo-seccion' }}" class="text-[2.1rem] leading-tight text-white md:text-[2.8rem]">{{ titulo }}</h1>
+    {% if texto %}<p class="mt-2 max-w-[56ch] text-bosque-suave md:text-lg">{{ texto }}</p>{% endif %}
+  </div>
+</div>

@@ -4,27 +4,27 @@
   {% if direcciones %}
     <ul class="grid gap-3 sm:grid-cols-2">
       {% for direccion in direcciones %}
-        <li class="card border border-base-300 bg-base-100">
+        <li class="card rounded-box border border-base-300 bg-tarjeta">
           <div class="card-body gap-2 p-4">
             <p class="font-display text-lg font-semibold">
               {{ direccion.alias|default:"Dirección" }}
               {% if direccion.predeterminada %}<span class="badge badge-primary badge-sm ml-1">Predeterminada</span>{% endif %}
             </p>
             <p class="text-sm leading-snug">{{ direccion.calle }} {{ direccion.numero }}, {{ direccion.colonia }}<br>{{ direccion.municipio }}, {{ direccion.estado }}, C. P. {{ direccion.codigo_postal }}</p>
-            {% if direccion.referencias %}<p class="text-sm opacity-80">{{ direccion.referencias }}</p>{% endif %}
+            {% if direccion.referencias %}<p class="text-sm text-suave">{{ direccion.referencias }}</p>{% endif %}
             <div class="card-actions mt-1">
               {% if not direccion.predeterminada %}
                 <form method="post" action="{% url 'cuentas:predeterminada' direccion.id %}"
                       hx-post="{% url 'cuentas:predeterminada' direccion.id %}" hx-target="#lista-direcciones" hx-swap="outerHTML">
                   {% csrf_token %}
-                  <button type="submit" class="btn btn-ghost btn-xs">Usar como predeterminada</button>
+                  <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-primary">Usar como predeterminada</button>
                 </form>
               {% endif %}
               <form method="post" action="{% url 'cuentas:borrar_direccion' direccion.id %}"
                     hx-post="{% url 'cuentas:borrar_direccion' direccion.id %}" hx-target="#lista-direcciones" hx-swap="outerHTML"
                     hx-confirm="¿Borrar la dirección «{{ direccion.alias|default:direccion.calle }}»?">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-ghost btn-xs text-error">Borrar<span class="sr-only"> {{ direccion.alias|default:direccion.calle }}</span></button>
+                <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-error">Borrar<span class="sr-only"> {{ direccion.alias|default:direccion.calle }}</span></button>
               </form>
             </div>
           </div>
@@ -35,8 +35,8 @@
     {% include "componentes/estado_vacio.html" with titulo="Todavía no tienes direcciones" texto="Agrega una para recibir tus pedidos." %}
   {% endif %}
 
-  <details class="collapse collapse-arrow border border-base-300 bg-base-200" {% if formulario_direccion.errors %}open{% endif %}>
-    <summary class="collapse-title font-medium">Agregar una dirección</summary>
+  <details class="collapse collapse-arrow rounded-box border border-base-300 bg-tarjeta" {% if formulario_direccion.errors %}open{% endif %}>
+    <summary class="collapse-title font-display text-lg font-bold">Agregar una dirección</summary>
     <div class="collapse-content">
       {% include "componentes/errores_formulario.html" with formulario=formulario_direccion %}
       <form method="post" action="{% url 'cuentas:agregar_direccion' %}"

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block titulo %}Aviso de privacidad{% endblock %}
 {% block contenido %}
-<div class="max-w-3xl mx-auto px-4 py-10 md:py-14">
-  <h1 class="text-3xl mb-2">Aviso de privacidad</h1>
-  <p class="mb-8 opacity-80">Última actualización: noviembre de 2026 (versión 2026-11). <a href="#historial" class="link">Qué cambió</a>.</p>
+{% include "componentes/seccion.html" with titulo="Aviso de privacidad" compacta=True %}
+<div class="max-w-3xl mx-auto px-4 py-8 md:py-10">
+  <p class="mb-8 text-suave">Última actualización: noviembre de 2026 (versión 2026-11). <a href="#historial" class="link link-primary">Qué cambió</a>.</p>
 
   <div class="alert alert-info mb-10">
     <span>AgroIA es un proyecto académico de la carrera de Ingeniería en Sistemas Computacionales del Tecnológico Nacional de México, campus Jiquilpan. No es un servicio comercial. Si se usa con productores reales, este aviso debe revisarlo una persona con conocimientos legales.</span>
@@ -54,7 +54,7 @@
 
     <section aria-labelledby="cambios">
       <h2 id="cambios" class="text-2xl">Cambios a este aviso</h2>
-      <p>Si este aviso cambia, publicaremos la nueva versión en esta página y anotaremos en el <a href="#historial" class="link">historial de versiones</a> su fecha y qué cambió. Al registrarte aceptas la versión vigente en ese momento, y la plataforma guarda cuál fue. Las funciones nuevas que sean opcionales, como el dictado por voz, te piden tu consentimiento antes de usarse por primera vez.</p>
+      <p>Si este aviso cambia, publicaremos la nueva versión en esta página y anotaremos en el <a href="#historial" class="link link-primary">historial de versiones</a> su fecha y qué cambió. Al registrarte aceptas la versión vigente en ese momento, y la plataforma guarda cuál fue. Las funciones nuevas que sean opcionales, como el dictado por voz, te piden tu consentimiento antes de usarse por primera vez.</p>
     </section>
 
     <section aria-labelledby="historial">

@@ -1,17 +1,24 @@
 {% comment %} "Agregar al carrito". Con sesión: formulario con HTMX (y sin JavaScript también
-   funciona); sin sesión: enlace al login que regresa al producto. Parámetros: producto, grande. {% endcomment %}
+   funciona); sin sesión: enlace al login que regresa al producto. Parámetros: producto, grande,
+   compacto (en la tarjeta: en pantallas angostas, un botón redondo «+» de 44 px con su
+   nombre accesible; desde sm, el texto completo a lo ancho). {% endcomment %}
 {% if producto.stock == 0 %}
-  <button type="button" class="btn {% if grande %}btn-lg{% else %}btn-sm{% endif %} btn-disabled" disabled>Agotado</button>
+  <button type="button" class="btn {% if grande %}btn-lg{% elif compacto %}btn-sm sm:btn-md sm:w-full{% else %}btn-sm{% endif %} btn-disabled" disabled>Agotado</button>
 {% elif usuario %}
   <form method="post" action="{% url 'tienda:agregar' producto.slug %}"
         hx-post="{% url 'tienda:agregar' producto.slug %}" hx-target="#agregado-{{ producto.slug }}" hx-swap="innerHTML"
-        hx-indicator="#agregando-{{ producto.slug }}" class="flex flex-wrap items-center gap-2">
+        hx-indicator="#agregando-{{ producto.slug }}" class="flex flex-wrap items-center gap-2 {% if compacto %}sm:flex-col sm:items-stretch{% endif %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-    <button type="submit" class="btn btn-primary {% if grande %}btn-lg{% else %}btn-sm{% endif %}">Agregar al carrito<span class="sr-only">: {{ producto.nombre }}</span></button>
+    {% if compacto %}
+      <button type="submit" class="btn btn-primary btn-circle h-11 min-h-11 w-11 text-2xl leading-none sm:hidden" aria-label="Agregar {{ producto.nombre }} al carrito"><span aria-hidden="true">+</span></button>
+      <button type="submit" class="btn btn-primary hidden w-full sm:inline-flex">Agregar al carrito<span class="sr-only">: {{ producto.nombre }}</span></button>
+    {% else %}
+      <button type="submit" class="btn btn-primary {% if grande %}btn-lg{% else %}btn-sm{% endif %}">Agregar al carrito<span class="sr-only">: {{ producto.nombre }}</span></button>
+    {% endif %}
     {% include "componentes/cargando.html" with id="agregando-"|add:producto.slug texto="Agregando…" %}
   </form>
   <div id="agregado-{{ producto.slug }}" role="status" aria-live="polite"></div>
 {% else %}
-  <a href="{% url 'cuentas:iniciar_sesion' %}?next={% url 'catalogo:detalle' producto.slug %}" class="btn btn-outline btn-primary {% if grande %}btn-lg{% else %}btn-sm{% endif %}">Inicia sesión para comprar<span class="sr-only">: {{ producto.nombre }}</span></a>
+  <a href="{% url 'cuentas:iniciar_sesion' %}?next={% url 'catalogo:detalle' producto.slug %}" class="btn btn-outline btn-primary {% if grande %}btn-lg{% elif compacto %}btn-sm min-h-11 sm:btn-md sm:w-full{% else %}btn-sm{% endif %}">{% if compacto %}<span class="sm:hidden">Entrar</span><span class="hidden sm:inline">Inicia sesión para comprar</span>{% else %}Inicia sesión para comprar{% endif %}<span class="sr-only">: {{ producto.nombre }}</span></a>
 {% endif %}

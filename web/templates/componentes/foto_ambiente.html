@@ -1,0 +1,8 @@
+{% comment %} Foto de ambiente opcional bajo una capa del color Bosque (las curvas van encima,
+   en la plantilla que la usa). Parámetros: foto (URL de {% foto_ambiente %}), alt, ancho, alto,
+   prioridad (la del hero: sin carga diferida). Siempre desde static/ (CSP: img-src 'self').
+   {% endcomment %}
+<img src="{{ foto }}" alt="{{ alt }}" width="{{ ancho|default:1600 }}" height="{{ alto|default:900 }}"
+     {% if prioridad %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"
+     class="absolute inset-0 h-full w-full object-cover">
+<span class="absolute inset-0 bg-bosque/85" aria-hidden="true"></span>

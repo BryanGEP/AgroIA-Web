@@ -1,0 +1,29 @@
+{% comment %} Pie del sitio (Bosque). Con el widget deja margen abajo para que la burbuja no
+   tape lo último de la página. {% endcomment %}
+<footer class="bg-bosque text-bosque-suave">
+  {# Con el widget, margen abajo: la burbuja no tapa lo último de la página. #}
+  <div class="max-w-6xl mx-auto grid gap-8 px-4 pt-10 {% if widget_agroia.mostrar %}pb-28{% else %}pb-10{% endif %} text-sm sm:grid-cols-[1.6fr_1fr_1fr]">
+    <div class="flex flex-col gap-3">
+      <a href="{% url 'paginas:inicio' %}" class="inline-flex items-center gap-2 self-start font-display text-xl font-bold text-white" aria-label="AgroIA, inicio">
+        <span class="text-[#9cc46a]">{% include "componentes/logo.html" %}</span><span translate="no">AgroIA</span>
+      </a>
+      <p class="max-w-[36ch]">AgroIA · Insumos y asesoría para productores de aguacate de Michoacán.</p>
+    </div>
+    <nav aria-label="Tienda">
+      <h2 class="mb-2 text-base text-white">Tienda</h2>
+      <ul class="flex flex-col gap-1.5">
+        <li><a href="{% url 'catalogo:lista' %}" class="link link-hover">Catálogo</a></li>
+        <li><a href="{% url 'tienda:carrito' %}" class="link link-hover">Carrito</a></li>
+        <li><a href="{% url 'tienda:mis_pedidos' %}" class="link link-hover">Mis pedidos</a></li>
+      </ul>
+    </nav>
+    <nav aria-label="AgroIA">
+      <h2 class="mb-2 text-base text-white">AgroIA</h2>
+      <ul class="flex flex-col gap-1.5">
+        <li><a href="{% url 'agroia:inicio' %}" class="link link-hover">AgroIA chat</a></li>
+        <li><a href="{% url 'diagnostico:inicio' %}" class="link link-hover">Diagnóstico por imagen</a></li>
+        <li><a href="{% url 'paginas:aviso_privacidad' %}" class="link link-hover font-medium">Aviso de privacidad</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>

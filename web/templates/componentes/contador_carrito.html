@@ -1,3 +1,3 @@
 {% comment %} Contador del carrito en el menú (sale de la sesión). Con oob=True se manda fuera
    de banda en las respuestas de HTMX para actualizarlo al agregar o quitar. {% endcomment %}
-<span id="contador-carrito" {% if oob %}hx-swap-oob="true"{% endif %} class="badge badge-sm badge-primary {% if not carrito_cantidad %}hidden{% endif %}" aria-label="{{ carrito_cantidad|default:0 }} productos en el carrito">{{ carrito_cantidad|default:0 }}</span>
+<span id="contador-carrito" {% if oob %}hx-swap-oob="true"{% endif %} class="badge badge-sm badge-accent {% if not carrito_cantidad %}hidden{% endif %}" aria-label="{{ carrito_cantidad|default:0 }} productos en el carrito">{{ carrito_cantidad|default:0 }}</span>

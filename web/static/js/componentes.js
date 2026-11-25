@@ -135,6 +135,10 @@ document.addEventListener("alpine:init", function () {
   //   abre, o al cargar la página si estaba abierto o hay una pregunta pendiente.
   // - Foco: en celular el panel es modal (pantalla completa, foco atrapado); en escritorio
   //   flota sin atraparlo. Al abrir entra al campo; al cerrar vuelve a la burbuja.
+  // - En celular la burbuja se oculta mientras se baja por la página (para no tapar el
+  //   texto) y vuelve al subir o al detenerse. No se oculta con el panel abierto ni con una
+  //   respuesta nueva sin leer, y al recibir el foco vuelve a aparecer. La animación está
+  //   en fuente.css (.burbuja-agroia) y se quita con prefers-reduced-motion.
   Alpine.data("widgetAgroia", function () {
     return {
       abierto: this.$persist(false).as("agroia-widget-abierto").using(sessionStorage),
@@ -144,6 +148,7 @@ document.addEventListener("alpine:init", function () {
       celular: false,
       enfocarAlCargar: false,
       anuncio: "",
+      bajando: false,
       init() {
         var self = this;
         var consulta = window.matchMedia("(max-width: 639px)");
@@ -152,6 +157,7 @@ document.addEventListener("alpine:init", function () {
           self.celular = evento.matches;
         });
         if (this.abierto || this.$el.dataset.pendiente === "true") this.cargar();
+        this.vigilarDesplazamiento();
         // Política de reproducción automática: el audio solo arranca con un gesto.
         ["pointerdown", "keydown"].forEach(function (tipo) {
           document.addEventListener(tipo, function () { self.prepararAudio(); }, { once: true });
@@ -165,6 +171,27 @@ document.addEventListener("alpine:init", function () {
       },
       get modal() {
         return this.celular ? "true" : "false";
+      },
+      vigilarDesplazamiento() {
+        var self = this;
+        var anterior = window.scrollY;
+        var espera = null;
+        window.addEventListener("scroll", function () {
+          var actual = window.scrollY;
+          var delta = actual - anterior;
+          anterior = actual;
+          if (!self.celular) { self.bajando = false; return; }
+          if (delta > 4 && actual > 80) self.bajando = true;
+          else if (delta < -4) self.bajando = false;
+          window.clearTimeout(espera);
+          espera = window.setTimeout(function () { self.bajando = false; }, 700);
+        }, { passive: true });
+      },
+      mostrarBurbuja() {
+        this.bajando = false;
+      },
+      get burbujaEscondida() {
+        return this.bajando && !this.abierto && !this.nueva ? "true" : "false";
       },
       get burbujaVisible() {
         return !(this.abierto && this.celular);
@@ -421,11 +448,13 @@ document.addEventListener("alpine:init", function () {
     return {
       url: "",
       error: "",
+      nombre: "",
       elegir(evento) {
         var archivo = evento.target.files && evento.target.files[0];
         if (this.url) URL.revokeObjectURL(this.url);
         this.url = "";
         this.error = "";
+        this.nombre = "";
         if (!archivo) return;
         if (["image/jpeg", "image/png"].indexOf(archivo.type) === -1) {
           this.error = "Elige una foto JPG o PNG.";
@@ -437,9 +466,31 @@ document.addEventListener("alpine:init", function () {
           return;
         }
         this.url = URL.createObjectURL(archivo);
+        this.nombre = archivo.name;
+      },
+      // Texto del selector de archivo propio (el nativo dice «Choose File» en inglés).
+      get archivoElegido() {
+        return this.nombre || "Ningún archivo elegido";
       },
       get lista() {
         return this.url !== "";
+      },
+    };
+  });
+
+  // Selector de archivo genérico en español (componentes/campo.html): el input nativo
+  // queda oculto a la vista (fuente.css, .selector-archivo) y aquí solo se muestra el nombre
+  // del archivo elegido. La validación sigue en el servidor.
+  Alpine.data("selectorArchivo", function () {
+    return {
+      nombre: "",
+      elegir(evento) {
+        if (!evento.target || evento.target.type !== "file") return;
+        var archivo = evento.target.files && evento.target.files[0];
+        this.nombre = archivo ? archivo.name : "";
+      },
+      get archivoElegido() {
+        return this.nombre || "Ningún archivo elegido";
       },
     };
   });
@@ -454,6 +505,16 @@ document.addEventListener("alpine:init", function () {
       },
     };
   });
+});
+
+// Listas con desplazamiento horizontal (data-desplazar-al-foco): el elemento que recibe el
+// foco se desplaza hasta quedar completo a la vista; sin animación con prefers-reduced-motion.
+document.addEventListener("focusin", function (evento) {
+  var lista = evento.target.closest && evento.target.closest("[data-desplazar-al-foco]");
+  if (!lista) return;
+  var elemento = evento.target.closest("li") || evento.target;
+  var quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  elemento.scrollIntoView({ block: "nearest", inline: "nearest", behavior: quieto ? "auto" : "smooth" });
 });
 
 // Filtros del catálogo con HTMX: no enviar los campos vacíos, para que la URL quede limpia

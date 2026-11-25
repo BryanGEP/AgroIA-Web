@@ -257,6 +257,17 @@ El código está montado como volumen: los cambios se ven sin reconstruir la ima
 docker compose restart web svc-usuarios svc-tienda svc-contenido svc-ia svc-contenido-eventos svc-usuarios-eventos svc-ia-worker
 ```
 
+### Fotos de ambiente
+
+El inicio, el login y el registro tienen un espacio opcional para una foto de ambiente: la foto va debajo de una capa color Bosque con las curvas de nivel encima. **Sin foto, la página se ve igual que ahora**; no hace falta código para agregarla:
+
+1. Guarda la foto en `web/static/img/ambiente/` con el nombre del espacio: `inicio.webp` (hero del inicio), `agroia.webp` y `diagnostico.webp` (tarjetas del inicio), `iniciar_sesion.webp` y `registro.webp` (panel lateral de cada pantalla). La lista completa está en `docs/avances/diseno-front.md`.
+2. Formato **WebP**, calidad 75 a 80. Tamaños recomendados: **1600 × 900 px** (hasta ~250 KB) para el hero, **800 × 300 px** (hasta ~80 KB) para las tarjetas y **1200 × 1600 px** (hasta ~200 KB) para el login y el registro. La foto se recorta para llenar el espacio (`object-cover`): deja lo importante al centro.
+3. Registra la foto en [docs/creditos-imagenes.md](docs/creditos-imagenes.md) (fuente, autor y licencia) antes de subirla.
+4. Si la página ya estaba abierta, reinicia `web` (`docker compose restart web`): la plantilla busca la foto en los archivos estáticos.
+
+Las fotos siempre se sirven desde `static/` (o desde el almacenamiento, en el caso de las imágenes de productos), nunca desde otro dominio: la Content-Security-Policy (`img-src 'self'`) las bloquearía. Las imágenes de enfermedades (roña, antracnosis) solo pueden ser fotos reales con licencia libre, nunca generadas por IA.
+
 ## Entornos virtuales (opcional)
 
 La forma oficial de correr los servicios y sus pruebas es Docker. Los entornos virtuales solo sirven para que el editor reconozca los paquetes y para correr ruff y pytest localmente:
@@ -288,6 +299,7 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - [Documento del Entregable 2](docs/entregable-2.md)
 - [Documento del Entregable 3](docs/entregable-3.md) y su [matriz de accesos](docs/entregable-3/matriz-accesos.md)
 - [Contrato de identidad](docs/contrato-identidad.md): qué emite svc-usuarios y cómo valida el token cada servicio.
+- [Créditos de imágenes](docs/creditos-imagenes.md): fuente, autor y licencia de cada foto del sitio.
 - [Eventos entre servicios](docs/eventos.md): qué es asíncrono, catálogo de eventos, sobre común, reintentos, fallidos y diagrama del flujo.
 
 ## Entregas

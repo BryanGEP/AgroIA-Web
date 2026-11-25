@@ -1,31 +1,40 @@
 {% extends "base.html" %}
 {% block titulo %}Diagnóstico por imagen{% endblock %}
 {% block contenido %}
-<div class="max-w-4xl mx-auto px-4 py-10 md:py-14">
-  <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-    <h1 class="text-3xl">Diagnóstico por imagen</h1>
-    <a href="{% url 'diagnostico:historial' %}" class="link">Mis diagnósticos</a>
+{% include "componentes/seccion.html" with titulo="Diagnóstico por imagen" compacta=True %}
+<div class="max-w-5xl mx-auto px-4 py-8 md:py-10">
+  <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+  <p class="max-w-prose text-suave">Sube una foto de una hoja o un fruto de aguacate y AgroIA te dirá si se ve sano o si tiene síntomas de roña o antracnosis. Es una orientación: confirma el tratamiento con un técnico.</p>
+    <a href="{% url 'diagnostico:historial' %}" class="link link-primary font-medium">Mis diagnósticos</a>
   </div>
-  <p class="mb-8 max-w-prose opacity-80">Sube una foto de una hoja o un fruto de aguacate y AgroIA te dirá si se ve sano o si tiene síntomas de roña o antracnosis. Es una orientación: confirma el tratamiento con un técnico.</p>
 
-  <div class="grid gap-8 md:grid-cols-2">
+  <div class="grid gap-6 md:grid-cols-2 md:gap-8">
     <form method="post" enctype="multipart/form-data" action="{% url 'diagnostico:inicio' %}"
           hx-post="{% url 'diagnostico:inicio' %}" hx-encoding="multipart/form-data" hx-target="#resultado" hx-swap="innerHTML"
-          hx-indicator="#analizando" x-data="vistaPrevia" class="flex flex-col gap-4" novalidate>
+          hx-indicator="#analizando" x-data="vistaPrevia" class="flex flex-col gap-4 self-start rounded-box border border-base-300 bg-tarjeta p-5" novalidate>
       {% csrf_token %}
       <div class="flex flex-col gap-1">
-        <label for="id_imagen" class="font-medium">{{ formulario.imagen.label }}</label>
+        <label for="id_imagen" class="font-display text-xl font-bold">{{ formulario.imagen.label }}</label>
+        {% comment %} Selector propio en español: el input nativo queda oculto a la vista pero sigue
+           en el orden de tabulación; la zona es su segunda etiqueta y muestra el foco y el
+           archivo elegido. {% endcomment %}
         <input type="file" name="imagen" id="id_imagen" accept="image/jpeg,image/png" required
-               class="file-input file-input-bordered w-full" aria-describedby="id_imagen-ayuda" @change="elegir">
-        <p id="id_imagen-ayuda" class="text-sm opacity-80">{{ formulario.imagen.help_text }}</p>
+               class="peer sr-only" aria-describedby="id_imagen-ayuda" @change="elegir">
+        <label for="id_imagen" class="tinte-fungicidas panel-tinte relative flex cursor-pointer flex-col items-center gap-2 overflow-hidden rounded-box border-2 border-dashed border-primary/50 px-4 py-6 text-center hover:border-primary peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-focus-visible:shadow-[0_0_0_5px_var(--color-base-content)]">
+          <span class="curvas absolute inset-0 opacity-15" aria-hidden="true"></span>
+          <svg class="relative h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span class="btn btn-primary relative">Elegir una foto</span>
+          <span class="relative break-all text-sm text-base-content" x-text="archivoElegido">Ningún archivo elegido</span>
+        </label>
+        <p id="id_imagen-ayuda" class="text-sm text-suave">{{ formulario.imagen.help_text }}</p>
         <p class="text-sm text-error" x-show="error" x-text="error" x-cloak role="alert"></p>
         {% for error in formulario.imagen.errors %}<p class="text-sm text-error" role="alert">{{ error }}</p>{% endfor %}
       </div>
-      <figure x-show="lista" x-cloak class="overflow-hidden rounded-box border border-base-300 bg-base-200">
+      <figure x-show="lista" x-cloak class="overflow-hidden rounded-box border border-base-300 bg-base-100">
         <img :src="url" alt="Vista previa de la foto que vas a enviar" class="max-h-80 w-full object-contain">
       </figure>
       <div class="flex items-center gap-3">
-        <button type="submit" class="btn btn-primary">Analizar foto</button>
+        <button type="submit" class="btn btn-primary btn-lg">Analizar foto</button>
         {% include "componentes/cargando.html" with id="analizando" texto="Analizando la foto…" %}
       </div>
     </form>

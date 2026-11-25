@@ -5,5 +5,5 @@
    intervalo. {% endcomment %}
 <li id="espera" class="chat chat-start" role="status"
     hx-get="{% url 'agroia:solicitud' conversacion_id %}" hx-trigger="load delay:{{ intervalo }}s" hx-swap="outerHTML">
-  <div class="chat-bubble bg-base-200 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
+  <div class="chat-bubble border border-base-300 bg-base-100 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
 </li>

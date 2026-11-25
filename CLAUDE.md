@@ -103,7 +103,12 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 ## Frontend (`web/`)
 
 - daisyUI para componentes, Tailwind para ajustes de diseño, HTMX para lo que depende del servidor, Alpine para lo que pasa solo en el navegador.
-- Tema propio `agroia` (primario verde aguacate) en `static/css/fuente.css`.
+- Dirección visual «Altura» (detalle en `docs/avances/diseno-front.md`): temas `agroia` y `agroia-oscuro` en `static/css/fuente.css`, con los colores propios como utilidades (`bg-bosque`, `text-suave`, `bg-tarjeta`, `text-andosol`, `text-aviso`…). Encabezado, pie y bandas de sección en Bosque con las curvas de nivel (`.curvas`, máscara de `static/img/curvas.svg`); contenido sobre Niebla en tarjetas.
+- Contraste AA siempre: Pulpa (`accent`) nunca como texto sobre fondo claro; el texto secundario con `text-suave`, nunca con `opacity-*` ni `text-warning` (no llegan a 4.5:1). Si agregas un par de colores, súmalo a la tabla de contrastes del avance de diseño.
+- Componentes del diseño: `encabezado`, `pie`, `seccion` (banda de título), `tarjeta_producto` (la «parcela» 4:3), `estado_vacio`, `error`, `foto_ambiente`. En las listas que se desplazan de lado, `data-desplazar-al-foco`; en las tablas del panel, `tabla-tarjetas` con `data-etiqueta` en cada celda.
+- Fotos de ambiente opcionales en `static/img/ambiente/<nombre>.webp` (etiqueta `{% foto_ambiente %}`): sin foto la página se ve igual. Toda imagen con `alt`, `width`, `height` y `loading="lazy"` (salvo la de arriba de la página), desde `static/` o el almacenamiento, nunca de otro dominio. Cada foto se registra en `docs/creditos-imagenes.md`; las de enfermedades, solo reales con licencia libre, nunca generadas por IA.
+- Comentarios de plantilla de varias líneas con `{% comment %}`: un `{# #}` partido se ve en la página (hay una prueba que lo revisa).
+- Clases que solo pone JavaScript no las genera Tailwind (lee las plantillas): usa un atributo `data-*` con su regla en `fuente.css`.
 - Todas las páginas extienden `templates/base.html`.
 - Fragmentos de HTMX en `templates/<modulo>/parciales/_nombre.html`; la vista devuelve el parcial si `request.htmx`, si no la página completa.
 - Componentes repetidos como `{% include %}` en `templates/componentes/`.
@@ -112,7 +117,7 @@ Cada servicio Django: `config/` (settings y urls), `apps/<app>/` con `models.py`
 - Diseño mobile-first. Cada `input` con `label`, cada imagen con `alt`.
 - HTMX y Alpine se sirven desde `static/vendor/`, no desde CDN. Alpine es la versión CSP (`@alpinejs/csp`): la lógica compleja va en `Alpine.data()` dentro de `static/js/`; sin `hx-on`, sin scripts ni estilos en línea (`style=`, `onclick=`), porque la Content-Security-Policy no permite `unsafe-inline` ni `unsafe-eval`.
 - El proxy `/api/<servicio>/` del gateway solo acepta el token en `Authorization`, nunca el de la sesión.
-- Widget flotante de AgroIA (`templates/agroia/parciales/_widget.html`, componente `widgetAgroia`): está en `base.html` salvo en /agroia/, las pantallas de acceso, el panel de administración y las páginas de error (vacían el bloque `widget_agroia`). Comparte con /agroia/ los parciales del chat y el flujo asíncrono; su conversación vive en la sesión del gateway. Carga diferida: cerrado y sin pregunta pendiente no hace peticiones.
+- Widget flotante de AgroIA (`templates/agroia/parciales/_widget.html`, componente `widgetAgroia`): está en `base.html` salvo en /agroia/, las pantallas de acceso, el panel de administración y las páginas de error (vacían el bloque `widget_agroia`). Comparte con /agroia/ los parciales del chat y el flujo asíncrono; su conversación vive en la sesión del gateway. Carga diferida: cerrado y sin pregunta pendiente no hace peticiones. En celular la burbuja se oculta mientras se baja y vuelve al subir, al detenerse o al recibir el foco (nunca con el panel abierto ni con una respuesta sin leer).
 - Cabeceras del gateway: la CSP estricta y `Permissions-Policy` (el micrófono solo para este sitio, para el dictado por voz del widget, detrás de un aviso). En HTMX, `style` no está en `attributesToSettle`: copiarlo violaría la CSP.
 - No uses Bootstrap, React ni jQuery.
 

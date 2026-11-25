@@ -1,15 +1,34 @@
 {% extends "base.html" %}
-{% comment %} Marco de las pantallas de cuenta: una columna angosta y centrada.
-   Bloques: titulo, intro, formulario y pie. {% endcomment %}
+{% load agroia %}
+{% comment %} Marco de las pantallas de cuenta: a un lado, la banda Bosque con curvas de nivel
+   (y una foto de ambiente opcional: static/img/ambiente/<nombre de la ruta>.webp, por
+   ejemplo iniciar_sesion.webp o registro.webp); al otro, el formulario en una tarjeta.
+   Bloques: titulo, encabezado, intro, formulario y pie. {% endcomment %}
 {% block contenido %}
-<div class="max-w-md mx-auto px-4 py-10 md:py-14">
-  <h1 class="text-3xl mb-2">{% block encabezado %}{% endblock %}</h1>
-  {% block intro %}{% endblock %}
-  <div class="mt-6 flex flex-col gap-5">
-    {% block formulario %}{% endblock %}
+{% foto_ambiente request.resolver_match.url_name as foto %}
+<div class="grid md:min-h-[calc(100dvh-4rem)] md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+  <div class="relative overflow-hidden bg-bosque text-bosque-texto">
+    {% if foto %}{% include "componentes/foto_ambiente.html" with foto=foto alt="Huerta de aguacate en Michoacán" ancho=1200 alto=1600 prioridad=True %}{% endif %}
+    <span class="curvas absolute inset-0 text-curvas-hero opacity-30" aria-hidden="true"></span>
+    <div class="relative mx-auto flex max-w-md items-center gap-4 px-4 py-6 md:h-full md:max-w-sm md:flex-col md:items-start md:justify-center md:gap-6 md:py-16">
+      <span class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#eff3e8] md:h-24 md:w-24">{% include "componentes/mascota.html" with clase="h-11 w-10 md:h-20 md:w-16" parpadea=True %}</span>
+      <div>
+        <p class="font-display text-xl font-bold leading-tight text-white md:text-[2.4rem]">Insumos, asesoría y diagnóstico para tu huerta</p>
+        <p class="mt-1 hidden text-bosque-suave md:mt-4 md:block md:text-lg">Compra con ficha técnica completa, guarda tus direcciones y pregúntale a AgroIA cuando lo necesites.</p>
+      </div>
+    </div>
   </div>
-  <div class="mt-8 flex flex-col gap-2 text-sm">
-    {% block pie %}{% endblock %}
+  <div class="flex justify-center px-4 py-8 md:items-center md:py-14">
+    <div class="w-full max-w-md rounded-box border border-base-300 bg-tarjeta p-6 md:p-8">
+      <h1 class="mb-2 text-[2rem] leading-tight">{% block encabezado %}{% endblock %}</h1>
+      {% block intro %}{% endblock %}
+      <div class="mt-6 flex flex-col gap-5">
+        {% block formulario %}{% endblock %}
+      </div>
+      <div class="mt-8 flex flex-col gap-2 border-t border-base-300 pt-5 text-sm">
+        {% block pie %}{% endblock %}
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -6,33 +6,33 @@
 <form method="get" action="{% url 'panel:pedidos' %}" class="mb-4 flex flex-wrap items-end gap-3">
   <div class="flex flex-col gap-1">
     <label for="filtro-estado" class="text-sm font-medium">Estado</label>
-    <select id="filtro-estado" name="estado" class="select select-bordered select-sm">
+    <select id="filtro-estado" name="estado" class="select bg-tarjeta">
       <option value="">Todos</option>
       {% for valor, texto in estados %}<option value="{{ valor }}" {% if filtros.estado == valor %}selected{% endif %}>{{ texto }}</option>{% endfor %}
     </select>
   </div>
-  <button type="submit" class="btn btn-sm">Filtrar</button>
+  <button type="submit" class="btn btn-primary">Filtrar</button>
 </form>
 {% if pedidos.results %}
-  <div class="overflow-x-auto rounded-box border border-base-300">
-    <table class="table">
+  <div class="overflow-x-auto rounded-box border border-base-300 bg-tarjeta">
+    <table class="table tabla-tarjetas">
       <thead><tr><th>Pedido</th><th>Fecha</th><th>Productos</th><th class="text-right">Total</th><th>Estado</th></tr></thead>
       <tbody>
         {% for p in pedidos.results %}
           <tr>
-            <td><a href="{% url 'panel:pedido' p.id %}" class="link font-medium">#{{ p.id }}</a></td>
-            <td>{{ p.creado_en|slice:":10" }}</td>
-            <td>{{ p.items|length }}</td>
-            <td class="text-right tabular-nums">{{ p.total|pesos }}</td>
-            <td>{% include "componentes/estado_pedido.html" with estado=p.estado %}</td>
+            <td class="celda-titulo"><a href="{% url 'panel:pedido' p.id %}" class="link font-medium">#{{ p.id }}</a></td>
+            <td data-etiqueta="Fecha">{{ p.creado_en|slice:":10" }}</td>
+            <td data-etiqueta="Productos">{{ p.items|length }}</td>
+            <td class="text-right tabular-nums" data-etiqueta="Total">{{ p.total|pesos }}</td>
+            <td data-etiqueta="Estado">{% include "componentes/estado_pedido.html" with estado=p.estado %}</td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   <nav class="mt-4 flex justify-between" aria-label="Páginas">
-    {% if pedidos.previous %}<a class="btn btn-ghost btn-sm" href="?{% if filtros.estado %}estado={{ filtros.estado }}&{% endif %}page={{ filtros.page|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
-    {% if pedidos.next %}<a class="btn btn-ghost btn-sm" href="?{% if filtros.estado %}estado={{ filtros.estado }}&{% endif %}page={{ filtros.page|add:1 }}">Siguientes</a>{% endif %}
+    {% if pedidos.previous %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.estado %}estado={{ filtros.estado }}&{% endif %}page={{ filtros.page|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
+    {% if pedidos.next %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.estado %}estado={{ filtros.estado }}&{% endif %}page={{ filtros.page|add:1 }}">Siguientes</a>{% endif %}
   </nav>
 {% else %}
   {% include "componentes/estado_vacio.html" with titulo="No hay pedidos con ese estado" %}

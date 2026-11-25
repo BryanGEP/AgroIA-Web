@@ -1,7 +1,7 @@
 {% extends "cuentas/marco.html" %}
 {% block titulo %}Recuperar contraseña{% endblock %}
 {% block encabezado %}Recuperar contraseña{% endblock %}
-{% block intro %}<p class="opacity-80">Escribe el correo de tu cuenta y te enviamos un enlace para elegir una contraseña nueva. Dura 1 hora.</p>{% endblock %}
+{% block intro %}<p class="text-suave">Escribe el correo de tu cuenta y te enviamos un enlace para elegir una contraseña nueva. Dura 1 hora.</p>{% endblock %}
 {% block formulario %}
   {% include "componentes/errores_formulario.html" %}
   <form method="post" action="{% url 'cuentas:recuperar' %}" class="flex flex-col gap-4" novalidate>
@@ -10,4 +10,4 @@
     <button type="submit" class="btn btn-primary mt-2">Enviar enlace</button>
   </form>
 {% endblock %}
-{% block pie %}<a href="{% url 'cuentas:iniciar_sesion' %}" class="link">Volver a iniciar sesión</a>{% endblock %}
+{% block pie %}<a href="{% url 'cuentas:iniciar_sesion' %}" class="link link-primary">Volver a iniciar sesión</a>{% endblock %}

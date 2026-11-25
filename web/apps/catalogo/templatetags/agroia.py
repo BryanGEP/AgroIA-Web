@@ -3,6 +3,8 @@
 from decimal import Decimal, InvalidOperation
 
 from django import template
+from django.contrib.staticfiles import finders
+from django.templatetags.static import static
 
 register = template.Library()
 
@@ -125,3 +127,16 @@ def porcentaje_entero(valor) -> int:
         return round(float(valor) * 100)
     except (TypeError, ValueError):
         return 0
+
+
+# Fotos de ambiente opcionales (huertas, campo). Van en static/img/ambiente/<nombre>.webp; si
+# el archivo no existe, la plantilla se ve igual que sin foto (Bosque con curvas de nivel). Ver
+# «Fotos de ambiente» en el README y docs/creditos-imagenes.md.
+FOTOS_AMBIENTE = "img/ambiente/{}.webp"
+
+
+@register.simple_tag
+def foto_ambiente(nombre: str) -> str:
+    """URL de la foto de ambiente `nombre`, o "" si todavía no se agregó."""
+    ruta = FOTOS_AMBIENTE.format(nombre)
+    return static(ruta) if finders.find(ruta) else ""

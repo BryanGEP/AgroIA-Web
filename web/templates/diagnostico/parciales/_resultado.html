@@ -3,10 +3,10 @@
 {% if pendiente %}
   {% include "diagnostico/parciales/_espera.html" %}
 {% elif no_disponible %}
-  <div class="flex flex-col gap-3 rounded-box border border-dashed border-base-300 p-6" role="status">
-    <h2 class="text-xl">{{ no_disponible }}</h2>
+  <div class="flex flex-col gap-3 rounded-box border border-base-300 bg-tarjeta p-6" role="status">
+    <h2 class="text-2xl">{{ no_disponible }}</h2>
     <p>Estamos terminando de entrenar el modelo que reconoce la roña y la antracnosis. Mientras tanto, describe los síntomas en el chat y AgroIA te orienta.</p>
-    <a href="{% url 'agroia:inicio' %}" class="btn btn-outline btn-primary btn-sm self-start">Preguntarle a AgroIA</a>
+    <a href="{% url 'agroia:inicio' %}" class="btn btn-outline btn-primary self-start">Preguntarle a AgroIA</a>
   </div>
 {% elif error %}
   <div class="alert alert-error" role="alert"><span>{{ error }}</span></div>
@@ -15,7 +15,9 @@
 {% elif request.htmx and formulario.errors %}
   {% for error in formulario.imagen.errors %}<div class="alert alert-error" role="alert"><span>{{ error }}</span></div>{% endfor %}
 {% else %}
-  <div class="flex h-full min-h-40 items-center justify-center rounded-box border border-dashed border-base-300 p-6 text-center opacity-80">
-    <p>Aquí verás el resultado.</p>
+  <div class="tinte-fungicidas panel-tinte relative flex h-full min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-box p-6 text-center">
+    <span class="curvas absolute inset-0 opacity-20" aria-hidden="true"></span>
+    <span class="relative block h-14 w-16" aria-hidden="true">{% include "componentes/marcador_categoria.html" with tinte="fungicidas" %}</span>
+    <p class="relative font-medium text-base-content">Aquí verás el resultado.</p>
   </div>
 {% endif %}
