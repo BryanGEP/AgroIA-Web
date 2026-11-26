@@ -111,3 +111,41 @@ def test_rango_invertido_400(admin):
 def test_listar_401_y_403(anonimo, cliente):
     assert anonimo.get(URL).status_code == 401
     assert cliente.get(URL).status_code == 403
+
+
+# --- Panel de administración: línea de tiempo de un pedido -----------------------------------
+
+
+def test_filtro_por_pedido(admin, mongo_simulado):
+    for pedido_id, tipo in (
+        (12, "pedido_creado"),
+        (12, "pedido_estado_cambiado"),
+        (13, "pedido_creado"),
+    ):
+        mongo_simulado["bitacora"].insert_one(
+            {
+                "tipo": tipo,
+                "usuario_id": None,
+                "servicio": "svc-tienda",
+                "datos": {"pedido_id": pedido_id},
+                "fecha": datetime(2026, 11, 26, 15, tzinfo=UTC),
+            }
+        )
+
+    cuerpo = admin.get(URL, {"pedido_id": 12}).json()
+
+    assert cuerpo["count"] == 2
+    assert {e["datos"]["pedido_id"] for e in cuerpo["results"]} == {12}
+
+
+def test_filtro_por_pedido_invalido_400(admin):
+    respuesta = admin.get(URL, {"pedido_id": "doce"})
+
+    assert respuesta.status_code == 400
+    assert "pedido_id" in respuesta.json()["campos"]
+
+
+def test_el_filtro_por_pedido_tiene_indice():
+    from apps.bitacora import servicios
+
+    assert [("datos.pedido_id", 1), ("fecha", -1)] in servicios.INDICES
