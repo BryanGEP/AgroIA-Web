@@ -312,3 +312,32 @@ def test_borrar_producto_es_logico(admin, anonimo, cliente):
     assert producto.activo is False
     assert Producto.objects.filter(pk=producto.pk).exists()
     assert Categoria.objects.exists()
+
+
+# --- Panel de administración: stock y conteo por categoría ------------------------------------
+
+
+def test_filtro_stock_max_y_orden_por_stock(admin):
+    ProductoFactory(nombre="Poco", stock=2)
+    ProductoFactory(nombre="Nada", stock=0)
+    ProductoFactory(nombre="Mucho", stock=40)
+
+    cuerpo = admin.get(PRODUCTOS, {"stock_max": 5, "ordering": "stock"}).json()
+
+    assert [p["nombre"] for p in cuerpo["results"]] == ["Nada", "Poco"]
+
+
+def test_filtro_stock_max_negativo_400(admin):
+    assert admin.get(PRODUCTOS, {"stock_max": -1}).status_code == 400
+
+
+def test_categoria_trae_cuantos_productos_tiene(admin):
+    categoria = CategoriaFactory(slug="riego")
+    ProductoFactory.create_batch(2, categoria=categoria)
+    ProductoFactory(categoria=categoria, activo=False)
+
+    listado = {c["slug"]: c["productos"] for c in admin.get(CATEGORIAS).json()["results"]}
+    detalle = admin.get(f"{CATEGORIAS}riego/").json()
+
+    assert listado["riego"] == 3
+    assert detalle["productos"] == 3

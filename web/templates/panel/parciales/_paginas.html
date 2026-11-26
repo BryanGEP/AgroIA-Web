@@ -1,0 +1,9 @@
+{% comment %} «Anteriores / Siguientes» con el número de página, conservando los filtros de la
+   URL. Parámetro: datos (la respuesta paginada: count, next, previous). {% endcomment %}
+{% if datos.previous or datos.next %}
+<nav class="mt-5 flex flex-wrap items-center justify-between gap-3" aria-label="Páginas">
+  {% if datos.previous %}<a class="btn border-base-300 bg-tarjeta" href="{% querystring page=filtros.page|add:-1 %}" rel="prev">Anteriores</a>{% else %}<span></span>{% endif %}
+  <span class="text-sm text-suave">Página {{ filtros.page }}</span>
+  {% if datos.next %}<a class="btn border-base-300 bg-tarjeta" href="{% querystring page=filtros.page|add:1 %}" rel="next">Siguientes</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}

@@ -1,0 +1,24 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}Eventos · Administración{% endblock %}
+{% block encabezado %}Estado de los eventos{% endblock %}
+{% block panel %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <p class="max-w-prose text-suave">Los streams de Redis, sus grupos de consumidores y los eventos que agotaron sus reintentos. Solo lectura.</p>
+  {# Se actualiza a mano: sin polling automático. #}
+  <a href="{% url 'panel:eventos' %}" hx-get="{% url 'panel:eventos' %}" hx-target="#estado-eventos" hx-swap="outerHTML"
+     hx-indicator="#actualizando-eventos" class="btn btn-primary">Actualizar</a>
+</div>
+<div class="mb-3 min-h-6">{% include "componentes/cargando.html" with id="actualizando-eventos" texto="Actualizando…" %}</div>
+{% include "panel/parciales/_eventos.html" %}
+
+<section aria-labelledby="t-comandos" class="mt-6 rounded-box border border-base-300 bg-tarjeta p-5">
+  <h2 id="t-comandos" class="text-2xl">Reprocesar o descartar</h2>
+  <p class="mt-2 max-w-prose text-suave">Desde aquí no se cambia nada. Para volver a publicar un fallido o borrarlo después de revisarlo, corre en la terminal, desde la raíz del proyecto:</p>
+  <ul class="mt-3 flex flex-col gap-2 text-sm">
+    <li><code class="block overflow-x-auto rounded bg-base-200 px-3 py-2">docker compose exec svc-contenido python -m agroia_comun.eventos reprocesar --id &lt;id&gt;</code></li>
+    <li><code class="block overflow-x-auto rounded bg-base-200 px-3 py-2">docker compose exec svc-contenido python -m agroia_comun.eventos descartar --id &lt;id&gt;</code></li>
+    <li><code class="block overflow-x-auto rounded bg-base-200 px-3 py-2">docker compose exec svc-contenido python -m agroia_comun.eventos estado</code></li>
+  </ul>
+  <p class="mt-3 max-w-prose text-sm text-suave">El motivo aquí es solo el nombre de la excepción; el texto completo se ve con el comando <code>estado</code>. Los fallidos sin sus datos (por ejemplo, una pregunta a la IA) no se pueden reprocesar: se descartan. Detalle en <code>docs/eventos.md</code>, «Operación».</p>
+</section>
+{% endblock %}

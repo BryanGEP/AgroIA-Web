@@ -1,6 +1,6 @@
 """Lógica de negocio del catálogo."""
 
-from django.db.models import Model, QuerySet
+from django.db.models import Count, Model, QuerySet
 from django.utils.text import slugify
 
 from apps.catalogo.models import Categoria, Producto
@@ -22,7 +22,7 @@ def generar_slug_unico(modelo: type[Model], nombre: str, excluir_pk: int | None 
 
 def categorias_visibles(es_admin: bool) -> QuerySet[Categoria]:
     """El administrador ve todas; el público, solo las activas."""
-    categorias = Categoria.objects.all()
+    categorias = Categoria.objects.annotate(total_productos=Count("productos"))
     return categorias if es_admin else categorias.filter(activa=True)
 
 

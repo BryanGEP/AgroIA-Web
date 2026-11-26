@@ -1,0 +1,64 @@
+{% load panel %}
+{% comment %} Estado de los eventos (GET /api/v1/eventos/estado/ de svc-contenido). Con HTMX
+   («Actualizar») se reemplaza este bloque. Sin el sobre ni los datos de ningún evento. {% endcomment %}
+<div id="estado-eventos" aria-live="polite">
+  <p class="mb-3 text-sm text-suave">Actualizado a las {{ actualizado|date:"H:i:s" }}.</p>
+  {% if error %}
+    {% include "panel/parciales/_tarjeta_error.html" with texto=error %}
+  {% else %}
+    <div class="grid gap-3 lg:grid-cols-2">
+      {% for s in estado.streams %}
+        <section class="rounded-box border border-base-300 bg-tarjeta p-4" aria-label="Stream {{ s.stream }}">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="break-all font-mono text-base font-bold">{{ s.stream }}</h2>
+            <p class="text-sm"><span class="font-display text-xl font-bold tabular-nums">{{ s.largo }}</span> <span class="text-suave">mensaje{{ s.largo|pluralize }}</span></p>
+          </div>
+          {% for g in s.grupos %}
+            <div class="mt-3 rounded-box bg-base-100 p-3">
+              <p class="font-medium">Grupo <span class="font-mono">{{ g.grupo }}</span></p>
+              <p class="text-sm">
+                <span class="{% if g.pendientes %}font-bold text-aviso{% endif %}">Pendientes: {{ g.pendientes }}</span> ·
+                <span class="{% if g.sin_leer %}font-bold text-aviso{% endif %}">Retraso (sin leer): {{ g.sin_leer|default_if_none:"?" }}</span>
+              </p>
+              {% if g.consumidores %}
+                <ul class="mt-1 text-sm text-suave">
+                  {% for c in g.consumidores %}<li><span class="font-mono">{{ c.nombre }}</span>: {{ c.pendientes }} pendiente{{ c.pendientes|pluralize }}, inactivo {{ c.inactivo_ms|segundos }}</li>{% endfor %}
+                </ul>
+              {% else %}
+                <p class="mt-1 text-sm text-aviso">Sin consumidores conectados.</p>
+              {% endif %}
+            </div>
+          {% empty %}
+            <p class="mt-2 text-sm text-suave">Sin grupos de consumidores.</p>
+          {% endfor %}
+        </section>
+      {% endfor %}
+    </div>
+
+    <section aria-labelledby="t-fallidos" class="mt-6">
+      <h2 id="t-fallidos" class="mb-3 flex items-center gap-2 text-2xl">Fallidos <span class="badge {% if estado.fallidos.total %}badge-error{% else %}badge-success{% endif %}">{{ estado.fallidos.total }}</span></h2>
+      {% if estado.fallidos.ultimos %}
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-tarjeta">
+          <table class="table tabla-tarjetas">
+            <thead><tr><th>Id</th><th>Fecha</th><th>Tipo</th><th>Grupo</th><th class="text-right">Intentos</th><th>Motivo</th></tr></thead>
+            <tbody>
+              {% for f in estado.fallidos.ultimos %}
+                <tr>
+                  <td class="celda-titulo font-mono text-sm">{{ f.id }}</td>
+                  <td data-etiqueta="Fecha">{{ f.fecha|fecha|date:"d/m/Y H:i" }}</td>
+                  <td data-etiqueta="Tipo">{{ f.tipo|default:"(ilegible)" }}{% if f.datos_omitidos %}<br><span class="text-sm text-suave">sin sus datos: no se puede reprocesar</span>{% endif %}</td>
+                  <td data-etiqueta="Grupo" class="font-mono text-sm">{{ f.grupo }}</td>
+                  <td data-etiqueta="Intentos" class="text-right tabular-nums">{{ f.intentos|default_if_none:"?" }}</td>
+                  <td data-etiqueta="Motivo" class="font-mono text-sm">{{ f.motivo|default:"?" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if estado.fallidos.total > estado.fallidos.ultimos|length %}<p class="mt-2 text-sm text-suave">Se muestran los {{ estado.fallidos.ultimos|length }} más recientes.</p>{% endif %}
+      {% else %}
+        <p class="text-suave">No hay eventos fallidos.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+</div>

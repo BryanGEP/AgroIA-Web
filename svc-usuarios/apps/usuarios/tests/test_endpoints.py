@@ -1,6 +1,8 @@
 """Endpoints de registro, perfil, direcciones y listado del administrador."""
 
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.test import override_settings
@@ -374,3 +376,77 @@ def test_registro_con_contrasena_de_mas_de_128_caracteres_400(anonimo):
     assert respuesta.status_code == 400
     assert "password" in respuesta.json()["campos"]
     assert not Usuario.objects.filter(email=REGISTRO["email"]).exists()
+
+
+# --- Panel de administración: detalle y filtros nuevos ----------------------------------------
+
+
+def test_admin_ve_el_detalle_de_un_usuario(admin):
+    usuario = UsuarioFactory(email="lucia@example.com", telefono="3531234567")
+
+    respuesta = admin.get(f"{USUARIOS}{usuario.pk}/")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["email"] == "lucia@example.com"
+    assert "password" not in respuesta.json()
+
+
+def test_detalle_de_usuario_inexistente_404(admin):
+    assert admin.get(f"{USUARIOS}{uuid.uuid4()}/").status_code == 404
+    assert admin.get(f"{USUARIOS}no-es-uuid/").status_code == 404
+
+
+def test_detalle_de_usuario_401_y_403(anonimo, cliente, usuario_cliente):
+    ruta = f"{USUARIOS}{usuario_cliente.pk}/"
+    assert anonimo.get(ruta).status_code == 401
+    assert cliente.get(ruta).status_code == 403
+
+
+def test_filtro_por_verificacion(admin):
+    UsuarioFactory(email="si@example.com", email_verificado=True)
+    UsuarioFactory(email="no@example.com", email_verificado=False)
+
+    no_verificados = admin.get(USUARIOS, {"email_verificado": "false"}).json()
+
+    assert "no@example.com" in [u["email"] for u in no_verificados["results"]]
+    assert "si@example.com" not in [u["email"] for u in no_verificados["results"]]
+
+
+def test_filtro_desde_usa_la_hora_de_mexico(admin):
+    mexico = ZoneInfo("America/Mexico_City")
+    tarde = UsuarioFactory(email="tarde@example.com")
+    temprano = UsuarioFactory(email="temprano@example.com")
+    # 23:30 del 25 en México son las 05:30 UTC del 26: no entra «desde el 26».
+    Usuario.objects.filter(pk=tarde.pk).update(
+        date_joined=datetime(2026, 11, 25, 23, 30, tzinfo=mexico)
+    )
+    Usuario.objects.filter(pk=temprano.pk).update(
+        date_joined=datetime(2026, 11, 26, 0, 30, tzinfo=mexico)
+    )
+
+    correos = [u["email"] for u in admin.get(USUARIOS, {"desde": "2026-11-26"}).json()["results"]]
+
+    assert "temprano@example.com" in correos
+    assert "tarde@example.com" not in correos
+
+
+def test_filtro_ids(admin):
+    uno, dos, _ = UsuarioFactory.create_batch(3)
+
+    cuerpo = admin.get(USUARIOS, {"ids": f"{uno.pk},{dos.pk}"}).json()
+
+    assert sorted(u["id"] for u in cuerpo["results"]) == sorted([str(uno.pk), str(dos.pk)])
+
+
+def test_filtro_ids_con_un_uuid_invalido_400(admin):
+    respuesta = admin.get(USUARIOS, {"ids": f"{uuid.uuid4()},no-es-uuid"})
+
+    assert respuesta.status_code == 400
+    assert "ids" in respuesta.json()["campos"]
+
+
+def test_filtro_ids_con_mas_de_20_400(admin):
+    respuesta = admin.get(USUARIOS, {"ids": ",".join(str(uuid.uuid4()) for _ in range(21))})
+
+    assert respuesta.status_code == 400
+    assert "ids" in respuesta.json()["campos"]

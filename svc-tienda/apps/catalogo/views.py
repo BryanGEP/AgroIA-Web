@@ -123,7 +123,7 @@ class ProductoViewSet(_SoloAdminEscribe, viewsets.ModelViewSet):
     serializer_class = ProductoSerializer
     lookup_field = "slug"
     filterset_class = ProductoFilter
-    ordering_fields = ["precio", "nombre", "creado_en"]
+    ordering_fields = ["precio", "nombre", "creado_en", "stock"]
     ordering = ["-creado_en", "-id"]
 
     def get_queryset(self):

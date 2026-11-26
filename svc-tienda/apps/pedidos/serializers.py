@@ -236,6 +236,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "metodo_pago",
             "pago_simulado",
             "creado_en",
+            "pagado_en",
             "transiciones_permitidas",
         ]
         read_only_fields = fields
@@ -257,3 +258,73 @@ class PedidoSerializer(serializers.ModelSerializer):
 @extend_schema_serializer(examples=[OpenApiExample("Enviar", value={"estado": "enviado"})])
 class CambiarEstadoSerializer(serializers.Serializer):
     estado = serializers.ChoiceField(choices=Pedido.Estado.choices)
+
+
+# --- Resumen del panel ---------------------------------------------------------------------
+
+
+class FiltroResumenSerializer(serializers.Serializer):
+    umbral = serializers.IntegerField(
+        required=False,
+        default=5,
+        min_value=0,
+        max_value=1000,
+        help_text="Existencias a partir de las cuales un producto tiene stock bajo (inclusive).",
+    )
+
+
+class _VentasSerializer(serializers.Serializer):
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    pedidos = serializers.IntegerField()
+
+
+class _RespaldoSerializer(serializers.Serializer):
+    pedidos_sin_pagado_en = serializers.IntegerField(
+        help_text="Ventas pagadas antes de que existiera pagado_en: cuentan por creado_en."
+    )
+    primer_pagado_en = serializers.DateField(allow_null=True)
+
+
+class _VentasResumenSerializer(serializers.Serializer):
+    hoy = _VentasSerializer()
+    ultimos_7_dias = _VentasSerializer()
+    mes = _VentasSerializer()
+    respaldo = _RespaldoSerializer()
+
+
+class _ProductoStockSerializer(serializers.Serializer):
+    slug = serializers.SlugField()
+    nombre = serializers.CharField()
+    stock = serializers.IntegerField()
+
+
+class _ListaStockSerializer(serializers.Serializer):
+    total = serializers.IntegerField()
+    productos = _ProductoStockSerializer(many=True, help_text="Hasta 10, de menor a mayor stock.")
+
+
+class _StockSerializer(serializers.Serializer):
+    umbral = serializers.IntegerField()
+    bajo = _ListaStockSerializer()
+    agotados = _ListaStockSerializer()
+
+
+class _PedidosResumenSerializer(serializers.Serializer):
+    pendientes = serializers.IntegerField()
+    por_enviar = serializers.IntegerField(help_text="Pagados que falta enviar.")
+
+
+class _UltimoPedidoSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    estado = serializers.CharField()
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)
+    creado_en = serializers.DateTimeField()
+    usuario_id = serializers.UUIDField()
+
+
+class ResumenSerializer(serializers.Serializer):
+    fecha = serializers.DateField(help_text="Hoy en America/Mexico_City.")
+    pedidos = _PedidosResumenSerializer()
+    ventas = _VentasResumenSerializer()
+    stock = _StockSerializer()
+    ultimos_pedidos = _UltimoPedidoSerializer(many=True)

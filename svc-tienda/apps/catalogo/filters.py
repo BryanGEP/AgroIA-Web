@@ -17,10 +17,16 @@ class ProductoFilter(django_filters.FilterSet):
     activo = django_filters.BooleanFilter(
         help_text="Solo para administradores; el público siempre ve solo productos activos."
     )
+    stock_max = django_filters.NumberFilter(
+        field_name="stock",
+        lookup_expr="lte",
+        min_value=0,
+        help_text="Existencias menores o iguales (stock bajo en el panel).",
+    )
 
     class Meta:
         model = Producto
-        fields = ["categoria", "precio_min", "precio_max", "disponible", "q", "activo"]
+        fields = ["categoria", "precio_min", "precio_max", "disponible", "q", "activo", "stock_max"]
 
     def filtrar_disponible(self, queryset: QuerySet, name: str, valor: bool) -> QuerySet:
         return queryset.filter(stock__gt=0) if valor else queryset.filter(stock=0)

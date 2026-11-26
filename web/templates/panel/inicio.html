@@ -1,0 +1,152 @@
+{% extends "panel/marco.html" %}
+{% load agroia panel %}
+{% block titulo %}Resumen · Administración{% endblock %}
+{% block encabezado %}Resumen{% endblock %}
+{% block panel %}
+{% comment %} Cada servicio llena sus tarjetas: si svc-tienda no responde, solo las de pedidos,
+   ventas, inventario y últimos pedidos muestran el error; si svc-usuarios no responde, solo la
+   de usuarios nuevos. {% endcomment %}
+<p class="mb-5 text-suave">Hoy es {{ hoy|date:"l j \d\e F \d\e Y"|lower }} (hora de México).</p>
+
+<div class="grid gap-4 lg:grid-cols-2">
+  {# Pedidos por atender #}
+  <section aria-labelledby="t-pedidos" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+    <h2 id="t-pedidos" class="text-2xl">Pedidos por atender</h2>
+    {% if tienda %}
+      <div class="grid grid-cols-2 gap-3">
+        <a href="{% url 'panel:pedidos' %}?estado=pendiente" class="flex flex-col gap-1 rounded-box border-2 border-warning bg-base-100 p-4 hover:border-primary">
+          <span class="font-display text-[2.4rem] font-bold leading-none tabular-nums">{{ tienda.pedidos.pendientes }}</span>
+          <span class="font-medium">Pendientes de pago</span>
+          <span class="link link-primary text-sm">Ver la lista</span>
+        </a>
+        <a href="{% url 'panel:pedidos' %}?estado=pagado" class="flex flex-col gap-1 rounded-box border-2 border-primary bg-base-100 p-4 hover:border-primary">
+          <span class="font-display text-[2.4rem] font-bold leading-none tabular-nums">{{ tienda.pedidos.por_enviar }}</span>
+          <span class="font-medium">Pagados por enviar</span>
+          <span class="link link-primary text-sm">Ver la lista</span>
+        </a>
+      </div>
+    {% else %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_tienda %}
+    {% endif %}
+  </section>
+
+  {# Ventas #}
+  <section aria-labelledby="t-ventas" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+    <h2 id="t-ventas" class="text-2xl">Ventas</h2>
+    {% if tienda %}
+      {% with v=tienda.ventas %}
+      <dl class="grid grid-cols-3 gap-3">
+        <div class="rounded-box bg-base-100 p-3">
+          <dt class="text-sm text-suave">Hoy</dt>
+          <dd class="font-display text-xl font-bold tabular-nums text-andosol sm:text-2xl">{{ v.hoy.total|pesos }}</dd>
+          <dd class="text-sm text-suave">{{ v.hoy.pedidos }} pedido{{ v.hoy.pedidos|pluralize }}</dd>
+        </div>
+        <div class="rounded-box bg-base-100 p-3">
+          <dt class="text-sm text-suave">Últimos 7 días</dt>
+          <dd class="font-display text-xl font-bold tabular-nums text-andosol sm:text-2xl">{{ v.ultimos_7_dias.total|pesos }}</dd>
+          <dd class="text-sm text-suave">{{ v.ultimos_7_dias.pedidos }} pedido{{ v.ultimos_7_dias.pedidos|pluralize }}</dd>
+        </div>
+        <div class="rounded-box bg-base-100 p-3">
+          <dt class="text-sm text-suave">Este mes</dt>
+          <dd class="font-display text-xl font-bold tabular-nums text-andosol sm:text-2xl">{{ v.mes.total|pesos }}</dd>
+          <dd class="text-sm text-suave">{{ v.mes.pedidos }} pedido{{ v.mes.pedidos|pluralize }}</dd>
+        </div>
+      </dl>
+      <p class="text-sm text-suave">Pedidos pagados, enviados o entregados, por su fecha de pago.
+        {% if v.respaldo.pedidos_sin_pagado_en %}
+          {% if v.respaldo.primer_pagado_en %}Los pedidos pagados antes del {{ v.respaldo.primer_pagado_en|date:"d/m/Y" }}{% else %}Los pedidos pagados hasta ahora{% endif %}
+          ({{ v.respaldo.pedidos_sin_pagado_en }}) se cuentan por su fecha de creación: entonces no se guardaba la fecha de pago.
+        {% endif %}
+      </p>
+      {% endwith %}
+    {% else %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_tienda %}
+    {% endif %}
+  </section>
+
+  {# Inventario #}
+  <section aria-labelledby="t-inventario" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="t-inventario" class="text-2xl">Inventario</h2>
+      <p class="text-sm text-suave">Stock bajo: {{ umbral }} o menos</p>
+    </div>
+    {% if tienda %}
+      {% with s=tienda.stock %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <h3 class="mb-2 flex items-center gap-2 text-lg">Stock bajo <span class="badge badge-warning">{{ s.bajo.total }}</span></h3>
+          {% if s.bajo.productos %}
+            <ul class="flex flex-col gap-1">
+              {% for p in s.bajo.productos %}<li class="flex justify-between gap-2"><a href="{% url 'panel:producto' p.slug %}" class="link link-hover">{{ p.nombre }}</a><span class="tabular-nums">{{ p.stock }}</span></li>{% endfor %}
+            </ul>
+          {% else %}<p class="text-suave">Ninguno.</p>{% endif %}
+        </div>
+        <div>
+          <h3 class="mb-2 flex items-center gap-2 text-lg">Agotados <span class="badge badge-error">{{ s.agotados.total }}</span></h3>
+          {% if s.agotados.productos %}
+            <ul class="flex flex-col gap-1">
+              {% for p in s.agotados.productos %}<li><a href="{% url 'panel:producto' p.slug %}" class="link link-hover">{{ p.nombre }}</a></li>{% endfor %}
+            </ul>
+          {% else %}<p class="text-suave">Ninguno.</p>{% endif %}
+        </div>
+      </div>
+      <a href="{% url 'panel:productos' %}?stock=bajo&amp;ordering=stock" class="link link-primary self-start font-medium">Ver los productos con stock bajo</a>
+      {% endwith %}
+    {% else %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_tienda %}
+    {% endif %}
+  </section>
+
+  {# Usuarios nuevos #}
+  <section aria-labelledby="t-usuarios" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+    <h2 id="t-usuarios" class="text-2xl">Usuarios nuevos de la semana</h2>
+    {% if nuevos %}
+      <p><span class="font-display text-[2.4rem] font-bold leading-none tabular-nums">{{ nuevos.count }}</span>
+        <span class="text-suave">desde el {{ semana|date:"d/m" }}</span></p>
+      {% if nuevos.results %}
+        <ul class="flex flex-col divide-y divide-base-300">
+          {% for u in nuevos.results|slice:":5" %}
+            <li class="flex flex-wrap items-baseline justify-between gap-x-3 py-2">
+              <a href="{% url 'panel:usuario' u.id %}" class="link link-hover font-medium">{{ u.nombre }} {{ u.apellidos }}</a>
+              <span class="text-sm text-suave">{{ u.date_joined|fecha|date:"d/m H:i" }}{% if not u.email_verificado %} · sin verificar{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <a href="{% url 'panel:usuarios' %}" class="link link-primary self-start font-medium">Ver todos los usuarios</a>
+    {% else %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_usuarios %}
+    {% endif %}
+  </section>
+
+  {# Últimos pedidos #}
+  <section aria-labelledby="t-ultimos" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5 lg:col-span-2">
+    <h2 id="t-ultimos" class="text-2xl">Últimos pedidos</h2>
+    {% if tienda %}
+      {% if tienda.ultimos_pedidos %}
+        <div class="overflow-x-auto">
+          <table class="table tabla-tarjetas">
+            <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th class="text-right">Total</th><th>Estado</th></tr></thead>
+            <tbody>
+              {% for p in tienda.ultimos_pedidos %}
+                {% elegir_usuario nombres p.usuario_id as cliente %}
+                <tr>
+                  <td class="celda-titulo"><a href="{% url 'panel:pedido' p.id %}" class="link link-primary font-medium">Pedido #{{ p.id }}</a></td>
+                  <td data-etiqueta="Fecha">{{ p.creado_en|fecha|date:"d/m/Y H:i" }}</td>
+                  <td data-etiqueta="Cliente">{% if cliente %}<a href="{% url 'panel:usuario' p.usuario_id %}" class="link link-hover">{{ cliente.nombre }} {{ cliente.apellidos }}</a>{% else %}<span class="text-suave">{{ p.usuario_id|id_corto }}</span>{% endif %}</td>
+                  <td class="text-right tabular-nums" data-etiqueta="Total">{{ p.total|pesos }}</td>
+                  <td data-etiqueta="Estado">{% include "componentes/estado_pedido.html" with estado=p.estado %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-suave">Todavía no hay pedidos.</p>
+      {% endif %}
+    {% else %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_tienda %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

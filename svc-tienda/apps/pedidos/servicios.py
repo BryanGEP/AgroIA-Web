@@ -9,11 +9,14 @@ por `_cambiar_estado_bloqueado`. Validar y descontar stock sigue siendo síncron
 """
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F
+from django.db.models import Count, F, Min, Sum
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 from rest_framework import status
 
 from agroia_comun.errores import ErrorDeNegocio
@@ -198,7 +201,11 @@ def _cambiar_estado_bloqueado(pedido: Pedido, nuevo: str, actor_id: uuid.UUID) -
         _devolver_stock(pedido)
     anterior = pedido.estado
     pedido.estado = nuevo
-    pedido.save(update_fields=["estado"])
+    campos = ["estado"]
+    if nuevo == Pedido.Estado.PAGADO and pedido.pagado_en is None:
+        pedido.pagado_en = timezone.now()
+        campos.append("pagado_en")
+    pedido.save(update_fields=campos)
     publicar_al_confirmar(
         "pedido_estado_cambiado",
         {
@@ -243,3 +250,78 @@ def pagar_pedido(pedido: Pedido) -> Pedido:
             )
         # Solo el dueño paga: él es quien lo cambió.
         return _cambiar_estado_bloqueado(bloqueado, Pedido.Estado.PAGADO, bloqueado.usuario_id)
+
+
+# --- Resumen del panel de administración --------------------------------------------------
+
+ESTADOS_DE_VENTA = (Pedido.Estado.PAGADO, Pedido.Estado.ENVIADO, Pedido.Estado.ENTREGADO)
+MAXIMO_EN_LISTA = 10
+
+
+def _ventas(pedidos, desde) -> dict:
+    datos = pedidos.filter(fecha_venta__gte=desde).aggregate(
+        total=Sum("total"), pedidos=Count("id")
+    )
+    total = (datos["total"] or CERO).quantize(CERO)
+    return {"total": str(total), "pedidos": datos["pedidos"]}
+
+
+def _productos_resumen(productos) -> dict:
+    return {
+        "total": productos.count(),
+        "productos": [
+            {"slug": p.slug, "nombre": p.nombre, "stock": p.stock}
+            for p in productos.order_by("stock", "nombre")[:MAXIMO_EN_LISTA]
+        ],
+    }
+
+
+def resumen(umbral: int) -> dict:
+    """Números del inicio del panel, sin traer listas enteras.
+
+    Ventas: pedidos pagados, enviados o entregados, por la fecha de pago (`pagado_en`); los
+    pagados antes de que existiera ese campo cuentan por `creado_en`. Los días son de la zona
+    del servidor (America/Mexico_City) aunque la base guarde en UTC.
+    """
+    ahora = timezone.localtime(timezone.now())
+    hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    ventas = Pedido.objects.filter(estado__in=ESTADOS_DE_VENTA).annotate(
+        fecha_venta=Coalesce("pagado_en", "creado_en")
+    )
+    sin_fecha = ventas.filter(pagado_en__isnull=True).count()
+    primero = Pedido.objects.filter(pagado_en__isnull=False).aggregate(primero=Min("pagado_en"))
+    primero = primero["primero"]
+    activos = Producto.objects.filter(activo=True)
+    return {
+        "fecha": hoy.date().isoformat(),
+        "pedidos": {
+            "pendientes": Pedido.objects.filter(estado=Pedido.Estado.PENDIENTE).count(),
+            "por_enviar": Pedido.objects.filter(estado=Pedido.Estado.PAGADO).count(),
+        },
+        "ventas": {
+            "hoy": _ventas(ventas, hoy),
+            "ultimos_7_dias": _ventas(ventas, hoy - timedelta(days=6)),
+            "mes": _ventas(ventas, hoy.replace(day=1)),
+            "respaldo": {
+                "pedidos_sin_pagado_en": sin_fecha,
+                "primer_pagado_en": (
+                    timezone.localtime(primero).date().isoformat() if primero else None
+                ),
+            },
+        },
+        "stock": {
+            "umbral": umbral,
+            "bajo": _productos_resumen(activos.filter(stock__gt=0, stock__lte=umbral)),
+            "agotados": _productos_resumen(activos.filter(stock=0)),
+        },
+        "ultimos_pedidos": [
+            {
+                "id": p.pk,
+                "estado": p.estado,
+                "total": str(p.total),
+                "creado_en": p.creado_en,
+                "usuario_id": str(p.usuario_id),
+            }
+            for p in Pedido.objects.order_by("-creado_en", "-id")[:5]
+        ],
+    }

@@ -64,6 +64,9 @@ class FiltroBitacoraSerializer(serializers.Serializer):
     correlacion_id = serializers.UUIDField(
         required=False, help_text="Todos los eventos de un mismo flujo (X-Correlacion-Id)."
     )
+    pedido_id = serializers.IntegerField(
+        required=False, min_value=1, help_text="Eventos de un pedido (su línea de tiempo)."
+    )
     desde = serializers.DateField(required=False, help_text="AAAA-MM-DD, inclusive.")
     hasta = serializers.DateField(required=False, help_text="AAAA-MM-DD, inclusive.")
 

@@ -22,7 +22,7 @@
       <li><a href="{% url 'agroia:inicio' %}" class="block border-b-2 py-2 {% if seccion == 'agroia' %}border-accent text-white{% else %}border-transparent hover:border-bosque-suave{% endif %}" {% if seccion == 'agroia' %}aria-current="page"{% endif %}>AgroIA chat</a></li>
       <li><a href="{% url 'diagnostico:inicio' %}" class="block border-b-2 py-2 {% if seccion == 'diagnostico' %}border-accent text-white{% else %}border-transparent hover:border-bosque-suave{% endif %}" {% if seccion == 'diagnostico' %}aria-current="page"{% endif %}>Diagnóstico</a></li>
       {% if usuario.rol == "administrador" %}
-        <li><a href="{% url 'panel:productos' %}" class="block border-b-2 py-2 {% if seccion == 'panel' %}border-accent text-white{% else %}border-transparent hover:border-bosque-suave{% endif %}" {% if seccion == 'panel' %}aria-current="page"{% endif %}>Administración</a></li>
+        <li><a href="{% url 'panel:inicio' %}" class="block border-b-2 py-2 {% if seccion == 'panel' %}border-accent text-white{% else %}border-transparent hover:border-bosque-suave{% endif %}" {% if seccion == 'panel' %}aria-current="page"{% endif %}>Administración</a></li>
       {% endif %}
     </ul>
     {% endwith %}
@@ -62,7 +62,7 @@
           <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
           <li><a href="{% url 'agroia:inicio' %}">AgroIA chat</a></li>
           <li><a href="{% url 'diagnostico:inicio' %}">Diagnóstico</a></li>
-          {% if usuario.rol == "administrador" %}<li><a href="{% url 'panel:productos' %}">Administración</a></li>{% endif %}
+          {% if usuario.rol == "administrador" %}<li><a href="{% url 'panel:inicio' %}">Administración</a></li>{% endif %}
           {% if usuario %}
             <li class="menu-title">{{ usuario.nombre }}</li>
             <li><a href="{% url 'tienda:mis_pedidos' %}">Mis pedidos</a></li>

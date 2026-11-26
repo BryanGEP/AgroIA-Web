@@ -26,5 +26,8 @@ urlpatterns = [
     path("administracion/pedidos/<int:pedido_id>/", views.pedido, name="pedido"),
     path("administracion/pedidos/<int:pedido_id>/estado/", views.cambiar_estado, name="estado"),
     path("administracion/usuarios/", views.usuarios, name="usuarios"),
+    path("administracion/usuarios/<uuid:usuario_id>/", views.usuario, name="usuario"),
     path("administracion/usuarios/<uuid:usuario_id>/rol/", views.cambiar_rol, name="rol"),
+    path("administracion/bitacora/", views.bitacora, name="bitacora"),
+    path("administracion/eventos/", views.eventos, name="eventos"),
 ]

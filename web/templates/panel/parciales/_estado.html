@@ -1,20 +1,30 @@
 {% load agroia %}
 {% comment %} Estado del pedido y botones con las transiciones que permite svc-tienda
-   (`transiciones_permitidas`). Con HTMX se reemplaza este bloque. {% endcomment %}
-<section id="estado-pedido" aria-labelledby="titulo-estado" class="flex flex-col gap-3 self-start rounded-box border border-base-300 bg-tarjeta p-5">
+   (`transiciones_permitidas`). Cada cambio pide confirmación (componente confirmar, con
+   htmx:confirm); sin JavaScript se envía sin confirmar. Con HTMX se reemplaza este bloque. {% endcomment %}
+<section id="estado-pedido" aria-labelledby="titulo-estado" class="flex flex-col gap-3 self-start rounded-box border border-base-300 bg-tarjeta p-5 lg:sticky lg:top-4">
   <h2 id="titulo-estado" class="text-2xl">Estado</h2>
-  <div>{% include "componentes/estado_pedido.html" with estado=pedido.estado %} <span class="badge badge-outline border-secondary text-secondary">Pago simulado</span></div>
+  <div class="flex flex-wrap gap-2">{% include "componentes/estado_pedido.html" with estado=pedido.estado %} <span class="badge badge-outline border-secondary text-secondary">Pago simulado</span></div>
   {% if error %}<p class="text-sm text-error" role="alert">{{ error }}</p>{% endif %}
   {% if aviso %}<p class="text-sm text-success" role="status">{{ aviso }}</p>{% endif %}
   {% if pedido.transiciones_permitidas %}
     <p class="text-sm text-suave">Cambiar a:</p>
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-col gap-2">
       {% for estado in pedido.transiciones_permitidas %}
         <form method="post" action="{% url 'panel:estado' pedido.id %}" hx-post="{% url 'panel:estado' pedido.id %}" hx-target="#estado-pedido" hx-swap="outerHTML"
-              {% if estado == "cancelado" %}hx-confirm="¿Cancelar el pedido #{{ pedido.id }}? Se devuelven las existencias."{% endif %}>
+              x-data="confirmar" @submit="pedir" @htmx:confirm="pedirHtmx">
           {% csrf_token %}
           <input type="hidden" name="estado" value="{{ estado }}">
-          <button type="submit" class="btn {% if estado == 'cancelado' %}btn-outline btn-error{% else %}btn-primary{% endif %}">{{ estados|elegir_clave:estado }}</button>
+          <button type="submit" class="btn w-full {% if estado == 'cancelado' %}btn-outline btn-error{% else %}btn-primary{% endif %}">{{ estados|elegir_clave:estado }}</button>
+          {% if estado == "cancelado" %}
+            {% include "componentes/confirmar.html" with id="confirmar-cancelado" titulo="¿Cancelar este pedido?" texto="Se devuelven las existencias. Un pedido cancelado ya no cambia de estado." accion="Sí, cancelar el pedido" peligro=True %}
+          {% elif estado == "pagado" %}
+            {% include "componentes/confirmar.html" with id="confirmar-pagado" titulo="¿Marcar el pedido como pagado?" texto="El pago es simulado: no se cobra nada. Normalmente lo marca el cliente al pagar." accion="Sí, marcar como pagado" %}
+          {% elif estado == "enviado" %}
+            {% include "componentes/confirmar.html" with id="confirmar-enviado" titulo="¿Marcar el pedido como enviado?" texto="Después ya no se podrá cancelar." accion="Sí, marcar como enviado" %}
+          {% else %}
+            {% include "componentes/confirmar.html" with id="confirmar-entregado" titulo="¿Marcar el pedido como entregado?" texto="Es el último estado: ya no cambiará." accion="Sí, marcar como entregado" %}
+          {% endif %}
         </form>
       {% endfor %}
     </div>

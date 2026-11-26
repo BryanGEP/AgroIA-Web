@@ -1,13 +1,19 @@
-"""Panel de administración: llama a svc-tienda y svc-usuarios con el token del administrador.
+"""Panel de administración: llama a los servicios con el token del administrador.
+
+También lee la bitácora y el estado de los eventos de svc-contenido. Nunca toca bases ni
+Redis: todo por las APIs de los servicios.
 
 Las reglas las aplica cada servicio (roles, transiciones de pedido, auto-degradación); el
 panel solo muestra lo que ellos permiten, por ejemplo `transiciones_permitidas` del pedido.
 """
 
+from datetime import date
+
 from clientes.tienda import reescribir_imagen
+from django.conf import settings
 from django.http import HttpRequest
 
-from apps.cuentas.servicios import con_sesion
+from apps.cuentas.servicios import ErrorApi, con_sesion
 
 ESTADOS = [
     ("pendiente", "Pendiente de pago"),
@@ -107,3 +113,59 @@ def cambiar_rol(request: HttpRequest, usuario_id: str, rol: str) -> dict:
     return con_sesion(
         request, "usuarios", "PATCH", f"usuarios/{usuario_id}/rol/", json={"rol": rol}
     )
+
+
+# --- Resumen, usuarios y bitácora (panel ampliado) ------------------------------------------
+
+
+def umbral_stock_bajo() -> int:
+    return settings.PANEL_UMBRAL_STOCK_BAJO
+
+
+def resumen_tienda(request: HttpRequest) -> dict:
+    """Pedidos por atender, ventas, stock y últimos pedidos (GET /resumen/ de svc-tienda)."""
+    return con_sesion(request, "tienda", "GET", "resumen/", params={"umbral": umbral_stock_bajo()})
+
+
+def usuarios_nuevos(request: HttpRequest, desde: date) -> dict:
+    """Registrados desde `desde` (hora de México): `count` y la primera página."""
+    return con_sesion(
+        request,
+        "usuarios",
+        "GET",
+        "usuarios/",
+        params={"desde": desde.isoformat(), "ordering": "-date_joined"},
+    )
+
+
+def usuario(request: HttpRequest, usuario_id: str) -> dict:
+    return con_sesion(request, "usuarios", "GET", f"usuarios/{usuario_id}/")
+
+
+def nombres_de_usuarios(request: HttpRequest, ids) -> dict[str, dict]:
+    """Los usuarios de una página (pedidos o bitácora) con una sola llamada (`ids`, hasta 20).
+    Si svc-usuarios no responde, la página se muestra igual, con el id corto."""
+    unicos = list(dict.fromkeys(str(i) for i in ids if i))[:20]
+    if not unicos:
+        return {}
+    try:
+        datos = con_sesion(
+            request, "usuarios", "GET", "usuarios/", params={"ids": ",".join(unicos)}
+        )
+    except ErrorApi:
+        return {}
+    return {u["id"]: u for u in datos.get("results", [])}
+
+
+def bitacora(request: HttpRequest, filtros: dict) -> dict:
+    return con_sesion(request, "contenido", "GET", "bitacora/", params=_limpios(filtros))
+
+
+def linea_de_tiempo(request: HttpRequest, pedido_id: int) -> list[dict]:
+    """Los eventos de un pedido, del más viejo al más nuevo (filtro `pedido_id`)."""
+    datos = con_sesion(request, "contenido", "GET", "bitacora/", params={"pedido_id": pedido_id})
+    return list(reversed(datos.get("results", [])))
+
+
+def estado_eventos(request: HttpRequest) -> dict:
+    return con_sesion(request, "contenido", "GET", "eventos/estado/")

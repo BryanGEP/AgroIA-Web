@@ -59,6 +59,8 @@ URL_SVC_IA = os.environ.get("URL_SVC_IA", "http://svc-ia:8000")
 # Segundos máximos de espera al llamar a un servicio; svc-ia aparte, porque el agente
 # puede tardar hasta AGENTE_TIMEOUT (45 s); se deja margen para que responda svc-ia.
 SERVICIOS_TIMEOUT = float(os.environ.get("SERVICIOS_TIMEOUT", "10"))
+# Panel de administración: existencias a partir de las cuales un producto tiene stock bajo.
+PANEL_UMBRAL_STOCK_BAJO = int(os.environ.get("PANEL_UMBRAL_STOCK_BAJO", "5"))
 IA_TIMEOUT = float(os.environ.get("IA_TIMEOUT", "50"))
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 

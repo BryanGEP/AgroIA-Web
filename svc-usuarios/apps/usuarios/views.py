@@ -191,13 +191,24 @@ class DireccionViewSet(viewsets.ModelViewSet):
         summary="Listar usuarios (administrador)",
         description=(
             "Solo administrador. Paginado de 20 en 20, los más recientes primero. Filtros: "
-            "`rol` y `q` (busca en correo, nombre y apellidos)."
+            "`rol`, `q` (busca en correo, nombre y apellidos), `email_verificado`, `desde` "
+            "(fecha de registro, hora de México) e `ids` (hasta 20 UUID separados por comas)."
         ),
         responses={
             200: UsuarioAdminSerializer(many=True),
             **INVALIDO,
             **SIN_TOKEN,
             403: OpenApiResponse(description="El usuario no es administrador."),
+        },
+    ),
+    retrieve=extend_schema(
+        summary="Ver un usuario (administrador)",
+        description="Solo administrador. Los mismos campos que el listado.",
+        responses={
+            200: UsuarioAdminSerializer,
+            **SIN_TOKEN,
+            403: OpenApiResponse(description="El usuario no es administrador."),
+            404: OpenApiResponse(description="No existe el usuario."),
         },
     ),
     rol=extend_schema(
@@ -218,7 +229,7 @@ class DireccionViewSet(viewsets.ModelViewSet):
         },
     ),
 )
-class UsuarioViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+class UsuarioViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioAdminSerializer
     # Pide token aunque AUTH_ACTIVA sea False: son datos personales.
@@ -226,6 +237,19 @@ class UsuarioViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filterset_class = UsuarioFilter
     ordering_fields = ["date_joined", "email"]
     ordering = ["-date_joined", "email"]
+
+    def get_object(self):
+        # Un id que no es UUID es un usuario que no existe (404), no un error del servidor.
+        try:
+            uuid.UUID(str(self.kwargs.get("pk")))
+        except ValueError:
+            raise NotFound() from None
+        return super().get_object()
+
+    def retrieve(self, request, *args, **kwargs):
+        # Sin filtros del listado: el detalle es por id.
+        self.filter_backends = []
+        return super().retrieve(request, *args, **kwargs)
 
     @action(detail=True, methods=["patch"], url_path="rol", filter_backends=[])
     def rol(self, request, pk=None):

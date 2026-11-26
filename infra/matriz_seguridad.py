@@ -418,6 +418,15 @@ class Matriz:
             json={"estado": "cancelado"},
         )
 
+        # Panel de administración: el resumen (pedidos, ventas por pagado_en, stock).
+        self.fila(
+            "Resumen del panel (administrador)",
+            "GET",
+            "/api/tienda/resumen/?umbral=5",
+            solo_admin | {"admin": 200},
+            mostrar="/api/tienda/resumen/",
+        )
+
     def usuarios(self):
         solo_admin = {
             "sin_verificar": (403, "sin_permiso"),
@@ -425,6 +434,13 @@ class Matriz:
             "admin": 200,
         }
         self.fila("Listar usuarios (administrador)", "GET", "/api/usuarios/usuarios/", solo_admin)
+        self.fila(
+            "Ver un usuario (administrador)",
+            "GET",
+            f"/api/usuarios/usuarios/{self.e.ids['cliente']}/",
+            solo_admin,
+            mostrar="/api/usuarios/usuarios/<id>/",
+        )
         # Al mismo rol que ya tiene: responde 200 sin cambiar nada ni dejar registro.
         self.fila(
             "Cambiar rol (administrador)",
@@ -437,6 +453,26 @@ class Matriz:
 
     def contenido(self):
         cuentas = ("sin_verificar", "cliente", "admin")
+        # Panel de administración: bitácora (con la línea de tiempo de un pedido) y estado de
+        # los eventos. Solo administrador.
+        solo_admin = {
+            "sin_verificar": (403, "sin_permiso"),
+            "cliente": (403, "sin_permiso"),
+            "admin": 200,
+        }
+        self.fila(
+            "Bitácora de un pedido (administrador)",
+            "GET",
+            f"/api/contenido/bitacora/?pedido_id={self.e.pedido or 1}",
+            solo_admin,
+            mostrar="/api/contenido/bitacora/?pedido_id=<id>",
+        )
+        self.fila(
+            "Estado de los eventos (administrador)",
+            "GET",
+            "/api/contenido/eventos/estado/",
+            solo_admin,
+        )
         ajena = {"sin_verificar": "cliente", "cliente": "sin_verificar", "admin": "cliente"}
         for cuenta in cuentas:
             r = self.http.post(

@@ -4,28 +4,46 @@
 {% block acciones %}<a href="{% url 'panel:producto_nuevo' %}" class="btn btn-accent">Nuevo producto</a>{% endblock %}
 {% block panel %}
 <form method="get" action="{% url 'panel:productos' %}" hx-get="{% url 'panel:productos' %}" hx-target="#tabla-productos" hx-push-url="true"
-      hx-trigger="change, submit, input changed delay:400ms from:#filtro-q" data-quitar-vacios
-      class="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem_10rem_auto] sm:items-end">
-  <div class="flex flex-col gap-1">
+      hx-trigger="change, submit, input changed delay:400ms from:#filtro-q" hx-indicator="#cargando-productos" data-quitar-vacios
+      class="mb-4 grid gap-3 rounded-box border border-base-300 bg-tarjeta p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))] lg:items-end">
+  <div class="flex flex-col gap-1 sm:col-span-2 lg:col-span-1">
     <label for="filtro-q" class="text-sm font-medium">Buscar</label>
-    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input bg-tarjeta w-full" placeholder="Nombre o descripción">
+    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input w-full bg-base-100" placeholder="Nombre o descripción">
   </div>
   <div class="flex flex-col gap-1">
     <label for="filtro-categoria" class="text-sm font-medium">Categoría</label>
-    <select id="filtro-categoria" name="categoria" class="select bg-tarjeta w-full">
+    <select id="filtro-categoria" name="categoria" class="select w-full bg-base-100">
       <option value="">Todas</option>
       {% for c in categorias %}<option value="{{ c.slug }}" {% if filtros.categoria == c.slug %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
     </select>
   </div>
   <div class="flex flex-col gap-1">
+    <label for="filtro-stock" class="text-sm font-medium">Existencias</label>
+    <select id="filtro-stock" name="stock" class="select w-full bg-base-100">
+      <option value="">Todas</option>
+      <option value="bajo" {% if filtros.stock == "bajo" %}selected{% endif %}>Stock bajo ({{ umbral }} o menos)</option>
+      <option value="agotado" {% if filtros.stock == "agotado" %}selected{% endif %}>Agotados</option>
+    </select>
+  </div>
+  <div class="flex flex-col gap-1">
     <label for="filtro-activo" class="text-sm font-medium">Estado</label>
-    <select id="filtro-activo" name="activo" class="select bg-tarjeta w-full">
+    <select id="filtro-activo" name="activo" class="select w-full bg-base-100">
       <option value="">Todos</option>
       <option value="true" {% if filtros.activo == "true" %}selected{% endif %}>Activos</option>
       <option value="false" {% if filtros.activo == "false" %}selected{% endif %}>Desactivados</option>
     </select>
   </div>
-  <button type="submit" class="btn btn-primary">Filtrar</button>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-orden" class="text-sm font-medium">Ordenar por</label>
+    <select id="filtro-orden" name="ordering" class="select w-full bg-base-100">
+      {% for valor, texto in ordenes.items %}<option value="{{ valor }}" {% if filtros.ordering == valor %}selected{% endif %}>{{ texto }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-5">
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+    <a href="{% url 'panel:productos' %}" class="btn btn-ghost text-primary">Quitar filtros</a>
+    {% include "componentes/cargando.html" with id="cargando-productos" texto="Buscando…" %}
+  </div>
 </form>
 {% include "panel/parciales/_productos.html" %}
 {% endblock %}

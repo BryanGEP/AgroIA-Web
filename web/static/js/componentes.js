@@ -484,13 +484,174 @@ document.addEventListener("alpine:init", function () {
   Alpine.data("selectorArchivo", function () {
     return {
       nombre: "",
+      url: "",
       elegir(evento) {
         if (!evento.target || evento.target.type !== "file") return;
         var archivo = evento.target.files && evento.target.files[0];
         this.nombre = archivo ? archivo.name : "";
+        if (this.url) URL.revokeObjectURL(this.url);
+        // Vista previa de la imagen elegida (blob:, que la CSP permite en img-src).
+        this.url = archivo && archivo.type.indexOf("image/") === 0 ? URL.createObjectURL(archivo) : "";
+      },
+      get hayVistaPrevia() {
+        return this.url !== "";
       },
       get archivoElegido() {
         return this.nombre || "Ningún archivo elegido";
+      },
+    };
+  });
+
+  // Confirmación con <dialog> (componentes/confirmar.html) para formularios con
+  // x-data="confirmar" @submit="pedir" @htmx:confirm="pedirHtmx". Sin JavaScript el
+  // formulario se envía sin confirmar. Al cerrarse, el foco vuelve al botón que lo abrió.
+  Alpine.data("confirmar", function () {
+    return {
+      confirmado: false,
+      emisor: null,
+      emitir: null,
+      pedir(evento) {
+        // Los formularios con HTMX se confirman en htmx:confirm (pedirHtmx).
+        if (this.confirmado || this.$root.hasAttribute("hx-post")) return;
+        evento.preventDefault();
+        this.emisor = evento.submitter || document.activeElement;
+        this.$refs.dialogo.showModal();
+      },
+      pedirHtmx(evento) {
+        if (evento.target !== this.$root) return;
+        evento.preventDefault();
+        this.emisor = document.activeElement;
+        this.emitir = evento.detail.issueRequest;
+        this.$refs.dialogo.showModal();
+      },
+      aceptar() {
+        var emitir = this.emitir;
+        var formulario = this.$root;
+        var emisor = this.emisor;
+        this.emitir = null;
+        this.$refs.dialogo.close();
+        if (emitir) {
+          emitir(true);
+          return;
+        }
+        this.confirmado = true;
+        if (emisor && emisor.form === formulario) {
+          formulario.requestSubmit(emisor);
+        } else {
+          formulario.requestSubmit();
+        }
+        this.confirmado = false;
+      },
+      cancelar() {
+        this.emitir = null;
+        this.$refs.dialogo.close();
+      },
+      cerrado() {
+        if (this.emisor && document.contains(this.emisor)) this.emisor.focus();
+      },
+    };
+  });
+
+  // Editor de la ficha técnica del panel: filas «característica / valor» que escriben el
+  // JSON en el textarea real (name="ficha_tecnica"). Sin JavaScript, o si la ficha tiene
+  // listas u objetos, queda el textarea con el JSON a mano.
+  Alpine.data("editorFicha", function () {
+    var siguiente = 0;
+    function aFila(clave, valor) {
+      var tipo = typeof valor;
+      var texto = tipo === "boolean" ? (valor ? "sí" : "no") : String(valor);
+      siguiente += 1;
+      return { indice: siguiente, clave: clave, valor: texto, tipo: tipo };
+    }
+    function filasDe(texto) {
+      var objeto = JSON.parse(texto && texto.trim() ? texto : "{}");
+      if (objeto === null || typeof objeto !== "object" || Array.isArray(objeto)) return null;
+      var filas = [];
+      var claves = Object.keys(objeto);
+      for (var i = 0; i < claves.length; i++) {
+        var valor = objeto[claves[i]];
+        if (valor !== null && typeof valor === "object") return null;
+        filas.push(aFila(claves[i], valor === null ? "" : valor));
+      }
+      return filas;
+    }
+    return {
+      filas: [],
+      modo: "json",
+      error: "",
+      init() {
+        try {
+          var filas = filasDe(this.textarea().value);
+          if (filas) {
+            this.filas = filas;
+            this.modo = "filas";
+          }
+        } catch (e) {
+          this.modo = "json";
+        }
+      },
+      textarea() {
+        return this.$root.querySelector("textarea[name=ficha_tecnica]");
+      },
+      get enFilas() {
+        return this.modo === "filas";
+      },
+      get enJson() {
+        return this.modo === "json";
+      },
+      get sinFilas() {
+        return this.filas.length === 0;
+      },
+      agregar() {
+        this.filas.push(aFila("", ""));
+        var self = this;
+        this.$nextTick(function () {
+          var claves = self.$root.querySelectorAll("[data-clave]");
+          if (claves.length) claves[claves.length - 1].focus();
+        });
+      },
+      quitar(evento) {
+        var indice = Number(evento.currentTarget.dataset.indice);
+        this.filas = this.filas.filter(function (f) { return f.indice !== indice; });
+        var self = this;
+        this.$nextTick(function () { self.escribir(); });
+      },
+      escribir() {
+        var objeto = {};
+        this.$root.querySelectorAll("[data-fila]").forEach(function (fila) {
+          var clave = fila.querySelector("[data-clave]").value.trim();
+          var texto = fila.querySelector("[data-valor]").value.trim();
+          if (!clave) return;
+          var tipo = fila.dataset.tipo;
+          var valor = texto;
+          if (tipo === "number" && texto !== "" && !isNaN(Number(texto))) valor = Number(texto);
+          if (tipo === "boolean") {
+            var minusculas = texto.toLowerCase();
+            if (["sí", "si", "true"].indexOf(minusculas) !== -1) valor = true;
+            if (["no", "false"].indexOf(minusculas) !== -1) valor = false;
+          }
+          objeto[clave] = valor;
+        });
+        this.textarea().value = JSON.stringify(objeto, null, 2);
+      },
+      aJson() {
+        this.escribir();
+        this.error = "";
+        this.modo = "json";
+      },
+      aFilas() {
+        try {
+          var filas = filasDe(this.textarea().value);
+          if (!filas) {
+            this.error = "Esta ficha tiene listas u objetos: edítala como JSON.";
+            return;
+          }
+          this.filas = filas;
+          this.error = "";
+          this.modo = "filas";
+        } catch (e) {
+          this.error = "El JSON tiene un error; corrígelo para volver a la lista.";
+        }
       },
     };
   });

@@ -57,10 +57,16 @@ class Pedido(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     metodo_pago = models.CharField(max_length=15, choices=MetodoPago.choices)
     creado_en = models.DateTimeField(auto_now_add=True)
+    # Cuándo pasó a pagado (lo pone _cambiar_estado_bloqueado). Vacío en los pedidos sin pagar
+    # y en los pagados antes de que existiera el campo: el resumen usa creado_en para esos.
+    pagado_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-creado_en", "-id"]
-        indexes = [models.Index(fields=["usuario_id", "-creado_en"], name="pedido_usuario_fecha")]
+        indexes = [
+            models.Index(fields=["usuario_id", "-creado_en"], name="pedido_usuario_fecha"),
+            models.Index(fields=["estado", "pagado_en"], name="pedido_estado_pagado"),
+        ]
 
     def __str__(self) -> str:
         return f"Pedido {self.pk} ({self.get_estado_display()})"

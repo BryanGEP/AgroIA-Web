@@ -1,0 +1,64 @@
+{% extends "panel/marco.html" %}
+{% load agroia panel %}
+{% block titulo %}{{ perfil.nombre }} {{ perfil.apellidos }} · Administración{% endblock %}
+{% block encabezado %}{{ perfil.nombre }} {{ perfil.apellidos }}{% endblock %}
+{% block panel %}
+<a href="{% url 'panel:usuarios' %}" class="link link-primary">Volver a usuarios</a>
+<div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+  <section aria-labelledby="t-datos" class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+    <h2 id="t-datos" class="text-2xl">Datos</h2>
+    <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
+      <dt class="text-suave">Correo</dt><dd class="break-all">{{ perfil.email }} {% if perfil.email_verificado %}<span class="badge badge-success badge-sm">Verificado</span>{% else %}<span class="badge badge-warning badge-sm">Sin verificar</span>{% endif %}</dd>
+      <dt class="text-suave">Teléfono</dt><dd>{{ perfil.telefono|default:"—" }}</dd>
+      <dt class="text-suave">Registro</dt><dd>{{ perfil.date_joined|fecha|date:"d/m/Y H:i" }}</dd>
+      <dt class="text-suave">Rol</dt><dd>{{ perfil.rol|capfirst }}{% if perfil.id == yo %} (tú){% endif %}</dd>
+      <dt class="text-suave">Cuenta</dt><dd>{% if perfil.is_active %}Activa{% else %}Desactivada{% endif %}</dd>
+    </dl>
+    <a href="{% url 'panel:bitacora' %}?usuario_id={{ perfil.id }}" class="link link-primary self-start font-medium">Ver su bitácora</a>
+  </section>
+
+  <section aria-labelledby="t-rol" class="flex flex-col gap-3 self-start rounded-box border border-base-300 bg-tarjeta p-5">
+    <h2 id="t-rol" class="text-2xl">Rol</h2>
+    {% if perfil.id == yo %}
+      <p class="text-suave">No puedes cambiar tu propio rol: otro administrador tendría que hacerlo.</p>
+    {% else %}
+      <form method="post" action="{% url 'panel:rol' perfil.id %}" x-data="confirmar" @submit="pedir" class="flex flex-col gap-3">
+        {% csrf_token %}
+        <input type="hidden" name="volver" value="detalle">
+        {% if perfil.rol == "administrador" %}
+          <input type="hidden" name="rol" value="cliente">
+          <p class="text-suave">Es administrador. Si lo cambias a cliente, deja de entrar al panel en su siguiente inicio de sesión o renovación.</p>
+          <button type="submit" class="btn btn-outline btn-error">Cambiar a cliente</button>
+          {% include "componentes/confirmar.html" with titulo="¿Quitarle el rol de administrador?" texto="Pasará a ser cliente y dejará de entrar al panel." accion="Sí, cambiar a cliente" peligro=True %}
+        {% else %}
+          <input type="hidden" name="rol" value="administrador">
+          <p class="text-suave">Es cliente. Como administrador podría ver y cambiar pedidos, productos y usuarios.</p>
+          <button type="submit" class="btn btn-primary">Hacerlo administrador</button>
+          {% include "componentes/confirmar.html" with titulo="¿Darle el rol de administrador?" texto="Podrá ver y cambiar pedidos, productos y usuarios." accion="Sí, hacerlo administrador" %}
+        {% endif %}
+      </form>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="t-sus-pedidos" class="flex flex-col gap-3 rounded-box border border-base-300 bg-tarjeta p-5 lg:col-span-2">
+    <h2 id="t-sus-pedidos" class="text-2xl">Sus pedidos</h2>
+    {% if error_pedidos %}
+      {% include "panel/parciales/_tarjeta_error.html" with texto=error_pedidos %}
+    {% elif pedidos.results %}
+      <ul class="flex flex-col divide-y divide-base-300">
+        {% for p in pedidos.results %}
+          <li class="flex flex-wrap items-center justify-between gap-3 py-2">
+            <a href="{% url 'panel:pedido' p.id %}" class="link link-primary font-medium">Pedido #{{ p.id }}</a>
+            <span class="text-sm text-suave">{{ p.creado_en|fecha|date:"d/m/Y" }}</span>
+            <span class="tabular-nums">{{ p.total|pesos }}</span>
+            {% include "componentes/estado_pedido.html" with estado=p.estado %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% if pedidos.count > pedidos.results|length %}<p class="text-sm text-suave">Se muestran los {{ pedidos.results|length }} más recientes de {{ pedidos.count }}.</p>{% endif %}
+    {% else %}
+      <p class="text-suave">No tiene pedidos.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -366,6 +366,8 @@ python infra/medir_recuperacion.py
 
 Los comandos funcionan en cualquier contenedor que tenga `comun`, también en svc-ia.
 
+**En el panel de administración** (`/administracion/eventos/`, solo lectura): lo mismo que `estado`, desde `GET /api/v1/eventos/estado/` de svc-contenido (web nunca se conecta a Redis). Sin el sobre ni los datos de ningún evento, y el motivo de los fallidos solo con el nombre de la excepción: el texto completo se ve con el comando. Se actualiza con un botón, sin polling. Reprocesar y descartar siguen siendo estos comandos; la pantalla dice cuál correr.
+
 ## Pendientes
 
 - **Pantalla de bitácora en el panel de administración (opcional, fase 4):** hoy se consulta solo por la API.

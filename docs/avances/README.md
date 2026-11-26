@@ -19,3 +19,4 @@ Un documento por fase o avance grande: qué se construyó, decisiones, verificac
 | Entrega 4 · IA asíncrona por eventos | 2026-11-22 | [e4-ia-asincrona.md](e4-ia-asincrona.md) | Entrega 4 |
 | Entrega 4 · Widget flotante de AgroIA | 2026-11-24 | [e4-widget-agroia.md](e4-widget-agroia.md) | Entrega 4 |
 | Diseño · Frontend con la dirección «Altura» | 2026-11-24 | [diseno-front.md](diseno-front.md) | Entrega 4 |
+| Entrega 4 · Panel de administración ampliado | 2026-11-26 | [panel-admin.md](panel-admin.md) | Entrega 4 |
