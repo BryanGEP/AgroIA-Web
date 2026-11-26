@@ -33,11 +33,18 @@ class CategoriaSerializer(serializers.ModelSerializer):
     slug = serializers.SlugField(
         max_length=120, required=False, help_text="Se genera a partir del nombre si no se envía."
     )
+    productos = serializers.SerializerMethodField(
+        help_text="Cuántos productos tiene (activos e inactivos)."
+    )
 
     class Meta:
         model = Categoria
-        fields = ["id", "nombre", "slug", "descripcion", "activa"]
-        read_only_fields = ["id"]
+        fields = ["id", "nombre", "slug", "descripcion", "activa", "productos"]
+        read_only_fields = ["id", "productos"]
+
+    def get_productos(self, categoria: Categoria) -> int:
+        anotado = getattr(categoria, "total_productos", None)
+        return anotado if anotado is not None else categoria.productos.count()
 
     def validate_slug(self, valor: str) -> str:
         repetidos = Categoria.objects.filter(slug=valor)

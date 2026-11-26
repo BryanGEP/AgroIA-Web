@@ -28,7 +28,9 @@ from apps.pedidos.serializers import (
     CambiarEstadoSerializer,
     CarritoSerializer,
     CrearPedidoSerializer,
+    FiltroResumenSerializer,
     PedidoSerializer,
+    ResumenSerializer,
 )
 
 SIN_TOKEN = {401: OpenApiResponse(description="Sin token o token inválido.")}
@@ -270,3 +272,64 @@ class PedidoViewSet(
             pedido, datos.validated_data["estado"], usuario_id(request)
         )
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
+
+
+class ResumenView(APIView):
+    """Números del inicio del panel de administración."""
+
+    permission_classes = [IsAuthenticated, EsAdministrador]
+
+    @extend_schema(
+        summary="Resumen para el panel",
+        description=(
+            "Solo administrador. Pedidos pendientes y pagados por enviar; ventas (pedidos "
+            "pagados, enviados o entregados) de hoy, de los últimos 7 días y del mes, contadas "
+            "por `pagado_en` (o `creado_en` en los pagados antes de que existiera ese campo); "
+            "productos activos con stock bajo (`0 < stock <= umbral`) y agotados, hasta 10 de "
+            "cada uno; y los últimos 5 pedidos. Los días son de America/Mexico_City."
+        ),
+        parameters=[FiltroResumenSerializer],
+        responses={
+            200: ResumenSerializer,
+            **INVALIDO,
+            **SIN_TOKEN,
+            403: OpenApiResponse(description="El usuario no es administrador."),
+        },
+        examples=[
+            OpenApiExample(
+                "Resumen",
+                response_only=True,
+                value={
+                    "fecha": "2026-11-26",
+                    "pedidos": {"pendientes": 3, "por_enviar": 2},
+                    "ventas": {
+                        "hoy": {"total": "1600.00", "pedidos": 1},
+                        "ultimos_7_dias": {"total": "5210.00", "pedidos": 4},
+                        "mes": {"total": "9870.50", "pedidos": 9},
+                        "respaldo": {"pedidos_sin_pagado_en": 2, "primer_pagado_en": "2026-11-26"},
+                    },
+                    "stock": {
+                        "umbral": 5,
+                        "bajo": {
+                            "total": 1,
+                            "productos": [{"slug": "urea-46", "nombre": "Urea 46%", "stock": 3}],
+                        },
+                        "agotados": {"total": 0, "productos": []},
+                    },
+                    "ultimos_pedidos": [
+                        {
+                            "id": 94,
+                            "estado": "pendiente",
+                            "total": "1600.00",
+                            "creado_en": "2026-11-26T10:12:00-06:00",
+                            "usuario_id": "8d3f6c2a-1b4e-4f7a-9c5d-2e6f8a0b1c3d",
+                        }
+                    ],
+                },
+            )
+        ],
+    )
+    def get(self, request):
+        filtros = FiltroResumenSerializer(data=request.query_params)
+        filtros.is_valid(raise_exception=True)
+        return Response(servicios.resumen(filtros.validated_data["umbral"]))
