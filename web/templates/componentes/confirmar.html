@@ -1,0 +1,14 @@
+{% comment %} Diálogo de confirmación para un formulario con x-data="confirmar" (static/js).
+   Va dentro del formulario. Sin JavaScript el formulario se envía sin confirmar, como antes.
+   Al cerrarse, el foco vuelve al botón que lo abrió. Parámetros: titulo, texto, accion
+   (texto del botón que confirma), peligro (botón rojo). {% endcomment %}
+<dialog x-ref="dialogo" class="modal" aria-labelledby="{{ id|default:'confirmar' }}-titulo" @close="cerrado">
+  <div class="modal-box max-w-md rounded-box border border-base-300 bg-tarjeta">
+    <h2 id="{{ id|default:'confirmar' }}-titulo" class="text-2xl">{{ titulo }}</h2>
+    {% if texto %}<p class="mt-2 text-suave">{{ texto }}</p>{% endif %}
+    <div class="modal-action flex-wrap">
+      <button type="button" class="btn btn-ghost text-primary" @click="cancelar">No, regresar</button>
+      <button type="button" class="btn {% if peligro %}btn-error{% else %}btn-primary{% endif %}" @click="aceptar">{{ accion }}</button>
+    </div>
+  </div>
+</dialog>

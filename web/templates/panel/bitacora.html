@@ -1,0 +1,52 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}Bitácora · Administración{% endblock %}
+{% block encabezado %}Bitácora{% endblock %}
+{% block panel %}
+<p class="mb-4 max-w-prose text-suave">Lo que pasó en el sistema, del más reciente al más viejo. Toca una correlación para ver un flujo completo de punta a punta.</p>
+{# Sin JavaScript: GET normal con «Filtrar». Con HTMX: reemplaza solo los resultados. #}
+<form method="get" action="{% url 'panel:bitacora' %}" hx-get="{% url 'panel:bitacora' %}" hx-target="#resultados-bitacora"
+      hx-push-url="true" hx-trigger="change, submit" hx-indicator="#cargando-bitacora" data-quitar-vacios
+      class="mb-4 rounded-box border border-base-300 bg-tarjeta p-4">
+  {# Abierto sin JavaScript; en celular se pliega si no hay filtros (plegarEnCelular). #}
+  <details open x-data="plegarEnCelular" data-hay-filtros="{% if filtros.tipo or filtros.usuario_id or filtros.correlacion_id or filtros.pedido_id or filtros.desde or filtros.hasta %}true{% else %}false{% endif %}">
+  <summary class="btn btn-outline btn-primary w-full md:hidden">Filtros</summary>
+  <div class="mt-4 grid gap-3 sm:grid-cols-2 md:mt-0 lg:grid-cols-3">
+  <div class="flex flex-col gap-1">
+    <label for="filtro-tipo" class="text-sm font-medium">Tipo</label>
+    <select id="filtro-tipo" name="tipo" class="select w-full bg-base-100">
+      <option value="">Todos</option>
+      {% for valor, texto in tipos.items %}<option value="{{ valor }}" {% if filtros.tipo == valor %}selected{% endif %}>{{ texto }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-desde" class="text-sm font-medium">Desde</label>
+    <input id="filtro-desde" type="date" name="desde" value="{{ filtros.desde }}" class="input w-full bg-base-100">
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-hasta" class="text-sm font-medium">Hasta</label>
+    <input id="filtro-hasta" type="date" name="hasta" value="{{ filtros.hasta }}" class="input w-full bg-base-100">
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-usuario" class="text-sm font-medium">Usuario (id)</label>
+    <input id="filtro-usuario" type="text" name="usuario_id" value="{{ filtros.usuario_id }}" class="input w-full bg-base-100 font-mono text-sm" autocomplete="off" spellcheck="false" placeholder="UUID del usuario">
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-correlacion" class="text-sm font-medium">Correlación</label>
+    <input id="filtro-correlacion" type="text" name="correlacion_id" value="{{ filtros.correlacion_id }}" class="input w-full bg-base-100 font-mono text-sm" autocomplete="off" spellcheck="false" placeholder="UUID del flujo">
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-pedido" class="text-sm font-medium">Pedido</label>
+    <input id="filtro-pedido" type="text" inputmode="numeric" name="pedido_id" value="{{ filtros.pedido_id }}" class="input w-full bg-base-100" autocomplete="off" placeholder="Número, por ejemplo 94">
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+    <a href="{% url 'panel:bitacora' %}" class="btn btn-ghost text-primary">Quitar filtros</a>
+    {% include "componentes/cargando.html" with id="cargando-bitacora" texto="Buscando…" %}
+  </div>
+  </div>
+  </details>
+</form>
+<div id="resultados-bitacora" aria-live="polite">
+  {% include "panel/parciales/_bitacora.html" %}
+</div>
+{% endblock %}

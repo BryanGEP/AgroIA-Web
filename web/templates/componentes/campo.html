@@ -20,6 +20,8 @@
         <span class="btn btn-sm btn-primary">Elegir un archivo</span>
         <span class="break-all" x-text="archivoElegido">Ningún archivo elegido</span>
       </label>
+      <img x-show="hayVistaPrevia" x-cloak :src="url" alt="Vista previa de la imagen elegida" width="400" height="300"
+           class="aspect-[4/3] w-full max-w-xs rounded-box border border-base-300 bg-base-200 object-cover">
     </div>
     {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm text-suave">{{ campo.help_text }}</p>{% endif %}
     {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}

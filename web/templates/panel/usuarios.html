@@ -1,44 +1,59 @@
 {% extends "panel/marco.html" %}
+{% load panel %}
 {% block titulo %}Usuarios · Administración{% endblock %}
 {% block encabezado %}Usuarios{% endblock %}
 {% block panel %}
-<form method="get" action="{% url 'panel:usuarios' %}" class="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
-  <div class="flex flex-col gap-1">
+<form method="get" action="{% url 'panel:usuarios' %}" data-quitar-vacios
+      class="mb-4 grid gap-3 rounded-box border border-base-300 bg-tarjeta p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+  <div class="flex flex-col gap-1 sm:col-span-2 lg:col-span-1">
     <label for="filtro-q" class="text-sm font-medium">Buscar</label>
-    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input bg-tarjeta w-full" placeholder="Correo, nombre o apellidos">
+    <input id="filtro-q" type="search" name="q" value="{{ filtros.q }}" class="input w-full bg-base-100" placeholder="Correo, nombre o apellidos">
   </div>
   <div class="flex flex-col gap-1">
     <label for="filtro-rol" class="text-sm font-medium">Rol</label>
-    <select id="filtro-rol" name="rol" class="select bg-tarjeta w-full">
+    <select id="filtro-rol" name="rol" class="select w-full bg-base-100">
       <option value="">Todos</option>
       <option value="cliente" {% if filtros.rol == "cliente" %}selected{% endif %}>Cliente</option>
       <option value="administrador" {% if filtros.rol == "administrador" %}selected{% endif %}>Administrador</option>
     </select>
   </div>
-  <button type="submit" class="btn btn-primary">Filtrar</button>
+  <div class="flex flex-col gap-1">
+    <label for="filtro-verificado" class="text-sm font-medium">Correo</label>
+    <select id="filtro-verificado" name="email_verificado" class="select w-full bg-base-100">
+      <option value="">Todos</option>
+      <option value="true" {% if filtros.email_verificado == "true" %}selected{% endif %}>Verificado</option>
+      <option value="false" {% if filtros.email_verificado == "false" %}selected{% endif %}>Sin verificar</option>
+    </select>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+    <a href="{% url 'panel:usuarios' %}" class="btn btn-ghost text-primary">Quitar filtros</a>
+  </div>
 </form>
 {% if usuarios.results %}
+  <p class="mb-2 text-sm text-suave">{{ usuarios.count }} usuario{{ usuarios.count|pluralize }}.</p>
   <div class="overflow-x-auto rounded-box border border-base-300 bg-tarjeta">
     <table class="table tabla-tarjetas">
-      <thead><tr><th>Usuario</th><th>Correo</th><th>Verificado</th><th>Rol</th></tr></thead>
+      <thead><tr><th>Usuario</th><th>Correo</th><th>Registro</th><th>Rol</th></tr></thead>
       <tbody>
         {% for u in usuarios.results %}
           <tr>
-            <td class="font-medium celda-titulo">{{ u.nombre }} {{ u.apellidos }}</td>
-            <td class="text-sm" data-etiqueta="Correo">{{ u.email }}</td>
-            <td data-etiqueta="Verificado">{% if u.email_verificado %}Sí{% else %}No{% endif %}</td>
+            <td class="font-medium celda-titulo"><a href="{% url 'panel:usuario' u.id %}" class="link link-hover">{{ u.nombre }} {{ u.apellidos }}</a></td>
+            <td class="text-sm" data-etiqueta="Correo"><span class="break-all">{{ u.email }}</span> {% if u.email_verificado %}<span class="badge badge-success badge-sm">Verificado</span>{% else %}<span class="badge badge-warning badge-sm">Sin verificar</span>{% endif %}</td>
+            <td data-etiqueta="Registro">{{ u.date_joined|fecha|date:"d/m/Y" }}</td>
             <td data-etiqueta="Rol">
               {% if u.id == yo %}
                 <span class="badge badge-primary badge-sm">{{ u.rol|capfirst }} (tú)</span>
               {% else %}
-                <form method="post" action="{% url 'panel:rol' u.id %}" class="flex items-center gap-2">
+                <form method="post" action="{% url 'panel:rol' u.id %}" class="flex flex-wrap items-center gap-2" x-data="confirmar" @submit="pedir">
                   {% csrf_token %}
                   <label for="rol-{{ u.id }}" class="sr-only">Rol de {{ u.email }}</label>
-                  <select id="rol-{{ u.id }}" name="rol" class="select select-sm bg-tarjeta">
+                  <select id="rol-{{ u.id }}" name="rol" class="select select-sm bg-base-100">
                     <option value="cliente" {% if u.rol == "cliente" %}selected{% endif %}>Cliente</option>
                     <option value="administrador" {% if u.rol == "administrador" %}selected{% endif %}>Administrador</option>
                   </select>
-                  <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-primary">Cambiar</button>
+                  <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-primary">Cambiar<span class="sr-only"> el rol de {{ u.email }}</span></button>
+                  {% include "componentes/confirmar.html" with id="rol-"|add:u.id titulo="¿Cambiar el rol de "|add:u.email|add:"?" texto="El nuevo rol se aplica en su siguiente inicio de sesión o renovación del token." accion="Sí, cambiar el rol" %}
                 </form>
               {% endif %}
             </td>
@@ -47,11 +62,9 @@
       </tbody>
     </table>
   </div>
-  <nav class="mt-4 flex justify-between" aria-label="Páginas">
-    {% if usuarios.previous %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.rol %}rol={{ filtros.rol }}&{% endif %}page={{ filtros.page|add:-1 }}">Anteriores</a>{% else %}<span></span>{% endif %}
-    {% if usuarios.next %}<a class="btn border-base-300 bg-tarjeta" href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.rol %}rol={{ filtros.rol }}&{% endif %}page={{ filtros.page|add:1 }}">Siguientes</a>{% endif %}
-  </nav>
+  {% include "panel/parciales/_paginas.html" with datos=usuarios %}
 {% else %}
-  {% include "componentes/estado_vacio.html" with titulo="No hay usuarios con esos filtros" %}
+  {% url 'panel:usuarios' as todos %}
+  {% include "componentes/estado_vacio.html" with titulo="No hay usuarios con esos filtros" texto="Prueba con otra palabra o quita algún filtro." enlace=todos accion="Quitar filtros" %}
 {% endif %}
 {% endblock %}

@@ -86,9 +86,7 @@ def test_el_menu_muestra_administracion_solo_al_administrador(client, con_sesion
     assert "Administración" not in client.get("/aviso-de-privacidad/").content.decode()
 
     con_sesion(rol="administrador")
-    assert (
-        'href="/administracion/productos/"' in client.get("/aviso-de-privacidad/").content.decode()
-    )
+    assert 'href="/administracion/"' in client.get("/aviso-de-privacidad/").content.decode()
 
 
 def test_listado_de_productos_con_filtros(client, servicios, con_sesion):
