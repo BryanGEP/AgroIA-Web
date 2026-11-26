@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}Insumos y asesoría para tu huerta{% endblock %}
+{% block contenido %}
+{% foto_ambiente "inicio" as foto_hero %}
+
+{# Hero: Bosque con curvas de nivel (y una foto de ambiente debajo, si se agrega). #}
+<section class="relative overflow-hidden bg-bosque text-bosque-texto" aria-labelledby="titulo-inicio">
+  {% if foto_hero %}{% include "componentes/foto_ambiente.html" with foto=foto_hero alt="Huerta de aguacate en Michoacán" prioridad=True %}{% endif %}
+  <span class="curvas absolute inset-0 text-curvas-hero opacity-30" aria-hidden="true"></span>
+  <div class="relative max-w-6xl mx-auto grid gap-10 px-4 pt-12 md:grid-cols-[1.15fr_0.85fr] md:items-end md:pt-20">
+    <div class="pb-12 md:pb-20">
+      <h1 id="titulo-inicio" class="max-w-[15ch] text-[2.4rem] leading-[1.02] text-white md:text-[3.6rem]">Insumos, asesoría y diagnóstico para tu huerta de aguacate</h1>
+      <p class="mt-5 max-w-[38ch] text-lg text-bosque-suave md:text-xl">Fungicidas, fertilizantes, riego y herramientas con su ficha técnica completa, y AgroIA para resolver tus dudas de manejo.</p>
+      <form action="{% url 'catalogo:lista' %}" method="get" role="search" class="mt-7 flex w-full max-w-xl flex-col gap-2 sm:flex-row lg:hidden">
+        <label for="buscar-inicio" class="sr-only">Buscar en el catálogo</label>
+        <input id="buscar-inicio" name="q" type="search" class="input input-lg w-full border-white/30 bg-white/10 text-bosque-texto placeholder:text-bosque-suave" placeholder="Fungicida, urea, manguera de goteo…" autocomplete="off">
+        <button type="submit" class="btn btn-accent btn-lg">Buscar</button>
+      </form>
+      <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+        <a href="{% url 'catalogo:lista' %}" class="btn btn-accent btn-lg">Ver el catálogo</a>
+        <a href="{% url 'agroia:inicio' %}" class="btn btn-lg border-2 border-white/50 bg-transparent text-white hover:border-white hover:bg-white/10 sm:flex-none">Preguntarle a AgroIA</a>
+      </div>
+    </div>
+
+    {# AgroIA en el hero (escritorio). En celular está la burbuja: así no tapa este texto. #}
+    <div class="hidden self-end md:block">
+      <div class="rounded-t-box bg-base-100 p-6 text-base-content">
+        <div class="mb-4 flex items-center gap-3">
+          <span class="block h-12 w-11">{% include "componentes/mascota.html" with clase="h-12 w-11" parpadea=True %}</span>
+          <div>
+            <p class="font-display text-xl font-bold leading-tight">AgroIA</p>
+            <p class="text-sm text-suave">Responde con las fuentes de su base de conocimiento</p>
+          </div>
+        </div>
+        <p class="mb-2 text-sm font-medium">Puedes preguntarle, por ejemplo:</p>
+        <ul class="flex flex-col gap-2 text-[0.95rem]">
+          <li class="rounded-box border border-base-300 bg-tarjeta px-3 py-2">¿Cada cuánto debo regar mi aguacate?</li>
+          <li class="rounded-box border border-base-300 bg-tarjeta px-3 py-2">¿Cómo distingo la roña de la antracnosis?</li>
+          <li class="rounded-box border border-base-300 bg-tarjeta px-3 py-2">¿Qué fertilizante uso antes de la floración?</li>
+        </ul>
+        <p class="mt-4 text-xs text-suave">AgroIA es orientativo y no sustituye el diagnóstico de un profesional.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if tienda_disponible %}
+  {% if categorias %}
+  <section class="max-w-6xl mx-auto px-4 pt-12 md:pt-16" aria-labelledby="categorias">
+    <h2 id="categorias" class="mb-5 text-[1.95rem] md:text-[2.45rem]">Categorías</h2>
+    {# En celular se desplazan de lado; la siguiente se ve a medias para que se note. #}
+    <ul data-desplazar-al-foco class="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-3 pt-2 lg:mx-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
+      {% for categoria in categorias %}
+        {% with t=categoria.slug|tinte %}
+        <li class="tinte-{{ t }} shrink-0 basis-[42%] snap-start sm:basis-[30%] lg:basis-auto">
+          <a href="{% url 'catalogo:lista' %}?categoria={{ categoria.slug }}" class="panel-tinte relative flex h-full min-h-36 flex-col justify-between gap-6 overflow-hidden rounded-box p-4 hover:brightness-[0.97]">
+            <span class="curvas absolute inset-0 opacity-15" aria-hidden="true"></span>
+            <span class="relative block h-12 w-14">{% include "componentes/marcador_categoria.html" with tinte=t nombre=categoria.nombre %}</span>
+            <span class="etiqueta-tinte relative font-display text-xl font-bold">{{ categoria.nombre }}</span>
+          </a>
+        </li>
+        {% endwith %}
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if productos %}
+  <section class="max-w-6xl mx-auto px-4 pt-12 md:pt-16" aria-labelledby="destacados">
+    <div class="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <h2 id="destacados" class="text-[1.95rem] md:text-[2.45rem]">Recién llegados</h2>
+      <a href="{% url 'catalogo:lista' %}" class="link link-primary font-medium"><span class="sm:hidden">Ver todo</span><span class="hidden sm:inline">Ver todos los productos</span></a>
+    </div>
+    <ul class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      {% for producto in productos %}
+        <li class="flex">{% include "componentes/tarjeta_producto.html" %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+{% else %}
+  <section class="max-w-6xl mx-auto px-4 pt-12">
+    {% include "componentes/estado_vacio.html" with titulo="El catálogo no está disponible en este momento" texto="Intenta de nuevo en unos minutos." %}
+  </section>
+{% endif %}
+
+{# AgroIA y diagnóstico: con espacio para una foto de ambiente cada uno. #}
+<section class="max-w-6xl mx-auto px-4 py-12 md:py-16" aria-labelledby="servicios">
+  <h2 id="servicios" class="sr-only">Lo que encuentras en AgroIA</h2>
+  <ul class="grid gap-4 md:grid-cols-2">
+    {% foto_ambiente "agroia" as foto_agroia %}
+    <li class="flex flex-col overflow-hidden rounded-box border border-base-300 bg-tarjeta">
+      <div class="relative h-28 overflow-hidden bg-bosque text-bosque-texto">
+        {% if foto_agroia %}{% include "componentes/foto_ambiente.html" with foto=foto_agroia alt="Productor revisando su huerta" ancho=800 alto=300 %}{% endif %}
+        <span class="curvas absolute inset-0 text-curvas-hero opacity-30" aria-hidden="true"></span>
+        <span class="absolute bottom-0 left-6 block h-20 w-[4.2rem] translate-y-1/3 rounded-full bg-[#eff3e8] p-2">{% include "componentes/mascota.html" with clase="h-16 w-14" %}</span>
+      </div>
+      <div class="flex flex-1 flex-col gap-2 p-6 pt-10">
+        <h3 class="text-2xl">Pregúntale a AgroIA</h3>
+        <p class="max-w-[46ch] text-suave">Riego, plagas, fertilización: una orientación al momento, con las fuentes que usó.</p>
+        <a href="{% url 'agroia:inicio' %}" class="btn btn-primary mt-3 self-start">Abrir el chat</a>
+      </div>
+    </li>
+    {% foto_ambiente "diagnostico" as foto_diagnostico %}
+    <li class="tinte-fungicidas flex flex-col overflow-hidden rounded-box border border-base-300 bg-tarjeta">
+      <div class="relative h-28 overflow-hidden bg-bosque text-bosque-texto">
+        {% if foto_diagnostico %}{% include "componentes/foto_ambiente.html" with foto=foto_diagnostico alt="Hojas de aguacate en la huerta" ancho=800 alto=300 %}{% endif %}
+        <span class="curvas absolute inset-0 text-curvas-hero opacity-30" aria-hidden="true"></span>
+        <span class="panel-tinte absolute bottom-0 left-6 grid h-20 w-20 translate-y-1/3 place-items-center rounded-full p-3">{% include "componentes/marcador_categoria.html" with tinte="fungicidas" nombre="hoja" %}</span>
+      </div>
+      <div class="flex flex-1 flex-col gap-2 p-6 pt-10">
+        <h3 class="text-2xl">Diagnóstico por imagen</h3>
+        <p class="max-w-[46ch] text-suave">Sube una foto de la hoja o el fruto para saber si está sano o tiene roña o antracnosis.</p>
+        <a href="{% url 'diagnostico:inicio' %}" class="btn btn-primary mt-3 self-start">Analizar una foto</a>
+      </div>
+    </li>
+  </ul>
+</section>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% comment %} El contenido del widget (GET /agroia/widget/, o al reiniciar). Contexto:
+   sugerencias, siguiente (la página donde está, para volver después de iniciar sesión),
+   widget_agroia.con_sesion y, con sesión, el de `_contexto_de_conversacion` (views.py).
+   Al visitante: el saludo y la invitación a entrar, sin campo de pregunta. {% endcomment %}
+{% if not widget_agroia.con_sesion %}
+  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+    {% include "agroia/parciales/_widget_saludo.html" %}
+    <div class="rounded-box border border-base-300 bg-base-200 p-4">
+      <p class="mb-3">Inicia sesión o crea tu cuenta para preguntarle a AgroIA. Tus conversaciones quedan en tu historial.</p>
+      <div class="flex flex-wrap gap-2">
+        <a href="{% url 'cuentas:iniciar_sesion' %}?next={{ siguiente|urlencode }}" class="btn btn-primary btn-sm">Iniciar sesión</a>
+        <a href="{% url 'cuentas:registro' %}?next={{ siguiente|urlencode }}" class="btn btn-outline btn-primary btn-sm">Crear cuenta</a>
+      </div>
+    </div>
+  </div>
+  {% include "agroia/parciales/_widget_pie.html" %}
+{% else %}
+  <div x-data="chat" class="flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1 overflow-y-auto p-3" data-desplazable>
+      {% if reiniciado %}<p class="sr-only" role="status">Empezaste una conversación nueva.</p>{% endif %}
+      {% if no_disponible %}<div class="alert alert-warning mb-3" role="alert"><span>{{ no_disponible }}</span></div>{% endif %}
+      {% if not conversacion %}{% include "agroia/parciales/_widget_saludo.html" %}{% endif %}
+      <ol id="widget-mensajes" data-mensajes class="flex flex-col gap-1" aria-live="polite">
+        {% if conversacion %}{% include "agroia/parciales/_conversacion.html" %}{% endif %}
+      </ol>
+      <div x-show="enviando" x-cloak class="chat chat-end">
+        <div class="chat-bubble chat-bubble-primary whitespace-pre-line" x-text="pregunta"></div>
+      </div>
+      <div id="widget-escribiendo" class="htmx-indicator chat chat-start" role="status">
+        <div class="chat-bubble bg-base-200 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
+      </div>
+      {% if not conversacion %}
+        <div id="widget-sugerencias" class="mt-3">
+          <p class="mb-2 text-sm font-medium">Preguntas sugeridas</p>
+          <form method="post" action="{% url 'agroia:widget_preguntar' %}" hx-post="{% url 'agroia:widget_preguntar' %}"
+                hx-target="#widget-mensajes" hx-swap="beforeend" hx-indicator="#widget-escribiendo"
+                @htmx:after-request="terminar" class="flex flex-wrap gap-2">
+            {% csrf_token %}
+            {% for sugerencia in sugerencias %}
+              <button type="submit" name="pregunta" value="{{ sugerencia }}" class="btn btn-outline btn-primary btn-sm h-auto min-h-8 rounded-full py-1 text-left font-normal">{{ sugerencia }}</button>
+            {% endfor %}
+          </form>
+        </div>
+      {% endif %}
+    </div>
+    <div class="border-t border-base-300 p-3">
+      {% url 'agroia:widget_preguntar' as accion %}
+      {% include "agroia/parciales/_formulario.html" with accion=accion objetivo="#widget-mensajes" indicador="#widget-escribiendo" id_campo="widget-pregunta" microfono=True %}
+      <a href="{% url 'agroia:inicio' %}" class="link link-primary mt-2 inline-block text-sm">Ver historial completo</a>
+    </div>
+    {% include "agroia/parciales/_widget_pie.html" %}
+  </div>
+{% endif %}

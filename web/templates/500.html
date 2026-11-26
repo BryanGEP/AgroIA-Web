@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{# Sin el widget de AgroIA: una página que ya falló no hace más peticiones. #}
+{% block widget_agroia %}{% endblock %}
+{% block titulo %}Algo salió mal{% endblock %}
+{% block contenido %}
+<div class="max-w-6xl mx-auto px-4">
+  {% include "componentes/error.html" with titulo="Algo salió mal de nuestro lado" texto="Intenta de nuevo en unos minutos." enlace="/" accion="Ir al inicio" %}
+</div>
+{% endblock %}

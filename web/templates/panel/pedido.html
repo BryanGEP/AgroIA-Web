@@ -1,0 +1,62 @@
+{% extends "panel/marco.html" %}
+{% load agroia panel %}
+{% block titulo %}Pedido #{{ pedido.id }} · Administración{% endblock %}
+{% block encabezado %}Pedido #{{ pedido.id }}{% endblock %}
+{% block panel %}
+<a href="{% url 'panel:pedidos' %}" class="link link-primary">Volver a pedidos</a>
+<div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+  <div class="flex flex-col gap-6">
+    <section aria-labelledby="t-datos-pedido" class="rounded-box border border-base-300 bg-tarjeta p-5">
+      <h2 id="t-datos-pedido" class="sr-only">Datos del pedido</h2>
+      <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
+        <dt class="text-suave">Creado</dt><dd>{{ pedido.creado_en|fecha|date:"d/m/Y H:i" }}</dd>
+        {% if pedido.pagado_en %}<dt class="text-suave">Pagado</dt><dd>{{ pedido.pagado_en|fecha|date:"d/m/Y H:i" }}</dd>{% endif %}
+        <dt class="text-suave">Cliente</dt>
+        <dd>{% if cliente %}<a href="{% url 'panel:usuario' pedido.usuario_id %}" class="link link-primary">{{ cliente.nombre }} {{ cliente.apellidos }}</a> <span class="break-all text-suave">({{ cliente.email }})</span>{% elif pedido.usuario_id %}<a href="{% url 'panel:usuario' pedido.usuario_id %}" class="link link-primary font-mono">{{ pedido.usuario_id|id_corto }}</a>{% else %}—{% endif %}</dd>
+        <dt class="text-suave">Método de pago</dt><dd>{% if pedido.metodo_pago == "tarjeta" %}Tarjeta{% elif pedido.metodo_pago == "transferencia" %}Transferencia{% else %}Contra entrega{% endif %}</dd>
+      </dl>
+    </section>
+    <section aria-labelledby="productos">
+      <h2 id="productos" class="mb-3 text-2xl">Productos</h2>
+      <ul class="flex flex-col divide-y divide-base-300 rounded-box border border-base-300 bg-tarjeta">
+        {% for item in pedido.items %}<li class="flex justify-between gap-3 p-4"><span>{{ item.cantidad }} × {{ item.nombre_producto }} <span class="text-sm text-suave">({{ item.precio_unitario|pesos }})</span></span><span class="tabular-nums">{{ item.importe|pesos }}</span></li>{% endfor %}
+      </ul>
+      <dl class="ml-auto mt-3 grid max-w-xs grid-cols-2 gap-y-1 text-right tabular-nums">
+        <dt class="text-left text-suave">Subtotal</dt><dd>{{ pedido.subtotal|pesos }}</dd>
+        <dt class="text-left text-suave">Envío</dt><dd>{{ pedido.envio|pesos }}</dd>
+        <dt class="text-left font-display text-xl font-bold">Total</dt><dd class="font-display text-xl font-bold text-andosol">{{ pedido.total|pesos }}</dd>
+      </dl>
+    </section>
+    <section aria-labelledby="t-envio">
+      {% with d=pedido.direccion_envio %}
+        <h2 id="t-envio" class="mb-2 text-2xl">Envío</h2>
+        <p>{{ d.calle }} {{ d.numero }}, {{ d.colonia }}, {{ d.municipio }}, {{ d.estado }}, C. P. {{ d.codigo_postal }}</p>
+        {% if d.referencias %}<p class="text-sm text-suave">{{ d.referencias }}</p>{% endif %}
+      {% endwith %}
+    </section>
+    <section aria-labelledby="t-linea" class="rounded-box border border-base-300 bg-tarjeta p-5">
+      <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="t-linea" class="text-2xl">Línea de tiempo</h2>
+        <a href="{% url 'panel:bitacora' %}?pedido_id={{ pedido.id }}" class="link link-primary">Ver en la bitácora</a>
+      </div>
+      {% if error_linea %}
+        {% include "panel/parciales/_tarjeta_error.html" with texto=error_linea %}
+      {% elif linea %}
+        <ol class="flex flex-col gap-4 border-l-2 border-base-300 pl-5">
+          {% for e in linea %}
+            <li class="relative">
+              <span class="absolute -left-[1.65rem] top-1.5 h-3 w-3 rounded-full bg-primary" aria-hidden="true"></span>
+              <p class="font-medium">{{ e|resumen_evento }}</p>
+              <p class="text-sm text-suave"><time datetime="{{ e.fecha }}">{{ e.fecha|fecha|date:"d/m/Y H:i" }}</time>{% if e.correlacion_id %} · <a href="{% url 'panel:bitacora' %}?correlacion_id={{ e.correlacion_id }}" class="link link-primary">ver el flujo completo</a>{% endif %}</p>
+            </li>
+          {% endfor %}
+        </ol>
+        <p class="mt-3 text-sm text-suave">Los cambios llegan a la bitácora por eventos: uno recién hecho aparece al recargar.</p>
+      {% else %}
+        <p class="text-suave">Todavía no hay eventos de este pedido en la bitácora.</p>
+      {% endif %}
+    </section>
+  </div>
+  {% include "panel/parciales/_estado.html" %}
+</div>
+{% endblock %}

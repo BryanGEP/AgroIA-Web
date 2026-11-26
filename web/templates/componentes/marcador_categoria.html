@@ -1,0 +1,20 @@
+{# Ilustración de la categoría para productos sin imagen. Parámetros: tinte (slug|tinte), nombre. #}
+<svg role="img" aria-label="Ilustración de {{ nombre|default:'producto' }}" viewBox="0 0 120 90" class="h-full w-full max-h-40" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  {% if tinte == "fungicidas" %}
+    <path d="M60 14c22 6 30 30 18 50-8 13-28 16-38 4-12-15-6-44 20-54z"/>
+    <path d="M60 14c-4 18-6 38-2 58"/><path d="M59 34l12-8M58 48l15-6M58 60l-10-8M59 40l-10-7"/>
+  {% elif tinte == "fertilizantes" %}
+    <path d="M38 24h44l6 52H32z"/><path d="M38 24c4-6 8-8 22-8s18 2 22 8"/>
+    <path d="M48 46h24M48 56h24"/><circle cx="60" cy="36" r="3"/>
+  {% elif tinte == "herramientas" %}
+    <circle cx="40" cy="62" r="10"/><circle cx="62" cy="68" r="10"/>
+    <path d="M46 54l38-38M56 60l30-24"/><path d="M78 22l10-6"/>
+  {% elif tinte == "riego" %}
+    <path d="M60 14c14 18 22 30 22 42a22 22 0 0 1-44 0c0-12 8-24 22-42z"/>
+    <path d="M50 58a10 10 0 0 0 10 10"/><path d="M20 80h80"/>
+  {% elif tinte == "proteccion" %}
+    <path d="M44 78V40l-8-14a5 5 0 0 1 9-4l7 12V18a5 5 0 0 1 10 0v14-6a5 5 0 0 1 10 0v8-4a5 5 0 0 1 10 0v26c0 12-8 22-20 22H44z"/>
+  {% else %}
+    <path d="M60 12c12 0 20 15 20 30a20 20 0 0 1-40 0c0-15 8-30 20-30z"/><circle cx="60" cy="48" r="8"/>
+  {% endif %}
+</svg>

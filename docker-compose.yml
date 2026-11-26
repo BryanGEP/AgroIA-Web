@@ -1,0 +1,436 @@
+# Entorno local de AgroIA-Web: cinco servicios propios, dos consumidores de eventos
+# (svc-usuarios-eventos y svc-contenido-eventos), el agente (repo AgroIA) con su base de
+# conocimiento (agente-db) y tres de infraestructura: doce contenedores.
+#
+#   docker compose up --build
+#
+# Antes de la primera vez: copiar .env.example a .env y generar las llaves JWT con
+# infra/generar_llaves.py (ver README.md). Cada servicio recibe solo sus variables.
+#
+# El punto de entrada es web (8000): páginas y proxy /api/<servicio>/. Los puertos
+# directos de los servicios (8001 a 8005) y de las bases son SOLO PARA DESARROLLO (Swagger
+# de cada servicio, Postman por servicio, depuración): se publican solo en 127.0.0.1, no
+# quedan visibles en la red y no forman parte de la API pública. Los servicios confían en
+# el último valor de X-Forwarded-For, que pone el gateway; desde un puerto directo se
+# podría falsificar, por eso nunca deben publicarse en 0.0.0.0. En el despliegue
+# (Entrega 5) solo se publica web (ver docs/contrato-identidad.md). Dentro de Docker cada
+# servicio escucha en el 8000 y se llama por su nombre (http://svc-tienda:8000).
+
+name: agroia-web
+
+x-django-env: &django-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Falta DJANGO_SECRET_KEY en .env}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+  JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+  JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
+
+# Eventos entre servicios (Redis Streams, Entrega 4; ver docs/eventos.md). Van en la base
+# lógica 1 de Redis; la caché del límite de intentos sigue en la 0.
+x-eventos-env: &eventos-env
+  EVENTOS_REDIS_URL: ${EVENTOS_REDIS_URL:-redis://redis:6379/1}
+  EVENTOS_MAX_REINTENTOS: ${EVENTOS_MAX_REINTENTOS:-5}
+  EVENTOS_ESPERA_BASE: ${EVENTOS_ESPERA_BASE:-2}
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+
+services:
+  # ---------------------------------------------------------------------------
+  # Servicios propios
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      <<: [*django-env, *postgres-env]
+      POSTGRES_DB: web_db
+      POSTGRES_USER: web
+      POSTGRES_PASSWORD: ${WEB_DB_PASSWORD:?Falta WEB_DB_PASSWORD en .env}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      URL_SVC_USUARIOS: ${URL_SVC_USUARIOS:-http://svc-usuarios:8000}
+      URL_SVC_TIENDA: ${URL_SVC_TIENDA:-http://svc-tienda:8000}
+      URL_SVC_CONTENIDO: ${URL_SVC_CONTENIDO:-http://svc-contenido:8000}
+      URL_SVC_IA: ${URL_SVC_IA:-http://svc-ia:8000}
+      SERVICIOS_TIMEOUT: ${SERVICIOS_TIMEOUT:-10}
+      IA_TIMEOUT: ${IA_TIMEOUT:-50}
+      PANEL_UMBRAL_STOCK_BAJO: ${PANEL_UMBRAL_STOCK_BAJO:-5}
+      # Orígenes que pueden usar el proxy /api/ desde un navegador (separados por coma).
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./web:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-usuarios:
+    build:
+      context: .
+      dockerfile: svc-usuarios/Dockerfile
+    environment: &svc-usuarios-env
+      <<: [*django-env, *postgres-env, *eventos-env]
+      POSTGRES_DB: usuarios_db
+      POSTGRES_USER: usuarios
+      POSTGRES_PASSWORD: ${USUARIOS_DB_PASSWORD:?Falta USUARIOS_DB_PASSWORD en .env}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt_privada.pem}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
+      VERSION_AVISO_PRIVACIDAD: ${VERSION_AVISO_PRIVACIDAD:-2026-11}
+    # Solo svc-usuarios recibe la llave privada.
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+      - source: jwt_privada
+        target: jwt_privada.pem
+    volumes:
+      - ./svc-usuarios:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  # Consumidor de correos de svc-usuarios: misma imagen, código y variables (también las de
+  # correo), otro comando. Envía los correos que piden los eventos correo_solicitado y
+  # genera el token de cada enlace al enviar. Monta la llave privada en solo lectura porque
+  # la configuración de svc-usuarios no arranca sin ella (es el mismo servicio); este
+  # proceso no firma JWT.
+  svc-usuarios-eventos:
+    build:
+      context: .
+      dockerfile: svc-usuarios/Dockerfile
+    command: ["python", "manage.py", "consumir_eventos"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment: *svc-usuarios-env
+    volumes:
+      - ./svc-usuarios:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+      - ./infra/llaves/publica.pem:/run/secrets/jwt_publica.pem:ro
+      - ./infra/llaves/privada.pem:/run/secrets/jwt_privada.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-tienda:
+    build:
+      context: .
+      dockerfile: svc-tienda/Dockerfile
+    environment:
+      <<: [*django-env, *postgres-env, *eventos-env]
+      POSTGRES_DB: tienda_db
+      POSTGRES_USER: tienda
+      POSTGRES_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
+      COSTO_ENVIO: ${COSTO_ENVIO:-150.00}
+      ENVIO_GRATIS_DESDE: ${ENVIO_GRATIS_DESDE:-1500.00}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-tienda:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-contenido:
+    build:
+      context: .
+      dockerfile: svc-contenido/Dockerfile
+    environment:
+      <<: [*django-env, *eventos-env]
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+      # Segundos que una solicitud a la IA puede quedar pendiente antes de darse por fallida.
+      IA_SOLICITUD_VENCE_SEGUNDOS: ${IA_SOLICITUD_VENCE_SEGUNDOS:-180}
+      # Límite de solicitudes a la IA por usuario (contadores en la caché de Redis, base 0).
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      IA_SOLICITUDES_POR_MINUTO: ${IA_SOLICITUDES_POR_MINUTO:-10}
+      IA_SOLICITUDES_POR_HORA: ${IA_SOLICITUDES_POR_HORA:-30}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-contenido:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8003:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  # Consumidor de eventos de svc-contenido: misma imagen y código, otro comando. Lee los
+  # streams de Redis con el grupo svc-contenido: guarda en la bitácora y guarda en la
+  # conversación o el diagnóstico lo que responde la IA (ia-resultados). Con
+  # `docker compose stop` (SIGTERM) termina el evento en curso y sale; si se cae, Docker lo
+  # reinicia y procesa lo que quedó pendiente.
+  svc-contenido-eventos:
+    build:
+      context: .
+      dockerfile: svc-contenido/Dockerfile
+    command: ["python", "manage.py", "consumir_eventos"]
+    restart: unless-stopped
+    stop_grace_period: 20s
+    environment:
+      <<: [*django-env, *eventos-env]
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017/contenido}
+      # Segundos que una solicitud a la IA puede quedar pendiente antes de darse por fallida.
+      IA_SOLICITUD_VENCE_SEGUNDOS: ${IA_SOLICITUD_VENCE_SEGUNDOS:-180}
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-contenido:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  svc-ia:
+    build:
+      context: .
+      dockerfile: svc-ia/Dockerfile
+    environment:
+      AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+      DEBUG: ${DJANGO_DEBUG:-False}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+      JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
+      # svc-ia no llama al LLM: traduce el contrato y llama al contenedor agente.
+      URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
+      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-45}
+      <<: *eventos-env
+      # En Windows los cambios de archivos montados no generan eventos dentro del
+      # contenedor; uvicorn --reload necesita revisar por sondeo.
+      WATCHFILES_FORCE_POLLING: "true"
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-ia:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    ports:
+      - "127.0.0.1:8004:8000"
+    networks: [agroia]
+
+  # Worker de svc-ia: misma imagen y código, otro comando. Atiende las solicitudes de IA
+  # que llegan por eventos (ia-solicitudes): llama al agente o al clasificador y publica el
+  # resultado en ia-resultados. Varios hilos, porque una respuesta tarda hasta 30 s. Con
+  # `docker compose stop` termina lo que tiene en curso (hasta AGENTE_TIMEOUT) y sale.
+  svc-ia-worker:
+    build:
+      context: .
+      dockerfile: svc-ia/Dockerfile
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      AUTH_ACTIVA: ${AUTH_ACTIVA:-True}
+      DEBUG: ${DJANGO_DEBUG:-False}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_publica.pem}
+      JWT_ISSUER: ${JWT_ISSUER:-agroia-usuarios}
+      URL_AGENTE: ${URL_AGENTE:-http://agente:8000}
+      AGENTE_TIMEOUT: ${AGENTE_TIMEOUT:-45}
+      # 2: con la llave gratuita de Groq, 3 llamadas a la vez provocan RateLimitError y
+      # respuestas de 11 a 39 s. Con una llave de pago se puede subir.
+      IA_WORKER_HILOS: ${IA_WORKER_HILOS:-2}
+      # Solo en desarrollo (exige DEBUG=True): resultados de diagnóstico de prueba.
+      IA_CLASIFICADOR_PRUEBA: ${IA_CLASIFICADOR_PRUEBA:-False}
+      <<: *eventos-env
+    secrets:
+      - source: jwt_publica
+        target: jwt_publica.pem
+    volumes:
+      - ./svc-ia:/app
+      - ./comun:/comun
+      - ./ruff.toml:/ruff.toml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [agroia]
+
+  # Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (rama main).
+  # No se copia su código: evoluciona en ese repo. svc-ia lo llama por la red interna;
+  # el puerto 8005 es solo para probarlo desde esta computadora.
+  agente:
+    build:
+      context: https://github.com/BryanGEP/AgroIA.git#main:svc-agente
+    environment:
+      # Cada integrante usa su propia llave gratuita de Groq (ver README.md).
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      # Base de conocimiento del agente (RAG): su propia base en agente-db.
+      POSTGRES_HOST: agente-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: conocimiento
+      POSTGRES_USER: agroia
+      POSTGRES_PASSWORD: ${AGENTE_DB_PASSWORD:?Falta AGENTE_DB_PASSWORD en .env}
+      DATABASE_URL: ""
+      # El modelo de embeddings (~471 MB) se descarga una vez y queda en el volumen.
+      HF_HOME: /cache/huggingface
+    volumes:
+      - modelos_hf:/cache/huggingface
+    depends_on:
+      agente-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8005:8000"
+    healthcheck:
+      # La imagen del agente no trae curl.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks: [agroia]
+
+  # ---------------------------------------------------------------------------
+  # Infraestructura
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Falta POSTGRES_SUPERUSER_PASSWORD en .env}
+      # Las lee infra/postgres/init.sql para crear un usuario por servicio.
+      USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:?Falta USUARIOS_DB_PASSWORD en .env}
+      TIENDA_DB_PASSWORD: ${TIENDA_DB_PASSWORD:?Falta TIENDA_DB_PASSWORD en .env}
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?Falta WEB_DB_PASSWORD en .env}
+    volumes:
+      - postgres_datos:/var/lib/postgresql/data
+      # Solo corre la primera vez que se crea el volumen.
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # Por TCP: durante la inicialización PostgreSQL solo escucha en el socket local,
+      # así que el servicio no queda "healthy" hasta que init.sql terminó.
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [agroia]
+
+  # Base de conocimiento del agente: PostgreSQL con pgvector. Es del agente, separada del
+  # contenedor postgres de los servicios; solo en la red interna (para depurar:
+  # docker compose exec agente-db psql -U agroia -d conocimiento). Se llena una vez con
+  #   docker compose run --rm agente python -m ingesta.cargar
+  agente-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: conocimiento
+      POSTGRES_USER: agroia
+      POSTGRES_PASSWORD: ${AGENTE_DB_PASSWORD:?Falta AGENTE_DB_PASSWORD en .env}
+    volumes:
+      - agente_db_datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agroia -d conocimiento"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [agroia]
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_datos:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [agroia]
+
+  # Caché del límite de intentos (base 0) y eventos (base 1). Persistencia AOF para que los
+  # eventos no se pierdan al reiniciar. noeviction: al llenarse la memoria, Redis rechaza
+  # escrituras en lugar de borrar llaves; otra política podría borrar eventos sin
+  # procesar, porque comparten instancia con la caché (ver docs/eventos.md).
+  redis:
+    image: redis:7
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_datos:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [agroia]
+
+# Llaves JWT generadas con infra/generar_llaves.py (carpeta fuera de git).
+secrets:
+  jwt_publica:
+    file: ./infra/llaves/publica.pem
+  jwt_privada:
+    file: ./infra/llaves/privada.pem
+
+volumes:
+  postgres_datos:
+  mongo_datos:
+  agente_db_datos:
+  modelos_hf:
+  redis_datos:
+
+networks:
+  agroia:

@@ -1,0 +1,63 @@
+{% load static tailwind_cli %}<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f8ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131a11" media="(prefers-color-scheme: dark)">
+  <title>{% block titulo %}AgroIA{% endblock %} · AgroIA</title>
+  <meta name="description" content="{% block descripcion %}Insumos, asesoría y diagnóstico para huertas de aguacate.{% endblock %}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c6 0 10 8 10 16a10 10 0 0 1-20 0C6 10 10 2 16 2z' fill='%232e5a1c'/%3E%3Ccircle cx='16' cy='20' r='5' fill='%236b4a2b'/%3E%3C/svg%3E">
+  {# Aplica el tema elegido antes de pintar, para que no parpadee (sin defer). #}
+  <script src="{% static 'js/tema.js' %}"></script>
+  {# CSP: HTMX sin eval, sin inyectar estilos (el indicador está en el CSS) y sin asentar `style` (lo copiaría en línea). #}
+  <meta name="htmx-config" content='{"allowEval": false, "includeIndicatorStyles": false, "attributesToSettle": ["class", "width", "height"]}'>
+  <link rel="preload" href="{% static 'fonts/barlow-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'fonts/barlow-semi-condensed-latin-700-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  {% tailwind_css %}
+  <script defer src="{% static 'vendor/htmx-2.0.11.min.js' %}"></script>
+  <script defer src="{% static 'vendor/alpine-persist-3.17.4.min.js' %}"></script>
+  {# Componentes de Alpine.data(): antes que Alpine, para registrarse en alpine:init. #}
+  <script defer src="{% static 'js/componentes.js' %}"></script>
+  {# Versión CSP de Alpine: sin eval, compatible con la Content-Security-Policy. #}
+  <script defer src="{% static 'vendor/alpine-csp-3.17.4.min.js' %}"></script>
+  {% block cabeza %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-base-100 text-base-content antialiased"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 btn btn-sm btn-accent">Saltar al contenido</a>
+
+  {% include "componentes/encabezado.html" %}
+
+  {% if usuario and not usuario.email_verificado %}
+    {% include "componentes/banner_verificacion.html" %}
+  {% endif %}
+
+  {% if messages %}
+    <div class="max-w-6xl mx-auto w-full px-4 pt-4 space-y-2" role="status">
+      {% for mensaje in messages %}
+        <div class="alert {% if mensaje.tags == 'error' %}alert-error{% elif mensaje.tags == 'warning' %}alert-warning{% elif mensaje.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">
+          <span>{{ mensaje }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main id="contenido" class="flex-1" tabindex="-1">
+    {% block contenido %}{% endblock %}
+  </main>
+
+  {% include "componentes/pie.html" %}
+
+  {% comment %} Widget flotante de AgroIA (agroia/parciales/_widget.html). Las páginas de error
+     vacían este bloque: una página que ya falló no hace más peticiones. `widget_contexto` lo
+     llena la página que da contexto a las preguntas sugeridas (el detalle de un producto).
+     {% endcomment %}
+  {% block widget_agroia %}
+    {% if widget_agroia.mostrar %}
+      <div id="widget-agroia-contexto" hidden>{% block widget_contexto %}{% endblock %}</div>
+      {% include "agroia/parciales/_widget.html" %}
+    {% endif %}
+  {% endblock %}
+</body>
+</html>

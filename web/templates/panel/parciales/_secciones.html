@@ -1,0 +1,10 @@
+{% load panel %}{% secciones_panel as secciones_panel %}
+{% comment %} Secciones del panel (barra lateral y menú de celular). Parámetros: seccion (la
+   activa), movil. {% endcomment %}
+<ul class="{% if movil %}menu dropdown-content z-20 mt-2 w-full rounded-box border border-base-300 bg-base-100 p-2 shadow-lg{% else %}flex flex-col gap-1 md:sticky md:top-4{% endif %}" {% if movil %}aria-label="Secciones del panel"{% endif %}>
+  {% for nombre, url in secciones_panel %}
+    <li>
+      <a href="{{ url }}" class="{% if movil %}{% if nombre == seccion %}menu-active{% endif %}{% else %}flex min-h-10 items-center rounded-box border-l-4 px-3 py-2 font-medium {% if nombre == seccion %}border-primary bg-tarjeta text-base-content{% else %}border-transparent text-suave hover:bg-tarjeta hover:text-base-content{% endif %}{% endif %}" {% if nombre == seccion %}aria-current="page"{% endif %}>{{ nombre }}</a>
+    </li>
+  {% endfor %}
+</ul>

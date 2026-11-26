@@ -1,0 +1,67 @@
+{% load static %}{% comment %} Widget flotante de AgroIA, en base.html (salvo /agroia/, las pantallas de
+   acceso, el panel de administración y las páginas de error). Componente `widgetAgroia`
+   de static/js/componentes.js.
+
+   Carga diferida: aquí solo están la burbuja y el panel vacío. El contenido
+   (`_widget_panel.html`) se pide con HTMX (evento `cargar`) la primera vez que se abre, al
+   cargar la página si estaba abierto, o si hay una pregunta pendiente (data-pendiente,
+   de la sesión): así el polling sigue al cambiar de página. Cerrado y sin pendiente, no
+   hace ninguna petición.
+
+   Foco: en celular el panel ocupa la pantalla y es modal (aria-modal="true", foco
+   atrapado); en escritorio flota sin ser modal. Esc lo cierra y el foco vuelve a la
+   burbuja. {% endcomment %}
+<div x-data="widgetAgroia" data-pendiente="{% if widget_agroia.pendiente %}true{% endif %}"
+     @keydown.escape.window="cerrarConEsc" @agroia-respuesta.window="llegoRespuesta">
+  <button type="button" x-ref="burbuja" @click="alternar" @focus="mostrarBurbuja" x-show="burbujaVisible"
+          :data-escondida="burbujaEscondida" data-escondida="false"
+          aria-controls="widget-agroia-panel" :aria-expanded="expandido" :aria-label="etiquetaBurbuja"
+          aria-label="Abrir el chat de AgroIA" aria-expanded="false"
+          class="burbuja-agroia btn btn-circle fixed bottom-4 right-4 z-40 h-16 w-16 border-[3px] border-accent bg-bosque text-bosque-texto shadow-xl hover:border-accent hover:bg-bosque motion-safe:hover:scale-105">
+    <span x-show="cerrado">{% include "componentes/mascota.html" with clase="h-11 w-10" parpadea=True %}</span>
+    <svg x-show="abierto" x-cloak viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true" focusable="false"><path class="fill-current" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    <span x-show="nueva" x-cloak class="absolute right-1 top-1 h-3.5 w-3.5 rounded-full border-2 border-base-100 bg-accent" aria-hidden="true"></span>
+  </button>
+  <span class="sr-only" aria-live="polite" x-text="anuncio"></span>
+
+  <section id="widget-agroia-panel" x-ref="panel" x-show="abierto" x-cloak tabindex="-1"
+           role="dialog" :aria-modal="modal" aria-labelledby="widget-agroia-titulo" @keydown.tab="atraparFoco"
+           x-transition:enter="motion-safe:transition motion-safe:duration-200 motion-safe:ease-out"
+           x-transition:enter-start="motion-safe:translate-y-3 motion-safe:opacity-0"
+           x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
+           class="fixed inset-0 z-50 flex flex-col bg-base-100 sm:inset-auto sm:bottom-24 sm:right-4 sm:h-[min(38rem,calc(100dvh-8rem))] sm:w-96 sm:overflow-hidden sm:rounded-box sm:border sm:border-base-300 sm:shadow-2xl">
+    <header class="relative flex items-center gap-3 overflow-hidden bg-bosque px-4 py-3 text-bosque-texto">
+      <span class="curvas absolute inset-0 text-curvas-hero opacity-25" aria-hidden="true"></span>
+      <span class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff3e8]">
+        {% include "componentes/mascota.html" with clase="h-9 w-8" parpadea=True %}
+      </span>
+      <div class="relative min-w-0 flex-1">
+        <h2 id="widget-agroia-titulo" class="font-display text-lg font-bold leading-tight text-white" translate="no">AgroIA</h2>
+        <p class="flex items-center gap-1.5 text-xs opacity-90"><span class="h-2 w-2 rounded-full bg-accent" aria-hidden="true"></span>En línea</p>
+      </div>
+      {% if widget_agroia.con_sesion %}
+        <button type="button" @click="alternarSonido" :aria-pressed="sonidoPulsado" :aria-label="etiquetaSonido" :title="etiquetaSonido"
+                aria-label="Activar el sonido" class="btn btn-ghost btn-sm btn-square relative text-bosque-texto hover:bg-white/10">
+          <svg x-show="sonido" x-cloak viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true" focusable="false"><path class="fill-current" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg x-show="silencio" viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true" focusable="false"><path class="fill-current" d="M3 9v6h4l5 5V4L7 9H3zm13.59 3 2.7-2.71-1.42-1.42L15.17 10l-2.7-2.71-1.42 1.42L13.76 11.4l-2.71 2.7 1.42 1.42 2.7-2.71 2.71 2.71 1.42-1.42z"/></svg>
+        </button>
+        <button type="button" hx-post="{% url 'agroia:widget_reiniciar' %}" hx-target="#widget-agroia-contenido"
+                hx-include="#widget-agroia-contexto" aria-label="Empezar una conversación nueva" title="Empezar una conversación nueva"
+                class="btn btn-ghost btn-sm btn-square relative text-bosque-texto hover:bg-white/10">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true" focusable="false"><path class="fill-current" d="M12 5V2L7 7l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-7z"/></svg>
+        </button>
+      {% endif %}
+      <button type="button" @click="cerrar" aria-label="Cerrar el chat" title="Cerrar el chat"
+              class="btn btn-ghost btn-sm btn-square relative text-bosque-texto hover:bg-white/10">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true" focusable="false"><path class="fill-current" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </header>
+    <div id="widget-agroia-contenido" x-ref="contenido" hx-get="{% url 'agroia:widget' %}" hx-trigger="cargar"
+         hx-include="#widget-agroia-contexto" @htmx:after-settle="contenidoListo"
+         class="flex min-h-0 flex-1 flex-col">
+      <div class="flex flex-1 items-center justify-center" role="status">
+        <span class="loading loading-dots loading-md" aria-hidden="true"></span><span class="sr-only">Cargando el chat…</span>
+      </div>
+    </div>
+  </section>
+</div>

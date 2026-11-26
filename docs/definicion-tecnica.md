@@ -1,0 +1,518 @@
+# AgroIA-Web · Definición técnica
+
+Aprobada el 22 de octubre de 2026 · actualizada el 22 de noviembre de 2026 (Entrega 4: eventos de negocio)
+
+## Stack decidido
+
+AgroIA-Web se construye con Django 5.2 LTS y DRF en el backend, y Tailwind + daisyUI + HTMX + Alpine en las plantillas del gateway. Todo corre localmente con Docker Compose.
+
+| Capa | Tecnología | Versión | Para qué |
+| --- | --- | --- | --- |
+| Lenguaje | Python | 3.12 | Todos los servicios |
+| Framework | Django | 5.2 LTS | Gateway y microservicios. Es LTS con soporte hasta abril de 2028; la 6.0 ya salió de soporte principal |
+| API | Django REST Framework | última estable | Endpoints REST de cada servicio |
+| Documentación API | drf-spectacular | última estable | Swagger / OpenAPI en `/api/docs/` |
+| Filtros | django-filter | última estable | Filtros y ordenamiento de listados |
+| Autenticación | djangorestframework-simplejwt + django-axes | última estable | JWT, blacklist y bloqueo por intentos |
+| Base relacional | PostgreSQL | 16 | Usuarios, catálogo y pedidos |
+| Base de documentos | MongoDB + pymongo | 7 | Conversaciones, diagnósticos y bitácora |
+| Caché / mensajería | Redis | 7 | Throttling (base 0) y eventos con Redis Streams (base 1; ver [`eventos.md`](eventos.md)) |
+| Servicio de IA | FastAPI | la del repo AgroIA | Adaptador del agente (contenedor `agente` del repo AgroIA, LangChain + Groq) y modelo de visión |
+| Estilos | Tailwind CSS + daisyUI | 4.x + 5.x | Diseño y componentes, sin Node con `django-tailwind-cli` |
+| Interactividad | HTMX + django-htmx | 2.x | Actualizar partes de la página sin recargar |
+| Interactividad ligera | Alpine.js | 3.x | Menús, modales, vista previa de imágenes |
+| Pruebas | pytest + pytest-django | última estable | Pruebas unitarias y de endpoints |
+| Estilo de código | ruff | última estable | Linter y formateador |
+| Contenedores | Docker + Docker Compose | actual | Levantar todo con `docker compose up` |
+
+Las versiones "última estable" se fijan en el `requirements.txt` de cada servicio el día que se crea. Nada de Node.js: `django-tailwind-cli` descarga el ejecutable de Tailwind con daisyUI incluido.
+
+Fuentes: [ciclo de soporte de Django](https://versionlog.com/django/), [django-tailwind-cli](https://pypi.org/project/django-tailwind-cli/4.8.1/), [daisyUI sin Node](https://daisyui.com/docs/install/standalone/).
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    nav([Navegador]) --> web
+    subgraph red["Red interna de Docker"]
+        web["web · gateway<br/>Django + plantillas"]
+        usu["svc-usuarios<br/>Django"]
+        tie["svc-tienda<br/>Django"]
+        con["svc-contenido<br/>Django"]
+        ia["svc-ia<br/>FastAPI"]
+        age["agente<br/>repo AgroIA"]
+        adb[("agente-db<br/>pgvector · conocimiento")]
+        pg[("postgres<br/>usuarios_db · tienda_db · web_db")]
+        mo[("mongo<br/>contenido")]
+        re[("redis")]
+        web -->|HTTP + JWT| usu & tie & con & ia
+        ia -->|POST /chat| age
+        age -->|RAG| adb
+        usu & tie & web --> pg
+        con --> mo
+        usu & web -.-> re
+    end
+    age -->|LLM| groq([Groq])
+```
+
+El gateway es el único punto de entrada: recibe al navegador y reparte cada petición al servicio que corresponde con el JWT del usuario. Ningún servicio lee la base de otro.
+
+## Servicios
+
+Son cinco servicios propios, tres procesos de eventos (`svc-contenido-eventos`, `svc-usuarios-eventos` y `svc-ia-worker`), el contenedor `agente` (construido desde el repo AgroIA) con su base de conocimiento `agente-db`, y tres de infraestructura: trece contenedores. Catálogo y pedidos se juntan en `svc-tienda`, y agente y diagnóstico en `svc-ia`, para no mantener seis servicios en cuatro semanas.
+
+| Servicio | Responsabilidad | Base de datos | Puerto local | Pieza del maestro |
+| --- | --- | --- | --- | --- |
+| `web` | Gateway: plantillas, sesión, enruta al resto y valida JWT (Entrega 3) | sesiones en PostgreSQL `web_db` | 8000 | API Gateway |
+| `svc-usuarios` | Registro, login, JWT, recuperación, roles, perfil y direcciones | PostgreSQL `usuarios_db` | 8001 | Identidad y usuarios |
+| `svc-tienda` | Categorías, productos, stock, carrito y pedidos | PostgreSQL `tienda_db` | 8002 | Negocio principal |
+| `svc-contenido` | Conversaciones con el agente, historial de diagnósticos y bitácora de actividad | MongoDB `contenido` | 8003 | Datos no estructurados |
+| `svc-contenido-eventos` | Consumidor de eventos de svc-contenido (misma imagen, `python manage.py consumir_eventos`): guarda en la bitácora, y en la conversación o el diagnóstico lo que responde la IA | MongoDB `contenido` | no se publica | Comunicación asíncrona |
+| `svc-usuarios-eventos` | Consumidor de correos de svc-usuarios (misma imagen, `python manage.py consumir_eventos`): envía los correos de `correo_solicitado` y genera el token de cada enlace. Monta la llave privada JWT en solo lectura porque la configuración del servicio la exige; no firma tokens | PostgreSQL `usuarios_db` | no se publica | Comunicación asíncrona |
+| `svc-ia` | Adaptador: traduce el contrato al agente y clasifica imágenes de aguacate (modelo pendiente). Sus endpoints síncronos quedan por compatibilidad | ninguna | 8004 | Integración de IA |
+| `svc-ia-worker` | Worker de svc-ia (misma imagen, `python -m app.worker`, `IA_WORKER_HILOS` hilos): atiende las solicitudes de IA que llegan por eventos, llama al agente o al clasificador y publica el resultado | ninguna (Redis para los eventos y la copia temporal de la foto) | no se publica | Comunicación asíncrona |
+| `agente` | Agente conversacional del repo BryanGEP/AgroIA, construido desde GitHub (`main:svc-agente`): LangChain + Groq con herramientas (RAG, reglas y Bayes). Solo red interna | PostgreSQL + pgvector `conocimiento` (en `agente-db`) | 8005 (solo pruebas) | — |
+| `agente-db` | Base de conocimiento del agente (`pgvector/pgvector:pg16`). Separada de `postgres`: es del agente. Se llena con `docker compose run --rm agente python -m ingesta.cargar` | — | no se publica | — |
+| `postgres` | Un contenedor con una base por servicio | — | 5432 | — |
+| `mongo` | Base de documentos | — | 27017 | — |
+| `redis` | Caché del límite de intentos (base 0) y eventos con Redis Streams (base 1), con persistencia AOF | — | 6379 | Bróker de eventos |
+
+**Reglas entre servicios:**
+
+- El navegador solo habla con `web`. Ningún servicio interno se publica hacia afuera.
+- Cada servicio es dueño de su base: nadie lee la base de otro. Si necesita un dato, llama a su API.
+- Lo que necesita respuesta inmediata va por HTTP síncrono, siempre con timeout. Los avisos entre servicios y lo lento van por eventos con Redis Streams: catálogo, sobre común, reintentos, fallidos y diagrama en [`eventos.md`](eventos.md). En la Entrega 4: primero `usuario_registrado` (hecho), después los eventos de negocio y, al final, el chat y el diagnóstico (guardar en `svc-contenido` pasa a ser un evento).
+- Dentro de Docker, los servicios se llaman por su nombre: `http://svc-tienda:8000`. El puerto local solo sirve para probar desde la computadora.
+
+## Estructura del monorepo
+
+Cada servicio es un proyecto independiente con su propio `requirements.txt`, `Dockerfile` y pruebas. Lo compartido vive en `comun/` y se instala en cada servicio como paquete local.
+
+```text
+AgroIA-Web/
+├── CLAUDE.md                 # reglas para Claude Code
+├── README.md
+├── CONTRIBUTING.md
+├── docker-compose.yml
+├── .env.example
+├── .github/
+├── docs/                     # entregables y documentación
+├── infra/                    # postgres/init.sql, generar_llaves.py
+├── comun/                    # paquete compartido: auth JWT, permisos, errores
+│   ├── pyproject.toml
+│   └── agroia_comun/
+│       ├── autenticacion.py      # validación del JWT RS256
+│       ├── configuracion.py      # lectura de la llave pública y de AUTH_ACTIVA
+│       ├── permisos.py
+│       ├── errores.py            # formato común de errores
+│       ├── openapi.py            # esquema y ejemplos de error en Swagger
+│       └── pruebas.py            # llaves y tokens para las pruebas
+├── web/                      # gateway con plantillas
+├── svc-usuarios/
+├── svc-tienda/
+├── svc-contenido/
+└── svc-ia/                   # FastAPI
+```
+
+Estructura interna de un servicio Django (ejemplo `svc-tienda`):
+
+```text
+svc-tienda/
+├── Dockerfile
+├── requirements.txt          # dependencias de ejecución
+├── requirements-dev.txt      # pytest, ruff, factory-boy
+├── pytest.ini
+├── manage.py
+├── config/                   # proyecto Django
+│   ├── settings.py           # lee todo de variables de entorno
+│   └── urls.py               # /api/v1/, /api/docs/, /salud/
+└── apps/
+    ├── catalogo/
+    │   ├── models.py
+    │   ├── serializers.py
+    │   ├── views.py          # ViewSets
+    │   ├── filters.py
+    │   ├── urls.py
+    │   ├── admin.py
+    │   └── tests/
+    └── pedidos/
+```
+
+El gateway `web/` sigue la misma base, con `templates/` (una carpeta por módulo y `parciales/` para los fragmentos que devuelve HTMX), `static/css/fuente.css` (entrada de Tailwind) y `clientes/` (un cliente HTTP por servicio).
+
+El agente vive en el repo AgroIA y sigue evolucionando ahí; no se copia su código. Docker Compose construye el contenedor `agente` desde `https://github.com/BryanGEP/AgroIA.git#main:svc-agente` y `svc-ia` lo llama por HTTP, traduciendo el contrato de AgroIA-Web a la API del agente (`POST /chat`). Los cambios del agente se hacen en AgroIA.
+
+## Contratos de API
+
+Los servicios Django exponen `/api/v1/...` (svc-ia es la excepción: sus rutas no llevan prefijo, ver su contrato abajo), documentación en `/api/docs/` y un `GET /salud/` que responde `{"estado": "ok"}` para Docker. Los listados usan paginación `?page=` con 20 elementos.
+
+**Formato de errores** (manejador común en `comun/agroia_comun/errores.py`): `{"error": "codigo_corto", "detalle": "mensaje para el usuario"}`. Los errores de validación agregan `"campos"` con los mensajes por campo:
+
+```json
+{"error": "validacion", "detalle": "Revisa los datos enviados.",
+ "campos": {"direccion_envio": {"codigo_postal": ["El código postal debe tener 5 dígitos."]}}}
+```
+
+| Código | HTTP | Cuándo |
+| --- | --- | --- |
+| `validacion` | 400 | Datos inválidos; trae `campos`. En el registro, los casos propios llegan como mensaje del campo: `email` → `email_registrado`, `password_confirmacion` → `password_no_coincide`, `acepto_privacidad` → `privacidad_no_aceptada` |
+| `json_invalido` | 400 | El cuerpo no es JSON válido |
+| `no_autenticado` | 401 | Falta el token |
+| `token_invalido` | 401 | Token con firma, emisor o tipo incorrectos, vencido o con un `user_id` que no es UUID |
+| `credenciales_invalidas` | 401 | Login con correo inexistente, contraseña incorrecta o cuenta desactivada (mismo mensaje) |
+| `refresh_invalido` | 401 | Renovar con un refresh vencido, alterado, en blacklist o de una sesión cerrada (400 si el logout recibe algo que no es un refresh) |
+| `sin_permiso` | 403 | Rol equivocado |
+| `email_no_verificado` | 403 | Acción que exige correo verificado (crear un pedido) |
+| `cuenta_bloqueada_temporalmente` | 403 | 5 logins fallidos con el mismo correo desde la misma IP; 15 minutos |
+| `token_expirado`, `enlace_invalido` | 400 | Enlace de verificación vencido (`token_invalido` si se alteró); enlace de recuperación inválido, usado o vencido |
+| `password_actual_incorrecta`, `password_repetida` | 400 | Cambio de contraseña |
+| `auto_degradacion` | 409 | Un administrador intenta quitarse su propio rol |
+| `demasiados_intentos` | 429 | Se rebasó el límite de intentos; trae `Retry-After` |
+| `2fa_no_disponible` | 501 | La cuenta tiene 2FA, que todavía no se implementa |
+| `no_encontrado` | 404 | No existe, o no es del usuario (no se revela que existe) |
+| `metodo_no_permitido` | 405 | Método HTTP no soportado en esa ruta |
+| `carrito_vacio` | 400 | Se intenta crear un pedido sin productos en el carrito |
+| `stock_insuficiente` | 409 | La cantidad pedida supera el stock disponible |
+| `producto_no_disponible` | 409 | El producto o su categoría están desactivados |
+| `transicion_invalida` | 409 | Cambio de estado del pedido no permitido |
+| `conversacion_llena` | 409 | La conversación llegó a 200 mensajes; hay que iniciar otra |
+| `agente_no_disponible` | 503 | El agente no respondió, falló o tardó más que `AGENTE_TIMEOUT` (svc-ia) |
+| `modelo_no_disponible` | 503 | No hay modelo de visión configurado; se integra en una entrega posterior (svc-ia) |
+
+Los códigos de negocio (`carrito_vacio` en adelante) se lanzan con `ErrorDeNegocio` desde `servicios.py`; svc-ia, que no usa `comun`, produce los suyos con el mismo formato. Un ObjectId mal formado en svc-contenido responde `no_encontrado` (404), igual que uno inexistente o ajeno.
+
+**`svc-usuarios`** — detalle completo en el documento de requerimientos de autenticación y en su [README](../svc-usuarios/README.md#endpoints--rol); el contrato de los tokens está en [`contrato-identidad.md`](contrato-identidad.md).
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| POST | `/auth/registro/` | público. Responde `{"id", "email", "mensaje"}`, sin tokens, y envía el correo de verificación. 5 por hora por IP |
+| POST | `/auth/login/` | público. `{"access", "refresh", "usuario": {"id", "nombre", "rol", "email_verificado"}}`. 10 por minuto por IP y bloqueo por correo + IP |
+| POST | `/auth/token/renovar/` | público. `{"access", "refresh"}`; rota el refresh |
+| POST | `/auth/verificar-correo/`, `/auth/reenviar-verificacion/` | público. El reenvío: 3 por hora por IP y por correo |
+| POST | `/auth/recuperar/`, `/auth/restablecer/` | público. Recuperar: 3 por hora por IP y por correo |
+| POST | `/auth/logout/`, `/auth/logout-todo/`, `/auth/cambiar-password/` | autenticado. Cambiar contraseña: 5 por hora por usuario |
+| GET, PATCH | `/usuarios/yo/` | autenticado. Solo se editan `nombre`, `apellidos` y `telefono`. **Entrega 2** |
+| CRUD | `/usuarios/yo/direcciones/` | autenticado, solo las propias (también el administrador). Una sola predeterminada. **Entrega 2** |
+| GET | `/usuarios/` | administrador. Filtros `rol` y `q`. **Entrega 2**. Para el panel ([avance](avances/panel-admin.md)): `email_verificado` (true o false), `desde` (fecha de registro, AAAA-MM-DD, hora de México) e `ids` (hasta 20 UUID separados por comas; 400 si alguno no es UUID o si pasan de 20) |
+| GET | `/usuarios/<id>/` | administrador. Los mismos campos que el listado (`UsuarioAdminSerializer`); 404 si no existe o el id no es UUID. Panel |
+| PATCH | `/usuarios/<id>/rol/` | administrador. No puede quitarse su propio rol; cada cambio queda en `CambioRol` |
+
+**`svc-tienda`**
+
+| Método | Ruta | Acceso | Notas |
+| --- | --- | --- | --- |
+| GET | `/categorias/` | público | Cada categoría trae `productos` (solo lectura: cuántos tiene, activos e inactivos). Panel |
+| POST, PATCH, DELETE | `/categorias/...` | administrador | Borrado lógico (`activa=False`) |
+| GET | `/productos/` | público | Filtros: `categoria`, `precio_min`, `precio_max`, `disponible`, `q` (búsqueda), `activo` (solo administrador) y `stock_max` (existencias menores o iguales, para el stock bajo del panel). Orden: `precio`, `nombre`, `creado_en`, `stock` |
+| GET | `/productos/<slug>/` | público |  |
+| POST, PATCH, DELETE | `/productos/...` | administrador | Borrado lógico (`activo=False`) |
+| GET, DELETE | `/carrito/` | autenticado | Ver o vaciar. Un carrito por usuario; se crea al primer uso |
+| POST | `/carrito/items/` | autenticado | `{"producto": "<slug>", "cantidad"}`. Si ya está, suma; valida stock |
+| PATCH, DELETE | `/carrito/items/<id>/` | autenticado | Cambiar cantidad o quitar |
+| POST | `/pedidos/` | cliente con correo verificado | Recibe `direccion_envio` y `metodo_pago` (`tarjeta`, `transferencia`, `contra_entrega`; todos simulados). Convierte el carrito en pedido, valida y descuenta stock en una transacción. Envío `COSTO_ENVIO`, gratis si el subtotal supera `ENVIO_GRATIS_DESDE` |
+| GET | `/pedidos/`, `/pedidos/<id>/` | dueño o administrador | Filtros: `estado`, `id` (número exacto), `usuario_id` y `desde` / `hasta` (fecha de creación, AAAA-MM-DD, inclusivos, hora de México). El pedido trae `pagado_en` (ver el modelo) |
+| POST | `/pedidos/<id>/pagar/` | cliente dueño | Pago simulado: `pendiente → pagado`; responde `"pago_simulado": true`. Agregado en la fase 2 |
+| PATCH | `/pedidos/<id>/estado/` | administrador | `pendiente → pagado → enviado → entregado`, o `cancelado` desde `pendiente` o `pagado`; el pedido trae `transiciones_permitidas` (solo lectura, vacía para clientes) con los estados a los que el administrador puede pasarlo; al cancelar se devuelve el stock |
+| GET | `/resumen/?umbral=5` | administrador | Inicio del panel. `umbral` de 0 a 1000 (400 `validacion` fuera de rango). Devuelve `fecha` (hoy en México); `pedidos` (`pendientes`, `por_enviar` = pagados); `ventas` de `hoy`, `ultimos_7_dias` y `mes` (`{"total": "texto decimal", "pedidos": n}`: pedidos pagados, enviados o entregados, por `pagado_en`, o por `creado_en` en los pagados antes de que existiera ese campo; `respaldo` dice cuántos y desde cuándo); `stock` (`umbral`, `bajo` y `agotados`, cada uno con `total` y hasta 10 `productos` activos `{slug, nombre, stock}`) y los 5 `ultimos_pedidos` `{id, estado, total, creado_en, usuario_id}`. Los días se cuentan en America/Mexico_City aunque la base guarde en UTC |
+
+**`svc-contenido`**
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET, POST | `/conversaciones/` | autenticado (solo las propias; también el administrador) |
+| GET, DELETE | `/conversaciones/<id>/` | dueño (las conversaciones son privadas: el administrador recibe 404) |
+| POST | `/conversaciones/<id>/mensajes/` | dueño. `{"rol": "usuario" \| "agente", "texto", "fuentes"?}`; máximo 200 mensajes (`conversacion_llena`) |
+| POST | `/conversaciones/<id>/preguntar/` | dueño. `{"texto"}` (máx. 4000). Guarda la pregunta, publica `ia_pregunta_solicitada` y responde **202** con la solicitud `{"id", "estado": "pendiente", "codigo", "creada_en", "vence_en"}` (`fallido` con `servicio_no_disponible` si no se pudo publicar). 409 `solicitud_en_curso` si ya hay una pendiente; 409 `conversacion_llena`; 429 `demasiados_intentos` al pasar el límite por usuario (10 por minuto y 30 por hora, compartido con `reintentar` y `diagnosticos/solicitar`). Entrega 4 |
+| POST | `/conversaciones/<id>/reintentar/` | dueño. Otra solicitud para la última pregunta, sin repetirla: **202**. 409 `sin_pregunta_pendiente` si el último mensaje no es una pregunta; 409 `solicitud_en_curso`. Entrega 4 |
+| GET | `/conversaciones/<id>/solicitud/` | dueño (404 para los demás, también el administrador). La solicitud actual; con `listo` trae `respuesta` y `fuentes`, con `fallido` el `codigo`. La vencida (más de `IA_SOLICITUD_VENCE_SEGUNDOS`) se marca `fallido` con `vencida` al leerla. La conversación (`GET /conversaciones/<id>/`) trae también `solicitud`. Entrega 4 |
+| GET, POST | `/diagnosticos/` | autenticado (solo los propios; el administrador lista todos). POST en `multipart`: imagen JPG, PNG o WebP (máx. 5 MB) y el resultado de svc-ia |
+| POST | `/diagnosticos/solicitar/` | autenticado. Solo la foto en `multipart` (JPG o PNG, máx. 5 MB). La guarda, deja el diagnóstico `pendiente` y una copia temporal en Redis, publica `diagnostico_solicitado` y responde **202** con el diagnóstico. Entrega 4 |
+| GET | `/diagnosticos/<id>/` | dueño o administrador. `imagen_url` apunta al endpoint de la foto (`null` si no hay foto). Desde la Entrega 4 trae `estado` (`pendiente`, `listo` o `fallido`), `codigo` y `es_prueba` (true si lo dio el clasificador de prueba). El listado solo muestra los `listo` |
+| GET | `/diagnosticos/<id>/imagen/` | dueño o administrador (404 para los demás). Devuelve el archivo con `Cache-Control: private`. Las fotos no se sirven como archivos estáticos, ni con `DEBUG=True` |
+| GET, POST | `/bitacora/` | administrador. Filtros `tipo`, `desde`, `hasta`. Filtros también `usuario_id` y `correlacion_id` (UUID) y, para la línea de tiempo del panel, `pedido_id` (entero; busca en `datos.pedido_id`, con su índice). La llenan los eventos de negocio (cada documento trae `evento_id` y `correlacion_id`); el POST queda para registros manuales |
+| GET | `/eventos/estado/` | administrador. Lo mismo que `python -m agroia_comun.eventos estado`: cada stream con su `largo` y sus `grupos` (`pendientes`, `sin_leer`, `consumidores` con `inactivo_ms`), y `fallidos` (`total` y los 10 últimos con `id`, `fecha`, `tipo`, `grupo`, `stream`, `intentos`, `motivo` y `datos_omitidos`). **Nunca el sobre ni sus datos**, y `motivo` es solo el nombre de la excepción (el texto completo, con el comando). 503 `eventos_no_disponible` si Redis no responde. Reprocesar y descartar siguen siendo comandos. Panel |
+
+**`svc-ia`** — cada respuesta trae `id` y `estado`. **Desde la Entrega 4 estos endpoints quedan por compatibilidad** (Postman, la matriz y pruebas directas del agente): el chat y el diagnóstico de la aplicación van por eventos con `svc-ia-worker` (ver [`eventos.md`](eventos.md#ia-asíncrona)).
+
+| Método | Ruta | Recibe | Devuelve |
+| --- | --- | --- | --- |
+| POST | `/agente/preguntar/` | `{"pregunta", "historial": [...]}` | `{"id", "estado": "listo", "respuesta", "fuentes"}` |
+| POST | `/diagnostico/` | imagen `multipart`, máx. 5 MB, JPG o PNG | `{"id", "estado": "listo", "clase": "sano" \| "rona" \| "antracnosis", "confianza": 0.0–1.0, "probabilidades", "modelo_version"}`. **Por ahora responde 503 `modelo_no_disponible`**: el modelo de visión todavía no existe |
+| GET | `/solicitudes/<id>/` | — | Estado de una solicitud (dueño o administrador); por ahora siempre `listo`, guardada en memoria (pasa a Redis en la Entrega 4) |
+
+`historial` es una lista de `{"rol": "usuario" | "agente", "texto"}`; svc-ia envía al agente las últimas 10 entradas en su campo `history` (el agente no guarda nada cuando lo recibe). `fuentes` son las referencias de la base de conocimiento del agente (RAG) que usó para responder; va vacía en saludos o temas no técnicos. Si el agente falla: 503 `agente_no_disponible`.
+
+Hasta la Entrega 3, `web` llamaba a `svc-ia` y después guardaba el resultado en `svc-contenido` (la orquestación vivía en el gateway). **Desde la Entrega 4 la IA es asíncrona:** web pide a `svc-contenido` (`preguntar` o `diagnosticos/solicitar`, 202); svc-contenido guarda la solicitud y publica el evento; `svc-ia-worker` llama al agente o al clasificador y publica el resultado, y `svc-contenido-eventos` lo guarda. La pantalla consulta el estado con HTMX (cada 2 s, cada 5 s después de 20 s). svc-ia y svc-contenido siguen sin llamarse por HTTP. El detalle, los códigos de error y la retención en Redis están en [`eventos.md`](eventos.md#ia-asíncrona).
+
+## Modelo de datos
+
+PostgreSQL guarda lo que necesita integridad y transacciones (usuarios, stock, pedidos). MongoDB guarda lo que crece y cambia de forma (mensajes, resultados de IA, bitácora). Entre servicios no hay llaves foráneas: se guarda el `usuario_id` como UUID (en MongoDB, como texto). Desde la Entrega 3 el `id` del usuario es UUID, igual que en ms-usuarios.
+
+**PostgreSQL · `usuarios_db`**
+
+| Tabla | Campos principales |
+| --- | --- |
+| `Usuario` | `AbstractUser` sin `username`; `id` (UUID), `email` (único, es el login), `nombre`, `apellidos`, `telefono`, `rol`, `email_verificado`, `token_version`, `acepto_privacidad_en`, `version_privacidad`, `tiene_2fa`. `AUTH_USER_MODEL = "usuarios.Usuario"`; su `id` es el `user_id` del JWT |
+| `Direccion` | `usuario` FK, `alias`, `calle`, `numero`, `colonia`, `municipio`, `estado`, `codigo_postal`, `referencias`, `predeterminada` (una sola por usuario, con `UniqueConstraint` condicional), `creada_en` |
+| `Dispositivo2FA`, `CodigoRespaldo` | Ver sección 12 del documento de autenticación |
+
+**PostgreSQL · `tienda_db`**
+
+| Tabla | Campos principales |
+| --- | --- |
+| `Categoria` | `nombre`, `slug` (único), `descripcion`, `activa` |
+| `Producto` | `categoria` FK, `nombre`, `slug` (único), `descripcion`, `precio` (Decimal 10,2), `stock` (≥ 0), `unidad` (pieza, kg, litro, costal), `imagen`, `ficha_tecnica` (JSON: dosis, composición, etc.), `activo`, `creado_en` |
+| `Carrito` | `usuario_id`, `creado_en`, `actualizado_en` |
+| `ItemCarrito` | `carrito` FK, `producto` FK, `cantidad` (> 0); único por carrito y producto |
+| `Pedido` | `usuario_id`, `estado`, `direccion_envio` (JSON, copia al momento de comprar), `subtotal`, `envio`, `total`, `metodo_pago`, `creado_en`, `pagado_en` (nullable; lo pone `_cambiar_estado_bloqueado` al pasar a pagado, una sola vez y dentro de la transacción; índice `estado` + `pagado_en`). El evento `pedido_estado_cambiado` no lo lleva: el catálogo de eventos no cambió |
+| `ItemPedido` | `pedido` FK, `producto` FK, `nombre_producto` y `precio_unitario` (copias), `cantidad`, `importe` |
+
+Los pedidos copian el nombre, el precio y la dirección: si después cambian, el pedido conserva lo que se compró. La ficha técnica variable va como `JSONField` en PostgreSQL para no repartir un producto entre dos bases.
+
+**MongoDB · `contenido`**
+
+```json
+// conversaciones
+{ "_id": ObjectId, "usuario_id": "8d3f6c2a-…", "titulo": "Manchas en hojas",
+  "creada_en": ISODate, "actualizada_en": ISODate,
+  "mensajes": [ { "rol": "usuario", "texto": "...", "fecha": ISODate },
+                { "rol": "agente", "texto": "...", "fuentes": ["..."], "fecha": ISODate,
+                  "solicitud_id": "5b8e2f1c-…" } ],
+  // Entrega 4: la solicitud a la IA en curso o la última (sin colección aparte)
+  "solicitud": { "id": "5b8e2f1c-…", "estado": "pendiente" | "listo" | "fallido",
+                 "codigo": null, "creada_en": ISODate, "vence_en": ISODate,
+                 "actualizada_en": ISODate } }
+
+// diagnosticos
+{ "_id": ObjectId, "usuario_id": "8d3f6c2a-…", "imagen": "diagnosticos/<uuid>.png",
+  "clase": "antracnosis", "confianza": 0.91,
+  "probabilidades": { "sano": 0.03, "rona": 0.06, "antracnosis": 0.91 },
+  "modelo_version": "v1", "creado_en": ISODate,
+  // Entrega 4: los pedidos por eventos nacen pendientes (sin clase hasta que llega)
+  "estado": "pendiente" | "listo" | "fallido", "codigo": null,
+  "solicitud": { "id": "…", "vence_en": ISODate } }
+
+// bitacora
+{ "_id": ObjectId, "tipo": "pedido_creado", "usuario_id": "8d3f6c2a-…",
+  "servicio": "svc-tienda", "datos": { ... }, "fecha": ISODate }
+```
+
+Índices: `usuario_id` + `actualizada_en` en conversaciones, `usuario_id` + `creado_en` en diagnósticos, `tipo` + `fecha`, `fecha`, `usuario_id` + `fecha`, `correlacion_id` y `datos.pedido_id` + `fecha` en bitácora; los crea `python manage.py crear_indices` al arrancar el contenedor. En diagnósticos se guarda el nombre del archivo en `default_storage` (`imagen`) y la API calcula `imagen_url`, para que siga funcionando al pasar a Cloud Storage. Los mensajes van dentro de su conversación porque siempre se leen juntos; si una conversación pasa de 200 mensajes, se inicia otra.
+
+## Frontend
+
+El gateway renderiza HTML con plantillas de Django. daisyUI da los componentes, Tailwind ajusta el diseño, HTMX actualiza partes de la página y Alpine maneja lo que solo pasa en el navegador.
+
+**Quién hace qué:**
+
+| Necesidad | Herramienta | Ejemplo en AgroIA-Web |
+| --- | --- | --- |
+| Componente estándar | daisyUI | `btn btn-primary`, `card`, `navbar`, `modal`, `alert`, `badge`, `input` |
+| Ajuste de diseño | Tailwind | `grid md:grid-cols-3 gap-6`, `max-w-6xl mx-auto` |
+| Algo cambia con datos del servidor | HTMX | Enviar pregunta al agente, agregar al carrito, filtrar productos, paginar |
+| Algo cambia solo en el navegador | Alpine | Abrir un menú, vista previa de la imagen antes de subirla, mostrar u ocultar contraseña |
+
+**Reglas:**
+
+1. **Tema propio de daisyUI** llamado `agroia` en `static/css/fuente.css`: primario verde aguacate, secundario café tierra, fondo claro. Modo oscuro opcional con el tema `agroia-oscuro`.
+2. **Plantilla base única** (`templates/base.html`) con navbar, mensajes de Django como `alert` y pie con el aviso de privacidad. Todas las páginas la extienden.
+3. **Fragmentos para HTMX** en `templates/<modulo>/parciales/_nombre.html`. La vista revisa `request.htmx` (django-htmx): si es petición HTMX devuelve el parcial; si no, la página completa.
+4. **CSRF en HTMX:** en `base.html`, `<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>`.
+5. **Componentes repetidos como `{% include %}`** con parámetros, en `templates/componentes/`: tarjeta de producto, campo de formulario, paginador, estado vacío.
+6. **Indicadores de carga** en toda petición HTMX que tarde: `hx-indicator` con un `loading` de daisyUI. El agente y el diagnóstico pueden tardar varios segundos.
+7. **Responsive desde el inicio:** primero celular, después `md:` y `lg:`. Muchos productores van a entrar desde el teléfono.
+8. **HTMX y Alpine se sirven desde `static/vendor/`**, no desde un CDN, para que funcione sin internet en la demo. Las fuentes (Barlow y Barlow Semi Condensed, OFL) también son locales, en `static/fonts/`.
+9. **Accesibilidad mínima:** cada `input` con `label`, imágenes con `alt`, contraste del tema revisado.
+10. **Imágenes de otros servicios:** el navegador no alcanza las direcciones internas. El gateway reescribe las URLs de imagen de svc-tienda a `/media/tienda/<ruta>` y esa ruta reenvía el archivo (solo `productos/` e `image/*`), sin publicar svc-tienda. Con Cloud Storage (Entrega 5) las URLs serán públicas y no se reescriben. Las **fotos de diagnóstico** son datos personales: el gateway las sirve por id en `/diagnostico/<id>/imagen/`, pidiéndolas a `GET /api/v1/diagnosticos/<id>/imagen/` de svc-contenido con el token del usuario (svc-contenido comprueba que sea el dueño o un administrador); el gateway no conoce la ruta del archivo.
+11. **CSS compilado:** `static/css/agroia.css` se genera a partir de `fuente.css` y no se sube al repo; el contenedor `web` lo compila al arrancar.
+
+**Base visual hecha** (ver `docs/avances/web-base-catalogo.md`): temas `agroia` y `agroia-oscuro`, `base.html`, componentes, inicio, catálogo con filtros HTMX que también funciona sin JavaScript, detalle y aviso de privacidad.
+
+**Pantallas hechas en la Entrega 2:** inicio, catálogo con filtros, detalle de producto y aviso de privacidad.
+
+**Pantallas hechas en la Entrega 3** ([avance](avances/e3-gateway.md)): iniciar sesión (`/iniciar-sesion/`), registro, verificar correo (el enlace del correo), reenviar verificación, recuperar y restablecer contraseña, mi cuenta con direcciones y cambiar contraseña; menú con el nombre del usuario y banner «Verifica tu correo para poder comprar».
+
+**Pantallas protegidas de la Entrega 3** ([avance](avances/e3-pantallas.md)): carrito con contador en el menú, checkout, mis pedidos con pago simulado, chat con AgroIA (el gateway orquesta svc-contenido y svc-ia), diagnóstico por imagen con historial y panel de administrador (productos, categorías, pedidos y usuarios). Las respuestas del agente se muestran con el filtro `markdown_seguro`, que escapa el HTML antes de dar formato.
+
+**Panel de administración ampliado (Entrega 4, [avance](avances/panel-admin.md)):** barra lateral (menú en celular) con Resumen, Pedidos, Productos, Categorías, Usuarios, Bitácora y Eventos. El resumen (`/administracion/`) pide a svc-tienda (`/resumen/`) y a svc-usuarios (`/usuarios/?desde=`) por separado: si uno no responde, solo sus tarjetas muestran el error. La bitácora (`/administracion/bitacora/`) muestra un resumen legible de cada evento y filtra por correlación; el estado de los eventos (`/administracion/eventos/`) es de solo lectura y se actualiza con un botón (HTMX), sin polling. El detalle de usuario (`/administracion/usuarios/<id>/`) y el de pedido enlazan a su bitácora; el pedido muestra su línea de tiempo. Las acciones que cambian algo piden confirmación con un `<dialog>` propio (componente `confirmar`); sin JavaScript el formulario se envía sin confirmar. El umbral de stock bajo es `PANEL_UMBRAL_STOCK_BAJO` (web, 5 por omisión). Las páginas mantienen el comportamiento del panel: sin sesión van al login y con rol cliente vuelven al inicio con «No tienes permiso»; los 401 y 403 los responden los servicios y el proxy `/api/`.
+
+**Content-Security-Policy:** el gateway manda `default-src 'self'` sin `unsafe-inline` ni `unsafe-eval`. Por eso Alpine es la versión CSP (`@alpinejs/csp` 3.17.4), la lógica compleja va en `Alpine.data()` en `static/js/componentes.js`, no hay `hx-on` ni scripts o estilos en línea, y HTMX corre con `allowEval: false`. `img-src` permite `blob:` para la vista previa de la foto del diagnóstico antes de enviarla (`URL.createObjectURL`). La misma respuesta lleva `Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=(), usb=()` (el micrófono solo para el dictado por voz del widget). En `htmx-config`, `style` no está en `attributesToSettle`: al reemplazar un elemento con el mismo id, HTMX copiaría el `style` en línea y la CSP lo bloquea.
+
+**Widget flotante de AgroIA (Entrega 4, [avance](avances/e4-widget-agroia.md)):** burbuja abajo a la derecha en todas las páginas, salvo /agroia/ (el chat completo), las pantallas de acceso, el panel de administración y las páginas de error.
+
+| Ruta del gateway | Qué hace |
+| --- | --- |
+| `GET /agroia/widget/` | El contenido del panel, con HTMX. Al visitante: el saludo y la invitación a iniciar sesión o crear cuenta (con `?next=` a la página donde estaba), sin llamar a servicios. Al usuario: su conversación del widget, o el saludo con las preguntas sugeridas de la sección |
+| `POST /agroia/widget/preguntar/` | Pregunta en la conversación del widget (guardada en la sesión del gateway y creada con el primer mensaje), con el mismo flujo asíncrono de /agroia/ (202, polling, «Reintentar», vencida, 429) |
+| `POST /agroia/widget/reiniciar/` | Empieza otra conversación sin borrar la anterior, que sigue en /agroia/ |
+
+- **Carga diferida:** la página trae solo la burbuja y el panel vacío. El contenido se pide la primera vez que se abre, al cargar la página si estaba abierto (se recuerda por pestaña) o si hay una pregunta pendiente (marca en la sesión), para que el polling siga al cambiar de página. Cerrado y sin pendiente, no hace peticiones.
+- **Comparte con /agroia/** los parciales `_conversacion`, `_formulario`, `_turno`, `_espera`, `_fallida`, `_reintentar` y `mensaje_chat` (con «Copiar» en cada respuesta), y las vistas `solicitud` y `reintentar`.
+- **Accesibilidad:** en celular el panel ocupa la pantalla y es modal (foco atrapado); en escritorio flota sin ser modal. Esc lo cierra y el foco vuelve a la burbuja.
+- **Dictado por voz** (Web Speech API): solo si el navegador la tiene, con un aviso antes del primer uso. El texto se queda en el campo sin enviarse. **Sonido** de aviso al llegar la respuesta (Web Audio, apagado por defecto).
+
+## Autenticación
+
+La implementa el equipo en `svc-usuarios` desde ahora; después se adaptará al módulo que arma el grupo. El detalle de cada tarea está en [Requerimientos de autenticación](requerimientos-autenticacion.md).
+
+**Cómo viaja la identidad:**
+
+1. El usuario inicia sesión en `web`. El gateway llama a `svc-usuarios`, recibe access y refresh, y los guarda en su sesión de servidor.
+2. El navegador solo recibe la cookie de sesión de Django (`HttpOnly`).
+3. En cada petición, el gateway reenvía `Authorization: Bearer <access>` al servicio que corresponda.
+4. Para clientes que no son navegador, el gateway expone el proxy `/api/<servicio>/<ruta>`, que valida el access del encabezado `Authorization` antes de reenviar (primera capa) y nunca usa la sesión. Ver [`contrato-identidad.md`](contrato-identidad.md#dos-capas-de-validación).
+5. Cada servicio valida la firma RS256 con la llave pública y el emisor (`JWT_ISSUER`), sin consultar `svc-usuarios`, y lee `user_id` (UUID), `rol` y `email_verificado` del token. Claims, duraciones y límites en [`contrato-identidad.md`](contrato-identidad.md).
+6. Si el access venció, el gateway renueva con el refresh y repite la petición.
+7. Al reenviar cada petición, el gateway pone en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenvía el `X-Forwarded-For` que mande el cliente.
+
+**Adaptación para que no estorbe en la Entrega 2:** las clases de autenticación y permisos se escriben una vez en `comun/` (implementadas en la fase 2) y se controlan con la variable `AUTH_ACTIVA`. Con `True`, aplican JWT y roles. Con `False` se apagan solo las revisiones de rol: un token que llega se valida igual, y los endpoints que necesitan saber quién es el usuario (carrito, pedidos) responden 401 sin token. Desde la Entrega 3 los tokens salen del login de `svc-usuarios`; `infra/emitir_token.py` queda solo para pruebas. Su valor por defecto en el código es `True`; solo el `.env` local puede apagarla, y solo junto con `DJANGO_DEBUG=True` (si no, el servicio no arranca). Para la entrega debe estar en `True`.
+
+La autenticación se revisó con las skills `insecure-defaults` y `static-analysis` de Claude Code el 19 de noviembre de 2026 ([revisión](avances/e3-identidad.md#revisión-de-seguridad)); al cerrar la Entrega 3 se repitieron Semgrep y CodeQL sobre todo el código ([documento de la entrega](entregable-3.md#evidencia-de-pruebas-de-seguridad)).
+
+## Entorno local
+
+Todo el sistema se levanta con `docker compose up --build` desde la raíz. Cada servicio escucha en el puerto 8000 dentro de su contenedor y se publica en su puerto local (8000–8004).
+
+**`docker-compose.yml` debe incluir:**
+
+- Los trece contenedores de la tabla de servicios (incluidos `agente`, `agente-db` y los tres procesos de eventos), en una red interna común. El modelo de embeddings del agente (~471 MB) se guarda en el volumen `modelos_hf`.
+- `postgres` con un script en `infra/postgres/init.sql` que crea `usuarios_db`, `tienda_db` y `web_db` (sesiones del gateway), cada una con su propio usuario (`usuarios`, `tienda`, `web`). Las contraseñas no van en el script: psql las lee del entorno con `\getenv`. Solo corre la primera vez que se crea el volumen; para repetirlo, `docker compose down -v` (borra los datos).
+- Volúmenes con nombre para PostgreSQL, MongoDB y Redis, para no perder datos al reiniciar. Redis con `--appendonly yes` y `--maxmemory-policy noeviction` (ver [`eventos.md`](eventos.md#infraestructura)).
+- Puertos publicados solo en `127.0.0.1` (también los de las bases): sirven para probar desde la computadora y no quedan visibles en la red.
+- `healthcheck` en las bases y `depends_on: condition: service_healthy` en los servicios que las usan.
+- Código montado como volumen en desarrollo, para que los cambios se vean sin reconstruir la imagen.
+- Al arrancar cada servicio Django: `python manage.py migrate` y luego el servidor.
+
+**Variables de entorno** (un solo `.env` en la raíz, documentado en `.env.example`):
+
+| Variable | Ejemplo | Usada por |
+| --- | --- | --- |
+| `DJANGO_SECRET_KEY` | cadena aleatoria larga | servicios Django |
+| `DJANGO_DEBUG` | `True` en local | servicios Django |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1,web,svc-usuarios,...` | servicios Django |
+| `AUTH_ACTIVA` | `True` | todos |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | `postgres`, `5432` | usuarios, tienda, web |
+| `POSTGRES_SUPERUSER_PASSWORD` | contraseña de desarrollo | contenedor `postgres` |
+| `USUARIOS_DB_PASSWORD`, `TIENDA_DB_PASSWORD`, `WEB_DB_PASSWORD` | contraseña de desarrollo | `init.sql` y cada servicio |
+| `MONGO_URL` | `mongodb://mongo:27017/contenido` | svc-contenido |
+| `REDIS_URL` | `redis://redis:6379/0` (caché del límite de intentos) | usuarios (web la recibe, pero hoy no la usa) |
+| `EVENTOS_REDIS_URL`, `EVENTOS_MAX_REINTENTOS`, `EVENTOS_ESPERA_BASE` | `redis://redis:6379/1`, `5`, `2` segundos | usuarios, tienda, contenido, los dos consumidores, ia |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | `/run/secrets/jwt_privada.pem` / `/run/secrets/jwt_publica.pem` | usuarios / todos |
+| `JWT_ISSUER` | `agroia-usuarios` (emisor de los tokens; ver `contrato-identidad.md`) | todos menos web |
+| `URL_SVC_USUARIOS`, `URL_SVC_TIENDA`, `URL_SVC_CONTENIDO`, `URL_SVC_IA` | `http://svc-tienda:8000` | web |
+| `SERVICIOS_TIMEOUT`, `IA_TIMEOUT` | `10` y `50` segundos | web |
+| `CORS_ALLOWED_ORIGINS` | vacío (solo el propio gateway); nunca `*` | web |
+| `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_TIMEOUT`, `DEFAULT_FROM_EMAIL` | backend de consola en local; `EMAIL_TIMEOUT` 10 s | svc-usuarios y `svc-usuarios-eventos` (el que envía) |
+| `FRONTEND_URL` | `http://localhost:8000` | svc-usuarios (enlaces de correo) |
+| `VERSION_AVISO_PRIVACIDAD` | `2026-11` | svc-usuarios (versión del aviso que se guarda al registrarse) |
+| `COSTO_ENVIO`, `ENVIO_GRATIS_DESDE` | `150.00`, `1500.00` | svc-tienda |
+| `GROQ_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | llave propia de cada integrante, `groq`, `openai/gpt-oss-120b` | contenedor `agente` |
+| `AGENTE_DB_PASSWORD` | contraseña de desarrollo | `agente` y `agente-db` (base `conocimiento`, usuario `agroia`) |
+| `URL_AGENTE`, `AGENTE_TIMEOUT` | `http://agente:8000`, `45` | svc-ia |
+
+Cada servicio Django recibe en su contenedor `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` con los de su propia base; `docker-compose.yml` los traduce desde las variables de arriba, y cada contenedor recibe solo las variables que usa.
+
+Las llaves `.pem` viven en `infra/llaves/`, que está en `.gitignore`. El script `infra/generar_llaves.py` (Python con `cryptography`, funciona igual en Windows y Linux, sin `openssl`) las crea la primera vez y nunca las sobrescribe. `docker-compose.yml` las monta como *secrets* en `/run/secrets/`: la pública en todos los servicios y la privada solo en `svc-usuarios`.
+
+**Comandos del día a día:**
+
+```bash
+docker compose up --build                       # levantar todo
+docker compose exec svc-tienda pytest           # pruebas de un servicio
+docker compose exec svc-tienda python manage.py makemigrations
+docker compose exec web python manage.py tailwind build
+docker compose logs -f svc-ia                   # ver logs de un servicio
+```
+
+## Convenciones de código, pruebas y documentación
+
+El código se escribe en español (modelos, campos, variables, URLs, mensajes) sin acentos ni ñ en los identificadores: `Direccion`, `rona`, `anio`. Los nombres propios de Django y DRF se quedan en inglés (`models`, `serializers`, `get_queryset`).
+
+**Código:**
+
+- `ruff check` y `ruff format` pasan antes de cada commit; configuración única en `ruff.toml` en la raíz, línea de 100 caracteres.
+- Vistas con `ViewSet` + `router` para CRUD; `APIView` solo para acciones que no son CRUD (login, crear pedido).
+- La lógica de negocio va en `servicios.py` de cada app, no en las vistas ni en los serializers. Ejemplo: `crear_pedido_desde_carrito(usuario_id)`.
+- Toda operación que toca stock o dinero va en `transaction.atomic()` y usa `select_for_update()` sobre los productos.
+- Dinero siempre en `Decimal`, nunca `float`.
+- Nada de secretos en el código: todo sale de variables de entorno.
+- Docstring corto en funciones de `servicios.py` y en endpoints no obvios.
+
+**Pruebas** (`pytest` + `pytest-django` + `factory-boy`):
+
+- Cada app tiene `tests/` con `test_modelos.py`, `test_endpoints.py` y, si aplica, `test_servicios.py`.
+- Por cada endpoint: el caso correcto, una validación que falla y, con `AUTH_ACTIVA`, el acceso sin token (401) y con rol equivocado (403).
+- Las llamadas a otros servicios y al LLM se simulan con `responses` o `unittest.mock`; las pruebas no dependen de que otro contenedor esté arriba.
+- `svc-contenido` usa `mongomock` en pruebas.
+- Meta: las pruebas de un servicio corren en menos de 30 segundos.
+
+**Documentación:**
+
+- `drf-spectacular` genera Swagger en `/api/docs/`; cada serializer y endpoint tiene descripción y ejemplos con `@extend_schema`. Las respuestas de error solo llevan su descripción en la vista: el hook `agroia_comun.openapi.documentar_errores` les agrega el esquema común y un ejemplo por código. `svc-ia` usa el Swagger que trae FastAPI.
+- Cada servicio tiene su `README.md`: qué hace, variables que usa, cómo correr pruebas y su matriz de endpoints × rol.
+- Colección de Postman en `docs/postman/AgroIA-Web.postman_collection.json`, con un entorno `local` y una carpeta por servicio. Se actualiza en el mismo PR que agrega un endpoint.
+
+**Ramas y commits:** igual que en `CONTRIBUTING.md`. Un PR por historia; el PR no se fusiona si fallan `ruff` o `pytest`.
+
+## Trabajo con Claude Code
+
+Un `CLAUDE.md` en la raíz resume este documento en reglas que Claude Code lee al iniciar cada sesión, para que los tres obtengan código con la misma estructura. Cada servicio puede tener su propio `CLAUDE.md` corto con lo específico (por ejemplo, `svc-ia` explica cómo cargar el modelo de visión).
+
+**Forma de trabajar una historia:**
+
+1. Crear la rama desde `develop` (`feat/...`).
+2. Pedirle a Claude Code un plan antes de código, con la skill de planeación de *superpowers*. Revisar el plan y corregirlo.
+3. Implementar con pruebas primero (skill de TDD de *superpowers*) para la lógica de negocio y los endpoints.
+4. Correr `ruff` y `pytest` dentro del contenedor del servicio.
+5. Revisar el diff completo y hacer el commit y el push a mano. Claude Code no hace commits ni push en este proyecto, y quien hace el PR es responsable del código.
+
+**Skills por tipo de tarea:**
+
+| Tarea | Skill |
+| --- | --- |
+| Planear una historia o un servicio nuevo | `superpowers` (brainstorming, writing-plans) |
+| Lógica de negocio y endpoints | `superpowers` (test-driven-development) |
+| Pantallas y componentes | `frontend-design`, `web-design-guidelines` |
+| Probar pantallas en un navegador | `webapp-testing` (example-skills) |
+| Revisar autenticación y configuración | `insecure-defaults`, `static-analysis` |
+| Revisar un PR grande | `differential-review` |
+| Revisar dependencias nuevas | `supply-chain-risk-auditor` |
+| Documentos de entrega | `docx`, `pdf` |
+
+`vercel-react-best-practices` no aplica, porque no se usa React.
+
+**Contexto que conviene darle a Claude Code** en cada tarea: el servicio y la historia, el contrato del endpoint de este documento y qué debe quedar probado. Pedidos vagos como "haz el carrito" producen código que no respeta los contratos.
+
+## Plan de construcción
+
+La fase 0 la hace una sola persona porque todo depende de ella. Después, las fases 1, 2 y 3 pueden ir en paralelo, una por integrante. Jira se documenta al final, como acordó el equipo.
+
+1. **Fase 0 · Base del monorepo.** `CLAUDE.md`, `ruff.toml`, `docker-compose.yml`, `.env.example`, script de llaves, init de PostgreSQL, paquete `comun/` vacío y el esqueleto de los cinco servicios respondiendo `GET /salud/`. Termina cuando `docker compose up` levanta todo en verde.
+2. **Fase 1 · Usuarios y entrada.** Hecha en su versión básica para la Entrega 2: modelos `Usuario` y `Direccion`, registro con aviso de privacidad, perfil, direcciones, listado del administrador y comando `asignar_admin`. En `web`: Tailwind + daisyUI, tema `agroia` y `base.html`. En la Entrega 3 (19 de noviembre de 2026, [avance](avances/e3-identidad.md)) se completaron envío de correos, verificación, login, renovación con rotación y blacklist, logout y el cambio de `id` a UUID. Las pantallas de registro, login y perfil se hicieron en la fase del gateway (20 de noviembre de 2026).
+3. **Fase 2 · Tienda.** Hecha: modelos, CRUD con filtros, búsqueda y paginación, carrito y creación de pedidos con stock. Se adelantó aquí la validación RS256 en `comun/` (autenticación, permisos y formato de errores) y el script `infra/emitir_token.py`. Pantallas: catálogo y detalle en la Entrega 2; carrito, checkout, mis pedidos y panel de administrador en la Entrega 3 ([avance](avances/e3-pantallas.md)).
+4. **Fase 3 · IA y contenido.** Hecha: `svc-ia` como adaptador del agente del repo AgroIA (contenedor `agente`, con su base de conocimiento) y con la interfaz del clasificador (el modelo de visión llega en una entrega posterior); `svc-contenido` con conversaciones, diagnósticos y bitácora. Las pantallas de chat y de diagnóstico se hicieron en la Entrega 3 ([avance](avances/e3-pantallas.md)).
+5. **Fase 4 · Seguridad completa.** Primera parte hecha el 19 de noviembre de 2026 ([avance](avances/e3-identidad.md)): recuperación y cambio de contraseña, cambio de rol con registro, revisión de `token_version` al renovar, límite de intentos (DRF + Redis y django-axes), log de seguridad en todos los servicios y contrato de identidad compatible con ms-usuarios. Segunda parte, la fase del gateway, hecha el 20 de noviembre de 2026 ([avance](avances/e3-gateway.md)): sesión con los JWT en el servidor y renovación automática, proxy `/api/<servicio>/` que valida el JWT antes de reenviar, CORS solo para `/api/`, Content-Security-Policy y las pantallas de cuenta. **Condición de seguridad cumplida:** el gateway pone en `X-Forwarded-For` la IP real del cliente (la `REMOTE_ADDR` de la conexión que recibe) y **no** reenvía el `X-Forwarded-For` que mande el cliente; los servicios confían en el último valor de ese encabezado para el límite de intentos, el bloqueo de axes y el log de seguridad (ver [`contrato-identidad.md`](contrato-identidad.md#ip-del-cliente-y-puertos-publicados)). Tercera parte, el mismo día ([avance](avances/e3-pantallas.md)): pantallas protegidas, fotos de diagnóstico servidas solo al dueño o al administrador, y pruebas de XSS del filtro `markdown_seguro`. 2FA y los opcionales solo si sobra tiempo.
+6. **Fase 5 · Calidad y entrega.** Hecha para la Entrega 2 el 18 de noviembre de 2026: pruebas, Swagger con ejemplos y errores documentados, colección de Postman en verde, READMEs revisados y [documento de la entrega](entregable-2.md). La revisión con `insecure-defaults` y `static-analysis` de la autenticación se hizo el 19 de noviembre de 2026 (Semgrep, CodeQL y `check --deploy`; ver la [revisión de seguridad](avances/e3-identidad.md#revisión-de-seguridad)). Cierre de la Entrega 3 el 20 de noviembre de 2026: verificación desde cero, matriz de accesos automatizada (`infra/matriz_seguridad.py`), Semgrep y CodeQL sobre todo el código y [documento de la entrega](entregable-3.md).
+7. **Fase 6 · Jira.** Cargar historias, sprints y retrospectivas con lo que realmente se hizo.
+8. **Entrega 4 · Eventos.** Primera parte hecha el 22 de noviembre de 2026 ([avance](avances/e4-eventos-base.md)): Redis Streams con grupos de consumidores, librería `agroia_comun.eventos` (sobre común, catálogo, reintentos con espera creciente, fallidos, idempotencia y reproceso), consumidor de svc-contenido en su propio contenedor y el evento `usuario_registrado` de punta a punta. Segunda parte, el mismo día ([avance](avances/e4-eventos-negocio.md)): eventos de negocio de svc-usuarios y svc-tienda hacia la bitácora, correos en segundo plano con su propio consumidor (cierra el riesgo B5), `X-Correlacion-Id` de punta a punta y filtros de la bitácora por usuario y correlación. Tercera parte, el mismo día ([avance](avances/e4-ia-asincrona.md)): chat y diagnóstico asíncronos con `svc-ia-worker`, reintentos y política por stream, latido para no reprocesar lo que sigue en curso, fallidos sin datos no registrables, retención de 24 h en los streams de la IA, clasificador de prueba solo en desarrollo y correlación en svc-ia. Cuarta parte, el 24 de noviembre de 2026 ([avance](avances/e4-widget-agroia.md)): el widget flotante de AgroIA en todas las páginas, con el mismo flujo asíncrono, dictado por voz detrás de un aviso y `Permissions-Policy`. El 26 de noviembre de 2026, el panel de administración ampliado ([avance](avances/panel-admin.md)): resumen, bitácora legible, estado de los eventos, detalle de usuario, `pagado_en` en el pedido y endpoints de administrador nuevos en los tres servicios.
+9. **Entrega 5 · Despliegue.** Solo se publica `web` (los puertos 8001 a 8005 y los de las bases quedan para desarrollo). Además de Cloud Storage para las imágenes, quedan pendientes de la revisión de seguridad de la Entrega 3: contenedores que no corran como root; gunicorn (Django) y uvicorn sin `--reload` (svc-ia) en lugar de los servidores de desarrollo; contraseña y TLS en Redis y MongoDB; opciones de HTTPS y cookies seguras (`SECURE_HSTS_SECONDS`, `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, que hoy reporta `check --deploy`), y SMTP real para los correos (con `DJANGO_DEBUG=False` svc-usuarios ya no arranca con el backend de consola). **Volver a aceptar el aviso de privacidad** (pendiente desde la fase 1; el aviso subió a la versión 2026-11 en la Entrega 4 y hoy la versión solo se guarda al registrarse, así que los usuarios existentes conservan la 2026-10 sin que se les pida aceptar la nueva):
+   - **svc-usuarios:** que la versión aceptada por el usuario llegue al gateway (en la respuesta del login o en el perfil), y un endpoint para aceptar la vigente que guarde la versión y la fecha, con sus pruebas, Postman y la matriz.
+   - **web:** al iniciar sesión, si la versión del usuario no es la vigente, una pantalla «Actualizamos el aviso de privacidad» con el resumen del cambio, el enlace al historial y «Aceptar», y un middleware que lleve ahí al usuario mientras no la acepte.
+   - **Decidir qué pasa si no la acepta** (por ejemplo, solo puede cerrar sesión o pedir la cancelación de su cuenta).
+   - **`cargar_usuarios_demo`:** que guarde la versión vigente en las cuentas demo (hoy quedan sin versión).
+
+## Decisiones tomadas
+
+El equipo aprobó estas decisiones el 22 de octubre de 2026. En el documento de la Entrega 2 van en una sección de "ajustes a la arquitectura" respecto al Entregable 1.
+
+| Decisión | Qué se hace | Por qué |
+| --- | --- | --- |
+| Servicios fusionados | Catálogo y pedidos en `svc-tienda`; agente y diagnóstico en `svc-ia` | Crear un pedido descuenta stock en la misma transacción; separarlos obligaría a una transacción distribuida. Agente y visión comparten dependencias y despliegue |
+| Ficha técnica | `JSONField` en PostgreSQL | MongoDB queda para conversaciones, diagnósticos y bitácora, que son los datos que realmente crecen y cambian de forma |
+| `svc-ia` | FastAPI como adaptador: el agente corre en su propio contenedor, construido desde el repo AgroIA, y svc-ia traduce el contrato (decisión revisada en la fase 3) | El agente sigue evolucionando en su repo sin copias que se desincronicen. Valida el JWT con PyJWT, porque las clases de `comun/` son de DRF |
+| Proveedor del LLM | El que ya usa el agente | Llave solo en `.env` y límite de gasto en la cuenta del proveedor |
+| Pago | Simulado: botón "Pagar" que marca el pedido como `pagado`, con etiqueta visible "pago simulado" | Ninguna entrega califica pagos |
+| Imágenes | Volumen local, siempre con `STORAGES` y `default_storage` de Django, nunca rutas a mano | En la Entrega 5 se pasa a Cloud Storage con `django-storages` cambiando solo la configuración. Las imágenes de diagnóstico las guarda `svc-contenido`; `svc-ia` no guarda nada |
+| Roles | Solo `cliente` y `administrador` | No hay funciones que requieran otro rol; agregar uno después es una migración pequeña |
+| Commits y push | Siempre manuales, por cada integrante | Claude Code no ejecuta `git commit` ni `git push` en este proyecto |
+| Bróker de eventos (Entrega 4, 22 de noviembre de 2026) | Redis Streams con un grupo de consumidores por servicio; librería propia en `comun` para reintentos, fallidos, idempotencia y reproceso; svc-ia instala solo el núcleo de `comun` (sin Django) | No pierde eventos si un consumidor está caído, confirma cada uno y permite que varios servicios escuchen el mismo evento, sin dependencias nuevas. Pub/sub pierde mensajes; Celery y RQ son colas de tareas para un solo destinatario. Comparación completa en [`eventos.md`](eventos.md) |

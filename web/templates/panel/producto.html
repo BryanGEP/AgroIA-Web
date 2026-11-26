@@ -1,0 +1,75 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}{% if producto %}Editar producto{% else %}Nuevo producto{% endif %} · Administración{% endblock %}
+{% block encabezado %}{% if producto %}{{ producto.nombre }}{% else %}Nuevo producto{% endif %}{% endblock %}
+{% block panel %}
+<a href="{% url 'panel:productos' %}" class="link link-primary">Volver a productos</a>
+<div class="mt-4 grid gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
+  <form method="post" enctype="multipart/form-data" class="grid gap-4 rounded-box border border-base-300 bg-tarjeta p-5 sm:grid-cols-2" novalidate>
+    {% csrf_token %}
+    <div class="sm:col-span-2">{% include "componentes/errores_formulario.html" %}</div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.nombre %}</div>
+    {% include "componentes/campo.html" with campo=formulario.categoria %}
+    {% include "componentes/campo.html" with campo=formulario.unidad %}
+    {% include "componentes/campo.html" with campo=formulario.precio %}
+    {% include "componentes/campo.html" with campo=formulario.stock %}
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.descripcion %}</div>
+
+    {% comment %} Ficha técnica: con JavaScript, filas «característica / valor» (componente
+       editorFicha) que escriben el JSON en el textarea real; sin JavaScript, o si la ficha
+       tiene listas u objetos, el textarea con el JSON. {% endcomment %}
+    <fieldset class="flex flex-col gap-3 sm:col-span-2" x-data="editorFicha">
+      <legend class="font-medium">Ficha técnica <span class="font-normal text-suave">(opcional)</span></legend>
+      <div x-show="enFilas" x-cloak class="flex flex-col gap-2">
+        <p class="text-sm text-suave">Una característica por fila, por ejemplo «ingrediente_activo» y «Oxicloruro de cobre». En la tienda se muestran con su nombre en español.</p>
+        <div class="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 text-sm font-medium sm:grid" aria-hidden="true"><span>Característica</span><span>Valor</span><span class="w-20"></span></div>
+        <template x-for="fila in filas" :key="fila.indice">
+          <div data-fila :data-tipo="fila.tipo" class="grid gap-2 rounded-box border border-base-300 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:border-0 sm:p-0">
+            <label class="flex flex-col gap-1"><span class="text-sm sm:sr-only">Característica</span><input data-clave type="text" :value="fila.clave" @input="escribir" class="input w-full bg-base-100" placeholder="ingrediente_activo" autocomplete="off"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm sm:sr-only">Valor</span><input data-valor type="text" :value="fila.valor" @input="escribir" class="input w-full bg-base-100" autocomplete="off"></label>
+            <button type="button" class="btn btn-ghost w-20 self-end text-error" :data-indice="fila.indice" @click="quitar">Quitar</button>
+          </div>
+        </template>
+        <p x-show="sinFilas" class="text-sm text-suave">Sin características todavía.</p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline btn-primary btn-sm min-h-9" @click="agregar">Agregar característica</button>
+          <button type="button" class="btn btn-ghost btn-sm min-h-9 text-primary" @click="aJson">Editar como JSON</button>
+        </div>
+      </div>
+      <div x-show="enJson" class="flex flex-col gap-2">
+        {% include "componentes/campo.html" with campo=formulario.ficha_tecnica %}
+        <button type="button" x-show="enJson" x-cloak class="btn btn-ghost btn-sm min-h-9 self-start text-primary" @click="aFilas">Volver a la lista</button>
+        <p x-show="error" x-cloak x-text="error" class="text-sm text-error" role="alert"></p>
+      </div>
+    </fieldset>
+
+    <div class="flex flex-col gap-3 sm:col-span-2">
+      {% if producto.imagen %}
+        <figure class="flex items-center gap-3">
+          <img src="{{ producto.imagen }}" alt="Foto actual de {{ producto.nombre }}" width="160" height="120" loading="lazy" class="aspect-[4/3] w-40 rounded-box border border-base-300 bg-base-200 object-cover">
+          <figcaption class="text-sm text-suave">Foto actual. Elige otra para reemplazarla.</figcaption>
+        </figure>
+      {% endif %}
+      {% include "componentes/campo.html" with campo=formulario.imagen %}
+    </div>
+    <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario.activo %}</div>
+    <div class="flex flex-wrap gap-3 sm:col-span-2">
+      <button type="submit" class="btn btn-primary btn-lg">Guardar</button>
+      <a href="{% url 'panel:productos' %}" class="btn btn-ghost btn-lg text-primary">Cancelar</a>
+    </div>
+  </form>
+  {% if producto %}
+    <aside class="flex flex-col gap-3 self-start rounded-box border border-base-300 bg-tarjeta p-5">
+      <h2 class="text-xl">En la tienda</h2>
+      <p class="text-sm text-suave">{% if producto.activo %}Se muestra en el catálogo.{% else %}Desactivado: no aparece en el catálogo. Marca «Visible en la tienda» y guarda para activarlo.{% endif %}</p>
+      <a href="{% url 'catalogo:detalle' producto.slug %}" class="link link-primary">Ver en la tienda</a>
+      {% if producto.activo %}
+        <form method="post" action="{% url 'panel:desactivar_producto' producto.slug %}" x-data="confirmar" @submit="pedir">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline btn-error w-full">Desactivar producto</button>
+          {% include "componentes/confirmar.html" with id="desactivar" titulo="¿Desactivar este producto?" texto="Ya no aparecerá en la tienda. Los pedidos que ya lo tienen no cambian." accion="Sí, desactivar" peligro=True %}
+        </form>
+      {% endif %}
+    </aside>
+  {% endif %}
+</div>
+{% endblock %}

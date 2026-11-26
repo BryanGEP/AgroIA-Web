@@ -1,0 +1,33 @@
+# Configuración única de ruff para todo el monorepo.
+# Dentro de los contenedores se monta en /ruff.toml para que `ruff check .` la encuentre.
+line-length = 100
+target-version = "py312"
+extend-exclude = ["venv", "**/venv", "**/migrations"]
+
+[lint]
+select = [
+    "E",   # pycodestyle
+    "W",   # pycodestyle (avisos)
+    "F",   # pyflakes
+    "I",   # orden de imports
+    "B",   # bugbear
+    "UP",  # sintaxis moderna de Python
+    "DJ",  # buenas prácticas de Django
+    "SIM", # simplificaciones
+    "C4",  # comprehensions
+    "PIE", # misceláneos
+    "RUF", # reglas propias de ruff
+]
+ignore = [
+    "RUF012", # atributos mutables de clase: Meta, fields y permission_classes de Django/DRF
+]
+
+[lint.isort]
+known-first-party = ["agroia_comun", "config", "apps", "app", "tests"]
+
+[lint.flake8-bugbear]
+# Dependencias de FastAPI que se declaran como valor por defecto.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query"]
+
+[format]
+quote-style = "double"

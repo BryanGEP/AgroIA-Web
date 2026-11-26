@@ -1,0 +1,4 @@
+{# Indicador de carga de HTMX. Parámetros: id, texto. #}
+<span id="{{ id|default:'cargando' }}" class="htmx-indicator items-center gap-2 text-sm" role="status" aria-live="polite">
+  <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>{{ texto|default:"Cargando…" }}
+</span>

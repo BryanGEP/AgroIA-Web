@@ -1,0 +1,8 @@
+{# Existencias en palabras. Parámetro: stock. #}
+{% if stock > 10 %}
+  <span class="badge badge-accent">Disponible</span>
+{% elif stock > 0 %}
+  <span class="badge badge-warning">Quedan {{ stock }}</span>
+{% else %}
+  <span class="badge badge-ghost border-base-300">Agotado</span>
+{% endif %}

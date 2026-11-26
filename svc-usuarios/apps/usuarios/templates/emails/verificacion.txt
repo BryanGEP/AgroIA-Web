@@ -1,0 +1,12 @@
+{% autoescape off %}Hola, {{ nombre }}:
+
+Gracias por crear tu cuenta en AgroIA. Confirma que este correo es tuyo para poder comprar en la tienda.
+
+Abre este enlace para verificar tu correo:
+{{ enlace }}
+
+El enlace vence en 24 horas. Si no creaste esta cuenta, ignora este correo.
+
+--
+Este correo fue enviado automáticamente, no respondas.
+{% endautoescape %}

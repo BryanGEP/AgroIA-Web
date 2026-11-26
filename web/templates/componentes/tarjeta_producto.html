@@ -1,0 +1,32 @@
+{% load agroia %}
+{% comment %} Tarjeta de producto. La «parcela» (4:3) muestra la foto del producto con el mismo
+   recorte en todas las tarjetas; sin foto, el pictograma de su categoría sobre curvas de nivel
+   de su tinte. Parámetros: producto, categorias. {% endcomment %}
+{% with t=producto.categoria|tinte %}
+{% nombre_categoria producto.categoria categorias as nombre_cat %}
+<article class="group tinte-{{ t }} flex w-full flex-col overflow-hidden rounded-box border border-base-300 bg-tarjeta transition-colors hover:border-primary">
+  <a href="{% url 'catalogo:detalle' producto.slug %}" class="flex flex-1 flex-col focus-visible:outline-offset-4">
+    <div class="panel-tinte relative aspect-[4/3] overflow-hidden">
+      {% if producto.imagen %}
+        <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" width="400" height="300" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover">
+      {% else %}
+        <span class="curvas absolute inset-0 opacity-20" aria-hidden="true"></span>
+        <span class="relative flex h-full items-center justify-center p-6 sm:p-8">{% include "componentes/marcador_categoria.html" with tinte=t nombre=nombre_cat %}</span>
+      {% endif %}
+    </div>
+    <div class="flex flex-1 flex-col gap-1 p-3 sm:p-4">
+      {% if nombre_cat %}<p class="text-xs text-suave sm:text-sm">{{ nombre_cat }}</p>{% endif %}
+      <h3 class="break-words text-base leading-snug group-hover:underline sm:text-lg">{{ producto.nombre }}</h3>
+      <div class="mt-auto flex flex-wrap items-baseline gap-x-1.5 pt-2">
+        <p class="font-display text-xl font-bold tabular-nums text-andosol sm:text-2xl">{{ producto.precio|pesos }}</p>
+        <p class="text-xs text-suave sm:text-sm">por {{ producto.unidad|unidad }}</p>
+      </div>
+    </div>
+  </a>
+  {# Fuera del enlace: un formulario no puede ir dentro de <a>. #}
+  <div class="flex items-center justify-between gap-2 px-3 pb-3 sm:flex-col sm:items-stretch sm:px-4 sm:pb-4">
+    <span class="sm:self-start">{% include "componentes/disponibilidad.html" with stock=producto.stock %}</span>
+    {% include "componentes/agregar_carrito.html" with compacto=True %}
+  </div>
+</article>
+{% endwith %}

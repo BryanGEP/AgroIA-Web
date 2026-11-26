@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Diagnóstico{% endblock %}
+{% block contenido %}
+<div class="max-w-5xl mx-auto px-4 py-8 md:py-10">
+  <a href="{% url 'diagnostico:historial' %}" class="link link-primary">Volver a mis diagnósticos</a>
+  <h1 class="mt-3 mb-6 text-[2rem] leading-tight md:text-[2.6rem]">Diagnóstico del {{ diagnostico.creado_en|slice:":10" }}</h1>
+  <div class="grid gap-8 md:grid-cols-2">
+    {% if diagnostico.imagen_url %}
+      <figure class="self-start overflow-hidden rounded-box border border-base-300 bg-base-200">
+        <img src="{% url 'diagnostico:imagen' diagnostico.id %}" alt="Foto analizada" width="800" height="600" class="h-auto w-full object-contain">
+      </figure>
+    {% endif %}
+    <div id="resultado" aria-live="polite">
+      {% if resultado %}
+        {% include "diagnostico/parciales/_clasificacion.html" %}
+      {% else %}
+        {% include "diagnostico/parciales/_resultado.html" %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

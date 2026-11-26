@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}{{ producto.nombre }}{% endblock %}
+{% block descripcion %}{{ producto.descripcion|truncatechars:150 }}{% endblock %}
+{# El nombre del producto para las preguntas sugeridas del widget (el gateway lo recorta). #}
+{% block widget_contexto %}<input type="hidden" name="producto" value="{{ producto.nombre }}">{% endblock %}
+{% block contenido %}
+{% nombre_categoria producto.categoria categorias as nombre_cat %}
+{% with t=producto.categoria|tinte %}
+<div class="max-w-6xl mx-auto px-4 py-6 md:py-10">
+  <nav class="breadcrumbs mb-4 text-sm text-suave md:mb-6" aria-label="Ruta">
+    <ul>
+      <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
+      <li><a href="{% url 'catalogo:lista' %}?categoria={{ producto.categoria }}">{{ nombre_cat }}</a></li>
+      <li aria-current="page">{{ producto.nombre }}</li>
+    </ul>
+  </nav>
+
+  <article class="grid gap-8 md:grid-cols-2 md:items-start">
+    {# La parcela: foto del producto (mismo recorte 4:3 que en las tarjetas) o el pictograma de su categoría sobre curvas de nivel. #}
+    <div class="tinte-{{ t }} panel-tinte relative aspect-[4/3] overflow-hidden rounded-box md:sticky md:top-4">
+      {% if producto.imagen %}
+        <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" width="800" height="600" fetchpriority="high" class="absolute inset-0 h-full w-full object-cover">
+      {% else %}
+        <span class="curvas absolute inset-0 opacity-25" aria-hidden="true"></span>
+        <span class="relative flex h-full items-center justify-center p-10 [&_svg]:max-h-56">{% include "componentes/marcador_categoria.html" with tinte=t nombre=nombre_cat %}</span>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-2">
+        <p class="tinte-{{ t }}"><a href="{% url 'catalogo:lista' %}?categoria={{ producto.categoria }}" class="etiqueta-tinte font-medium link link-hover">{{ nombre_cat }}</a></p>
+        <h1 class="break-words text-[2rem] leading-tight md:text-[2.6rem]">{{ producto.nombre }}</h1>
+      </div>
+
+      <div class="flex flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-5">
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-2">
+          <p class="font-display text-[2.4rem] font-bold leading-none tabular-nums text-andosol">{{ producto.precio|pesos }}</p>
+          <p class="text-suave">por {{ producto.unidad|unidad }}</p>
+          <span class="ml-auto self-center">{% include "componentes/disponibilidad.html" with stock=producto.stock %}</span>
+        </div>
+        <div class="flex flex-col gap-3">
+          {% include "componentes/agregar_carrito.html" with grande=True %}
+        </div>
+      </div>
+
+      {% if producto.descripcion %}
+        <p class="max-w-prose text-lg leading-relaxed">{{ producto.descripcion }}</p>
+      {% endif %}
+
+      {% with filas=producto.ficha_tecnica|ficha_filas %}
+      {% if filas %}
+      <section aria-labelledby="ficha" class="mt-2">
+        <h2 id="ficha" class="mb-3 text-2xl">Ficha técnica</h2>
+        <dl class="divide-y divide-base-300 rounded-box border border-base-300 bg-tarjeta px-4">
+          {% for fila in filas %}
+            <div class="grid gap-1 py-3 sm:grid-cols-[12rem_1fr]">
+              <dt class="font-medium text-suave">{{ fila.etiqueta }}</dt>
+              <dd>
+                {% if fila.lista %}
+                  <ul class="flex flex-wrap gap-x-4 gap-y-1">
+                    {% for clave, valor in fila.lista %}<li><span class="font-medium">{{ clave }}</span> {{ valor }}</li>{% endfor %}
+                  </ul>
+                {% else %}
+                  {{ fila.valor }}
+                {% endif %}
+              </dd>
+            </div>
+          {% endfor %}
+        </dl>
+      </section>
+      {% endif %}
+      {% endwith %}
+    </div>
+  </article>
+</div>
+{% endwith %}
+{% endblock %}

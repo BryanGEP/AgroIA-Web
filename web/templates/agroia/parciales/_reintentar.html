@@ -1,0 +1,11 @@
+{# Conversaciones de antes de los eventos: la última pregunta quedó sin respuesta. #}
+<li class="my-2">
+  <form method="post" action="{% url 'agroia:reintentar' conversacion_id %}"
+        hx-post="{% url 'agroia:reintentar' conversacion_id %}" hx-target="closest li" hx-swap="outerHTML"
+        class="flex flex-wrap items-center gap-3 rounded-box border border-warning/40 bg-warning/10 p-3">
+    {% csrf_token %}
+    <p class="flex-1 text-sm">Tu última pregunta no tiene respuesta todavía.</p>
+    <button type="submit" class="btn btn-sm">Reintentar</button>
+    {% if aviso %}<p class="w-full text-sm text-aviso" role="alert">{{ aviso }}</p>{% endif %}
+  </form>
+</li>

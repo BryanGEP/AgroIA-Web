@@ -1,0 +1,18 @@
+# El build context de todos los servicios es la raíz del repo: nada de esto debe
+# llegar a las imágenes.
+.git
+.github
+.claude
+.env
+infra/llaves
+*.pem
+docs
+**/venv
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+**/media
+**/staticfiles

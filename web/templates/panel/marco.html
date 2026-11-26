@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% comment %} Marco del panel: banda con el título, barra lateral de secciones (escritorio) o
+   menú desplegable (celular), con la sección activa marcada. Bloques: encabezado, acciones,
+   panel. {% endcomment %}
+{% block contenido %}
+{% with nombre=request.resolver_match.url_name %}
+{% if nombre == "inicio" %}{% firstof "Resumen" as seccion %}{% elif "producto" in nombre %}{% firstof "Productos" as seccion %}{% elif "categoria" in nombre %}{% firstof "Categorías" as seccion %}{% elif "pedido" in nombre or nombre == "estado" %}{% firstof "Pedidos" as seccion %}{% elif "usuario" in nombre or nombre == "rol" %}{% firstof "Usuarios" as seccion %}{% elif nombre == "bitacora" %}{% firstof "Bitácora" as seccion %}{% elif nombre == "eventos" %}{% firstof "Eventos" as seccion %}{% endif %}
+<div class="relative overflow-hidden bg-bosque text-bosque-texto">
+  <span class="curvas absolute inset-0 text-curvas-hero opacity-20" aria-hidden="true"></span>
+  <div class="relative max-w-6xl mx-auto flex flex-wrap items-end justify-between gap-3 px-4 py-6 md:py-8">
+    <div class="min-w-0">
+      <p class="text-bosque-suave">Administración</p>
+      <h1 class="break-words text-[2rem] leading-tight text-white md:text-[2.4rem]">{% block encabezado %}{% endblock %}</h1>
+    </div>
+    <div class="flex flex-wrap gap-2">{% block acciones %}{% endblock %}</div>
+  </div>
+</div>
+<div class="max-w-6xl mx-auto grid gap-6 px-4 py-6 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-8 md:py-8">
+  {# Celular: menú desplegable con la sección actual; funciona sin JavaScript (<details>). #}
+  <details class="dropdown w-full md:hidden">
+    <summary class="btn w-full justify-between border-base-300 bg-tarjeta">
+      <span>Sección: <span class="font-display font-bold">{{ seccion }}</span></span>
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    {% include "panel/parciales/_secciones.html" with movil=True %}
+  </details>
+  {# Escritorio: barra lateral #}
+  <nav aria-label="Secciones del panel" class="hidden md:block">
+    {% include "panel/parciales/_secciones.html" %}
+  </nav>
+  <div class="min-w-0">
+    {% block panel %}{% endblock %}
+  </div>
+</div>
+{% endwith %}
+{% endblock %}

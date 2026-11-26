@@ -1,0 +1,21 @@
+{% comment %} La mascota de AgroIA (el aguacate), tomada del widget del repo del agente. SVG en
+   línea con los colores en clases (sin estilos en línea, por la CSP); el parpadeo está en
+   fuente.css y solo corre si el sistema no pide menos movimiento. Parámetros: clase
+   (tamaño), parpadea (bool). Es decorativa: aria-hidden. {% endcomment %}
+<svg viewBox="0 0 120 140" class="mascota {{ clase|default:'h-10 w-9' }}" aria-hidden="true" focusable="false">
+  <path class="fill-none stroke-[#5c7a3a] [stroke-width:3] [stroke-linecap:round]" d="M60 22 C60 12 60 8 60 3"/>
+  <path class="fill-[#8fae6b]" d="M60 12 C49 3 38 6 38 15 C47 19 57 16 60 12 Z"/>
+  <path class="fill-primary" d="M60 14 C38 14 27 38 27 68 C27 104 42 128 60 128 C78 128 93 104 93 68 C93 38 82 14 60 14 Z"/>
+  <path class="fill-[#d8e9a8]" d="M60 26 C44 26 36 46 36 70 C36 100 47 118 60 118 C73 118 84 100 84 70 C84 46 76 26 60 26 Z"/>
+  <circle class="fill-secondary" cx="60" cy="90" r="18"/>
+  <ellipse class="fill-[#c99b74] opacity-55" cx="54" cy="84" rx="6" ry="4"/>
+  <g class="{% if parpadea %}mascota-ojos{% endif %}">
+    <ellipse class="fill-[#1c2a1e]" cx="51" cy="54" rx="4.2" ry="5.2"/>
+    <ellipse class="fill-[#1c2a1e]" cx="69" cy="54" rx="4.2" ry="5.2"/>
+    <circle class="fill-white" cx="52.6" cy="52" r="1.5"/>
+    <circle class="fill-white" cx="70.6" cy="52" r="1.5"/>
+  </g>
+  <circle class="fill-[#f2a9a0] opacity-70" cx="43" cy="62" r="3.6"/>
+  <circle class="fill-[#f2a9a0] opacity-70" cx="77" cy="62" r="3.6"/>
+  <path class="fill-none stroke-[#1c2a1e] [stroke-width:2.6] [stroke-linecap:round]" d="M52 64 c4 5 12 5 16 0"/>
+</svg>

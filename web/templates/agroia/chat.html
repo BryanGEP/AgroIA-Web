@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titulo %}AgroIA{% endblock %}
+{% block cabeza %}{% if solicitud.estado == "pendiente" %}<noscript><meta http-equiv="refresh" content="5"></noscript>{% endif %}{% endblock %}
+{% block contenido %}
+{# Banda de AgroIA: la mascota sobre Bosque con curvas de nivel. #}
+<div class="relative overflow-hidden bg-bosque text-bosque-texto">
+  <span class="curvas absolute inset-0 text-curvas-hero opacity-25" aria-hidden="true"></span>
+  <div class="relative max-w-6xl mx-auto flex items-center gap-4 px-4 py-6 md:py-8">
+    <span class="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[#eff3e8] md:h-20 md:w-20">{% include "componentes/mascota.html" with clase="h-12 w-11 md:h-16 md:w-14" parpadea=True %}</span>
+    <div>
+      <p class="font-display text-2xl font-bold text-white md:text-3xl" translate="no">AgroIA</p>
+      <p class="text-bosque-suave">Tu asistente para el cultivo del aguacate. Responde con las fuentes que usó.</p>
+    </div>
+  </div>
+</div>
+<div class="max-w-6xl mx-auto px-4 py-6 md:py-10">
+  <div class="grid gap-6 md:grid-cols-[16rem_1fr]">
+    {# Conversaciones: a un lado en escritorio; en celular, plegadas arriba. #}
+    <aside aria-labelledby="titulo-conversaciones">
+      <details class="md:hidden mb-2" {% if not conversacion %}open{% endif %}>
+        <summary class="btn btn-outline btn-primary w-full">Mis conversaciones ({{ conversaciones|length }})</summary>
+        <div class="mt-3">{% include "agroia/parciales/_lista.html" %}</div>
+      </details>
+      <div class="hidden md:block">
+        <h2 id="titulo-conversaciones" class="mb-3 text-2xl">Mis conversaciones</h2>
+        {% include "agroia/parciales/_lista.html" %}
+      </div>
+    </aside>
+
+    <section aria-labelledby="titulo-chat" class="flex min-h-[60vh] flex-col gap-4 rounded-box border border-base-300 bg-tarjeta p-4 md:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 id="titulo-chat" class="break-words text-[1.75rem] leading-tight md:text-[2.2rem]">{% if conversacion %}{{ conversacion.titulo }}{% else %}Pregúntale a AgroIA{% endif %}</h1>
+        {% if conversacion %}
+          <form method="post" action="{% url 'agroia:borrar' conversacion.id %}" hx-post="{% url 'agroia:borrar' conversacion.id %}" hx-confirm="¿Borrar esta conversación?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost text-error">Borrar conversación</button>
+          </form>
+        {% endif %}
+      </div>
+      <p class="text-sm text-suave">AgroIA responde sobre el cultivo del aguacate con su base de conocimiento y cita sus fuentes. Confirma cualquier tratamiento con un técnico.</p>
+
+      <div x-data="chat" class="flex flex-1 flex-col gap-4">
+        <ol id="mensajes" data-mensajes class="flex flex-col gap-1" aria-live="polite">
+          {% if not conversacion %}<li class="flex flex-col items-center gap-2 rounded-box bg-base-100 px-4 py-8 text-center"><span class="block h-20 w-16">{% include "componentes/mascota.html" with clase="h-20 w-16" %}</span><span class="font-display text-xl font-bold">¡Hola! Soy AgroIA</span><span class="text-suave">Escribe tu primera pregunta para iniciar una conversación.</span></li>{% endif %}
+          {% include "agroia/parciales/_conversacion.html" %}
+        </ol>
+        {# La pregunta recién enviada se ve al instante mientras responde AgroIA (Alpine). #}
+        <div x-show="enviando" x-cloak class="flex flex-col gap-1">
+          <div class="chat chat-end"><div class="chat-bubble chat-bubble-primary whitespace-pre-line" x-text="pregunta"></div></div>
+        </div>
+        <div id="escribiendo" class="htmx-indicator chat chat-start" role="status">
+          <div class="chat-bubble bg-base-100 text-base-content"><span class="loading loading-dots loading-sm" aria-hidden="true"></span> AgroIA está escribiendo…</div>
+        </div>
+
+        {% if conversacion %}
+          {% url 'agroia:preguntar' conversacion.id as accion %}
+          {% include "agroia/parciales/_formulario.html" with accion=accion objetivo="#mensajes" indicador="#escribiendo" campo=formulario.pregunta %}
+        {% else %}
+          {% url 'agroia:nueva' as accion %}
+          {% include "agroia/parciales/_formulario.html" with accion=accion indicador="#escribiendo" campo=formulario.pregunta %}
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

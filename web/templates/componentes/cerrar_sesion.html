@@ -1,0 +1,5 @@
+{# Cerrar sesión solo por POST con CSRF: un enlace externo no puede cerrar la sesión. #}
+<form method="post" action="{% url 'cuentas:cerrar_sesion' %}">
+  {% csrf_token %}
+  <button type="submit" class="w-full text-left">Cerrar sesión</button>
+</form>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load agroia %}
+{% block titulo %}Confirmar pedido{% endblock %}
+{% block contenido %}
+{% include "componentes/seccion.html" with titulo="Confirmar pedido" compacta=True %}
+<div class="max-w-5xl mx-auto px-4 py-8 md:py-10">
+
+  {% if aviso_verificacion %}
+    <div class="alert alert-warning mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center" role="alert">
+      <span>Para comprar necesitas verificar tu correo. Abre el enlace que te enviamos al registrarte; tu carrito se queda como está.</span>
+      <form method="post" action="{% url 'cuentas:reenviar_verificacion' %}">
+        {% csrf_token %}
+        <input type="hidden" name="desde_banner" value="1">
+        <input type="hidden" name="next" value="{% url 'tienda:checkout' %}">
+        <button type="submit" class="btn btn-sm">Reenviar el enlace</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="grid gap-10 lg:grid-cols-[1fr_20rem]">
+    <div class="flex flex-col gap-8">
+      {% include "componentes/errores_formulario.html" %}
+      {% if direcciones %}
+        <form id="form-checkout" method="post" action="{% url 'tienda:checkout' %}" class="flex flex-col gap-8" novalidate>
+          {% csrf_token %}
+          <fieldset class="flex flex-col gap-3 rounded-box border border-base-300 bg-tarjeta p-5">
+            <legend class="float-left mb-2 w-full font-display text-2xl font-bold">Dirección de envío</legend>
+            {% for opcion in formulario.direccion %}
+              {% with direccion=direcciones|elegir:opcion.data.value %}
+              <label class="flex cursor-pointer items-start gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 has-[:checked]:border-primary">
+                <input type="radio" name="direccion" value="{{ opcion.data.value }}" class="radio radio-primary mt-1" {% if opcion.data.selected %}checked{% endif %}>
+                <span><span class="font-medium">{{ direccion.alias|default:"Dirección" }}</span><br>
+                  <span class="text-sm text-suave">{{ direccion.calle }} {{ direccion.numero }}, {{ direccion.colonia }}, {{ direccion.municipio }}, {{ direccion.estado }}, C. P. {{ direccion.codigo_postal }}</span></span>
+              </label>
+              {% endwith %}
+            {% endfor %}
+            {% for error in formulario.direccion.errors %}<p class="text-sm text-error">{{ error }}</p>{% endfor %}
+          </fieldset>
+          <fieldset class="flex flex-col gap-3 rounded-box border border-base-300 bg-tarjeta p-5">
+            <legend class="float-left mb-2 flex w-full flex-wrap items-center gap-2 font-display text-2xl font-bold">Método de pago <span class="badge badge-outline border-secondary font-sans text-sm font-medium text-secondary">Pago simulado</span></legend>
+            {% for opcion in formulario.metodo_pago %}
+              <label class="flex min-h-11 cursor-pointer items-center gap-3"><input type="radio" name="metodo_pago" value="{{ opcion.data.value }}" class="radio radio-primary" {% if opcion.data.selected %}checked{% endif %}><span>{{ opcion.choice_label }}</span></label>
+            {% endfor %}
+            {% for error in formulario.metodo_pago.errors %}<p class="text-sm text-error">{{ error }}</p>{% endfor %}
+            <p class="text-sm text-suave">Ningún método cobra de verdad: el pago es una simulación.</p>
+          </fieldset>
+        </form>
+      {% else %}
+        <p>Para continuar agrega la dirección a la que enviaremos tu pedido.</p>
+      {% endif %}
+
+      <details class="collapse collapse-arrow rounded-box border border-base-300 bg-tarjeta" {% if not direcciones or formulario_direccion.errors %}open{% endif %}>
+        <summary class="collapse-title font-display text-lg font-bold">Agregar una dirección</summary>
+        <div class="collapse-content">
+          {% include "componentes/errores_formulario.html" with formulario=formulario_direccion %}
+          <form method="post" action="{% url 'tienda:checkout_direccion' %}" class="grid gap-4 sm:grid-cols-2 pt-2" novalidate>
+            {% csrf_token %}
+            <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario_direccion.alias %}</div>
+            {% include "componentes/campo.html" with campo=formulario_direccion.calle %}
+            {% include "componentes/campo.html" with campo=formulario_direccion.numero %}
+            {% include "componentes/campo.html" with campo=formulario_direccion.colonia %}
+            {% include "componentes/campo.html" with campo=formulario_direccion.codigo_postal %}
+            {% include "componentes/campo.html" with campo=formulario_direccion.municipio %}
+            {% include "componentes/campo.html" with campo=formulario_direccion.estado %}
+            <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario_direccion.referencias %}</div>
+            <div class="sm:col-span-2"><button type="submit" class="btn btn-outline btn-primary">Guardar y usar esta dirección</button></div>
+          </form>
+        </div>
+      </details>
+    </div>
+
+    <aside class="flex flex-col gap-4 self-start rounded-box border border-base-300 bg-tarjeta p-5 lg:sticky lg:top-4" aria-labelledby="resumen">
+      <h2 id="resumen" class="text-2xl">Resumen</h2>
+      <ul class="flex flex-col gap-2 text-sm">
+        {% for item in carrito.items %}<li class="flex justify-between gap-2"><span>{{ item.cantidad }} × {{ item.producto.nombre }}</span><span class="tabular-nums">{{ item.importe|pesos }}</span></li>{% endfor %}
+      </ul>
+      <dl class="grid grid-cols-2 gap-y-1 border-t border-base-300 pt-3 text-right tabular-nums">
+        <dt class="text-left">Subtotal</dt><dd>{{ carrito.subtotal|pesos }}</dd>
+        <dt class="text-left">Envío</dt><dd>{% if carrito.envio == "0.00" %}Gratis{% else %}{{ carrito.envio|pesos }}{% endif %}</dd>
+        <dt class="text-left font-display text-xl font-bold">Total</dt><dd class="font-display text-2xl font-bold text-andosol">{{ carrito.total|pesos }}</dd>
+      </dl>
+      {% if direcciones %}<button type="submit" form="form-checkout" class="btn btn-primary btn-lg">Confirmar pedido</button>{% endif %}
+      <a href="{% url 'tienda:carrito' %}" class="link link-primary text-center">Volver al carrito</a>
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% comment %} Campo de formulario con su etiqueta, ayuda y errores (los de la API llegan
+   aquí con agregar_errores_de_api). Parámetro: campo (un BoundField). {% endcomment %}
+{% with id=campo.id_for_label ayuda_id=campo.id_for_label|add:"-ayuda" error_id=campo.id_for_label|add:"-error" %}
+{% if campo.field.widget.input_type == "checkbox" %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="flex items-start gap-3 cursor-pointer">
+      {{ campo }}
+      <span>{{ campo.label }}{% if campo.name == "acepto_privacidad" %} (<a href="{% url 'paginas:aviso_privacidad' %}" class="link" target="_blank" rel="noopener">leer el aviso</a>){% endif %}</span>
+    </label>
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
+{% elif campo.field.widget.input_type == "file" %}
+  {% comment %} Selector de archivo en español (el nativo dice «Choose File»): el input queda
+     oculto a la vista pero en el orden de tabulación; la zona es su segunda etiqueta. {% endcomment %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal text-suave">(opcional)</span>{% endif %}</label>
+    <div x-data="selectorArchivo" @change="elegir" class="selector-archivo flex flex-col gap-2 text-sm">
+      {{ campo }}
+      <label for="{{ id }}" class="zona-archivo flex cursor-pointer flex-wrap items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-3 hover:border-primary">
+        <span class="btn btn-sm btn-primary">Elegir un archivo</span>
+        <span class="break-all" x-text="archivoElegido">Ningún archivo elegido</span>
+      </label>
+      <img x-show="hayVistaPrevia" x-cloak :src="url" alt="Vista previa de la imagen elegida" width="400" height="300"
+           class="aspect-[4/3] w-full max-w-xs rounded-box border border-base-300 bg-base-200 object-cover">
+    </div>
+    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm text-suave">{{ campo.help_text }}</p>{% endif %}
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
+{% else %}
+  <div class="flex flex-col gap-1">
+    <label for="{{ id }}" class="font-medium">{{ campo.label }}{% if not campo.field.required %} <span class="font-normal text-suave">(opcional)</span>{% endif %}</label>
+    {{ campo }}
+    {% if campo.help_text %}<p id="{{ ayuda_id }}" class="text-sm text-suave">{{ campo.help_text }}</p>{% endif %}
+    {% for error in campo.errors %}<p id="{{ error_id }}" class="text-sm text-error">{{ error }}</p>{% endfor %}
+  </div>
+{% endif %}
+{% endwith %}

@@ -1,0 +1,23 @@
+{% comment %} Resultado del diagnóstico (HTMX reemplaza #resultado). Contexto: pendiente
+   (esperando), resultado, no_disponible, error o los errores del formulario. {% endcomment %}
+{% if pendiente %}
+  {% include "diagnostico/parciales/_espera.html" %}
+{% elif no_disponible %}
+  <div class="flex flex-col gap-3 rounded-box border border-base-300 bg-tarjeta p-6" role="status">
+    <h2 class="text-2xl">{{ no_disponible }}</h2>
+    <p>Estamos terminando de entrenar el modelo que reconoce la roña y la antracnosis. Mientras tanto, describe los síntomas en el chat y AgroIA te orienta.</p>
+    <a href="{% url 'agroia:inicio' %}" class="btn btn-outline btn-primary self-start">Preguntarle a AgroIA</a>
+  </div>
+{% elif error %}
+  <div class="alert alert-error" role="alert"><span>{{ error }}</span></div>
+{% elif resultado %}
+  {% include "diagnostico/parciales/_clasificacion.html" with diagnostico=resultado.diagnostico sugeridos=resultado.sugeridos %}
+{% elif request.htmx and formulario.errors %}
+  {% for error in formulario.imagen.errors %}<div class="alert alert-error" role="alert"><span>{{ error }}</span></div>{% endfor %}
+{% else %}
+  <div class="tinte-fungicidas panel-tinte relative flex h-full min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-box p-6 text-center">
+    <span class="curvas absolute inset-0 opacity-20" aria-hidden="true"></span>
+    <span class="relative block h-14 w-16" aria-hidden="true">{% include "componentes/marcador_categoria.html" with tinte="fungicidas" %}</span>
+    <p class="relative font-medium text-base-content">Aquí verás el resultado.</p>
+  </div>
+{% endif %}

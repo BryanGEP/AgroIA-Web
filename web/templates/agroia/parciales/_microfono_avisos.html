@@ -1,0 +1,14 @@
+{% comment %} El aviso antes del primer dictado (la aceptación se recuerda en el navegador),
+   el indicador «Escuchando…» y los errores del micrófono. El estado se anuncia a los
+   lectores de pantalla (aria-live). {% endcomment %}
+<div x-show="pidiendoPermiso" x-cloak class="rounded-box border border-info/40 bg-info/10 p-3 text-sm" role="group" aria-labelledby="aviso-microfono">
+  <p id="aviso-microfono">Tu voz se envía al servicio de reconocimiento de tu navegador (Google en Chrome, Microsoft en Edge, Apple en Safari) para convertirla en texto. AgroIA no recibe el audio: solo el texto que tú envíes. <a href="{% url 'paginas:aviso_privacidad' %}#microfono" class="link">Aviso de privacidad</a>.</p>
+  <div class="mt-2 flex flex-wrap gap-2">
+    <button type="button" class="btn btn-primary btn-sm" @click="aceptar">Usar el micrófono</button>
+    <button type="button" class="btn btn-ghost btn-sm" @click="cancelar">Cancelar</button>
+  </div>
+</div>
+<p class="flex items-center gap-2 text-sm" :class="claseEstado" aria-live="polite" x-show="hayEstado" x-cloak>
+  <span class="status status-error animate-pulse motion-reduce:animate-none" x-show="escuchando" aria-hidden="true"></span>
+  <span x-text="estado"></span>
+</p>

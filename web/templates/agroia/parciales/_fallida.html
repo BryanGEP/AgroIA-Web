@@ -1,0 +1,21 @@
+{% comment %} La solicitud falló. Ofrece «Reintentar» (otra respuesta a la misma pregunta, sin
+   repetirla), que reemplaza este elemento por la espera. Parámetros: conversacion_id,
+   solicitud, mensaje_de_fallo, se_puede_reintentar y aviso (opcional: por qué no entró el
+   último «Reintentar»). {% endcomment %}
+<li class="my-2" role="alert">
+  {% if solicitud.codigo == "conversacion_llena" %}
+    <div class="alert alert-info">
+      <span>Esta conversación llegó a su límite de mensajes.</span>
+      <a href="{% url 'agroia:inicio' %}" class="btn btn-sm btn-primary">Iniciar una conversación nueva</a>
+    </div>
+  {% else %}
+    <form method="post" action="{% url 'agroia:reintentar' conversacion_id %}"
+          hx-post="{% url 'agroia:reintentar' conversacion_id %}" hx-target="closest li" hx-swap="outerHTML"
+          class="flex flex-wrap items-center gap-3 rounded-box border-2 border-warning bg-base-100 p-3">
+      {% csrf_token %}
+      <p class="flex-1 text-sm">{{ mensaje_de_fallo }} Tu pregunta quedó guardada.</p>
+      {% if se_puede_reintentar %}<button type="submit" class="btn btn-primary btn-sm min-h-9">Reintentar</button>{% endif %}
+      {% if aviso %}<p class="w-full text-sm text-aviso" role="alert">{{ aviso }}</p>{% endif %}
+    </form>
+  {% endif %}
+</li>

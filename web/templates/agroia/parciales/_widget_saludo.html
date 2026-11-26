@@ -1,0 +1,6 @@
+{# El saludo del widget, con la mascota. #}
+<div class="flex flex-col items-center gap-2 py-3 text-center">
+  {% include "componentes/mascota.html" with clase="h-20 w-[4.4rem] motion-safe:animate-[mascota-flota_4s_ease-in-out_infinite]" parpadea=True %}
+  <p class="font-display text-xl font-bold">¡Hola! Soy AgroIA 🥑</p>
+  <p class="max-w-xs text-sm text-suave">Tu asistente para el cultivo del aguacate. Pregúntame lo que quieras.</p>
+</div>

@@ -1,0 +1,62 @@
+{% comment %} Lista de direcciones y formulario para agregar una. Con HTMX, cada acción
+   reemplaza solo este bloque (#lista-direcciones); sin JavaScript, recarga la página. {% endcomment %}
+<div id="lista-direcciones" class="flex flex-col gap-6">
+  {% if direcciones %}
+    <ul class="grid gap-3 sm:grid-cols-2">
+      {% for direccion in direcciones %}
+        <li class="card rounded-box border border-base-300 bg-tarjeta">
+          <div class="card-body gap-2 p-4">
+            <p class="font-display text-lg font-semibold">
+              {{ direccion.alias|default:"Dirección" }}
+              {% if direccion.predeterminada %}<span class="badge badge-primary badge-sm ml-1">Predeterminada</span>{% endif %}
+            </p>
+            <p class="text-sm leading-snug">{{ direccion.calle }} {{ direccion.numero }}, {{ direccion.colonia }}<br>{{ direccion.municipio }}, {{ direccion.estado }}, C. P. {{ direccion.codigo_postal }}</p>
+            {% if direccion.referencias %}<p class="text-sm text-suave">{{ direccion.referencias }}</p>{% endif %}
+            <div class="card-actions mt-1">
+              {% if not direccion.predeterminada %}
+                <form method="post" action="{% url 'cuentas:predeterminada' direccion.id %}"
+                      hx-post="{% url 'cuentas:predeterminada' direccion.id %}" hx-target="#lista-direcciones" hx-swap="outerHTML">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-primary">Usar como predeterminada</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{% url 'cuentas:borrar_direccion' direccion.id %}"
+                    hx-post="{% url 'cuentas:borrar_direccion' direccion.id %}" hx-target="#lista-direcciones" hx-swap="outerHTML"
+                    hx-confirm="¿Borrar la dirección «{{ direccion.alias|default:direccion.calle }}»?">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-error">Borrar<span class="sr-only"> {{ direccion.alias|default:direccion.calle }}</span></button>
+              </form>
+            </div>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% include "componentes/estado_vacio.html" with titulo="Todavía no tienes direcciones" texto="Agrega una para recibir tus pedidos." %}
+  {% endif %}
+
+  <details class="collapse collapse-arrow rounded-box border border-base-300 bg-tarjeta" {% if formulario_direccion.errors %}open{% endif %}>
+    <summary class="collapse-title font-display text-lg font-bold">Agregar una dirección</summary>
+    <div class="collapse-content">
+      {% include "componentes/errores_formulario.html" with formulario=formulario_direccion %}
+      <form method="post" action="{% url 'cuentas:agregar_direccion' %}"
+            hx-post="{% url 'cuentas:agregar_direccion' %}" hx-target="#lista-direcciones" hx-swap="outerHTML" hx-indicator="#guardando-direccion"
+            class="grid gap-4 sm:grid-cols-2 pt-2" novalidate>
+        {% csrf_token %}
+        <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario_direccion.alias %}</div>
+        {% include "componentes/campo.html" with campo=formulario_direccion.calle %}
+        {% include "componentes/campo.html" with campo=formulario_direccion.numero %}
+        {% include "componentes/campo.html" with campo=formulario_direccion.colonia %}
+        {% include "componentes/campo.html" with campo=formulario_direccion.codigo_postal %}
+        {% include "componentes/campo.html" with campo=formulario_direccion.municipio %}
+        {% include "componentes/campo.html" with campo=formulario_direccion.estado %}
+        <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario_direccion.referencias %}</div>
+        <div class="sm:col-span-2">{% include "componentes/campo.html" with campo=formulario_direccion.predeterminada %}</div>
+        <div class="sm:col-span-2 flex items-center gap-3">
+          <button type="submit" class="btn btn-primary">Guardar dirección</button>
+          {% include "componentes/cargando.html" with id="guardando-direccion" texto="Guardando…" %}
+        </div>
+      </form>
+    </div>
+  </details>
+</div>

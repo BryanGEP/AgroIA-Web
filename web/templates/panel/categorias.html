@@ -1,0 +1,38 @@
+{% extends "panel/marco.html" %}
+{% block titulo %}Categorías · Administración{% endblock %}
+{% block encabezado %}Categorías{% endblock %}
+{% block acciones %}<a href="{% url 'panel:categoria_nueva' %}" class="btn btn-accent">Nueva categoría</a>{% endblock %}
+{% block panel %}
+{% if categorias %}
+<div class="overflow-x-auto rounded-box border border-base-300 bg-tarjeta">
+  <table class="table tabla-tarjetas">
+    <thead><tr><th>Categoría</th><th>Descripción</th><th class="text-right">Productos</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+    <tbody>
+      {% for c in categorias %}
+        <tr>
+          <td class="font-medium celda-titulo"><a href="{% url 'panel:categoria' c.slug %}" class="link link-hover">{{ c.nombre }}</a></td>
+          <td class="max-w-sm text-sm" data-etiqueta="Descripción">{{ c.descripcion|truncatechars:90|default:"—" }}</td>
+          <td class="text-right tabular-nums" data-etiqueta="Productos"><a href="{% url 'panel:productos' %}?categoria={{ c.slug }}" class="link link-primary" aria-label="Ver los {{ c.productos }} productos de {{ c.nombre }}">{{ c.productos }}</a></td>
+          <td data-etiqueta="Estado">{% if c.activa %}<span class="badge badge-success badge-sm">Activa</span>{% else %}<span class="badge badge-ghost badge-sm">Desactivada</span>{% endif %}</td>
+          <td class="celda-acciones">
+            <div class="flex flex-wrap justify-end gap-1">
+              <a href="{% url 'panel:categoria' c.slug %}" class="btn btn-ghost btn-sm min-h-9 text-primary">Editar<span class="sr-only"> {{ c.nombre }}</span></a>
+              {% if c.activa %}
+                <form method="post" action="{% url 'panel:desactivar_categoria' c.slug %}" x-data="confirmar" @submit="pedir">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-ghost btn-sm min-h-9 text-error">Desactivar<span class="sr-only"> {{ c.nombre }}</span></button>
+                  {% include "componentes/confirmar.html" with id="desactivar-"|add:c.slug titulo="¿Desactivar «"|add:c.nombre|add:"»?" texto="Sus productos dejarán de verse en la tienda hasta que la actives otra vez." accion="Sí, desactivar" peligro=True %}
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  {% url 'panel:categoria_nueva' as nueva %}
+  {% include "componentes/estado_vacio.html" with titulo="Todavía no hay categorías" texto="Crea la primera para empezar a cargar productos." enlace=nueva accion="Nueva categoría" %}
+{% endif %}
+{% endblock %}

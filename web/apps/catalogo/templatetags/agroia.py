@@ -1,0 +1,142 @@
+"""Filtros de plantilla del gateway: precios, ficha técnica y categorías."""
+
+from decimal import Decimal, InvalidOperation
+
+from django import template
+from django.contrib.staticfiles import finders
+from django.templatetags.static import static
+
+register = template.Library()
+
+# Tinte y nombre de la ilustración por categoría (las clases están en static/css/fuente.css).
+CATEGORIAS = {"fungicidas", "fertilizantes", "herramientas", "riego", "proteccion"}
+
+UNIDADES = {"pieza": "pieza", "kg": "kg", "litro": "litro", "costal": "costal"}
+
+ETIQUETAS = {
+    "ingrediente_activo": "Ingrediente activo",
+    "intervalo_seguridad": "Intervalo de seguridad",
+    "categoria_toxicologica": "Categoría toxicológica",
+    "materia_organica": "Materia orgánica",
+    "proteccion_uv": "Protección UV",
+    "corte_maximo": "Corte máximo",
+    "longitud_hoja": "Longitud de la hoja",
+    "longitud_garrocha": "Longitud de la garrocha",
+    "separacion_goteros": "Separación de goteros",
+    "caudal_maximo": "Caudal máximo",
+    "presion_maxima": "Presión máxima",
+    "composicion": "Composición",
+    "presentacion": "Presentación",
+    "formulacion": "Formulación",
+    "aplicacion": "Aplicación",
+    "certificacion": "Certificación",
+    "conexion": "Conexión",
+    "diametro": "Diámetro",
+    "incluye_cartuchos": "Incluye cartuchos",
+}
+
+
+@register.filter
+def pesos(valor) -> str:
+    """Precio en pesos con formato es-MX: 1250.5 → $1,250.50."""
+    try:
+        cantidad = Decimal(str(valor))
+    except (InvalidOperation, TypeError, ValueError):
+        return ""
+    return f"${cantidad:,.2f}"
+
+
+@register.filter
+def unidad(valor: str) -> str:
+    return UNIDADES.get(valor, valor or "")
+
+
+@register.filter
+def tinte(slug: str) -> str:
+    """Nombre de la categoría para su tinte e ilustración; 'general' si no se conoce."""
+    return slug if slug in CATEGORIAS else "general"
+
+
+@register.simple_tag
+def nombre_categoria(slug: str, categorias: list[dict] | None) -> str:
+    for categoria in categorias or []:
+        if categoria.get("slug") == slug:
+            return categoria.get("nombre", slug)
+    return (slug or "").replace("-", " ").capitalize()
+
+
+def _etiqueta(clave: str) -> str:
+    if clave in ETIQUETAS:
+        return ETIQUETAS[clave]
+    if any(letra.isupper() or letra.isdigit() for letra in clave):
+        return clave  # símbolos como N, K2O o P2O5
+    return clave.replace("_", " ").capitalize()
+
+
+def _valor(valor) -> str:
+    if isinstance(valor, bool):
+        return "Sí" if valor else "No"
+    if isinstance(valor, list):
+        return ", ".join(_valor(v) for v in valor)
+    return str(valor)
+
+
+@register.filter
+def ficha_filas(ficha) -> list[dict]:
+    """La ficha técnica (JSON) como filas legibles; los objetos anidados, como sublista."""
+    if not isinstance(ficha, dict):
+        return []
+    filas = []
+    for clave, valor in ficha.items():
+        if isinstance(valor, dict):
+            filas.append(
+                {
+                    "etiqueta": _etiqueta(clave),
+                    "lista": [(_etiqueta(k), _valor(v)) for k, v in valor.items()],
+                }
+            )
+        else:
+            filas.append({"etiqueta": _etiqueta(clave), "valor": _valor(valor)})
+    return filas
+
+
+@register.filter
+def elegir(elementos, identificador):
+    """El elemento de una lista de diccionarios cuyo `id` es `identificador`."""
+    return next((e for e in elementos or [] if str(e.get("id")) == str(identificador)), {})
+
+
+@register.filter
+def elegir_clave(diccionario, clave):
+    """El valor de `clave` en un diccionario (o la clave si no está)."""
+    return (diccionario or {}).get(clave, clave)
+
+
+@register.filter
+def porcentaje(valor) -> str:
+    """0.913 -> "91 %"."""
+    try:
+        return f"{round(float(valor) * 100)} %"
+    except (TypeError, ValueError):
+        return ""
+
+
+@register.filter
+def porcentaje_entero(valor) -> int:
+    try:
+        return round(float(valor) * 100)
+    except (TypeError, ValueError):
+        return 0
+
+
+# Fotos de ambiente opcionales (huertas, campo). Van en static/img/ambiente/<nombre>.webp; si
+# el archivo no existe, la plantilla se ve igual que sin foto (Bosque con curvas de nivel). Ver
+# «Fotos de ambiente» en el README y docs/creditos-imagenes.md.
+FOTOS_AMBIENTE = "img/ambiente/{}.webp"
+
+
+@register.simple_tag
+def foto_ambiente(nombre: str) -> str:
+    """URL de la foto de ambiente `nombre`, o "" si todavía no se agregó."""
+    ruta = FOTOS_AMBIENTE.format(nombre)
+    return static(ruta) if finders.find(ruta) else ""

@@ -1,0 +1,12 @@
+{# Se muestra con sesión y el correo sin verificar (usuario.email_verificado es falso). #}
+<div class="border-b-2 border-warning bg-tarjeta">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" role="status">
+    <p class="font-medium">Verifica tu correo para poder comprar. Te enviamos un enlace al registrarte.</p>
+    <form method="post" action="{% url 'cuentas:reenviar_verificacion' %}">
+      {% csrf_token %}
+      <input type="hidden" name="desde_banner" value="1">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-sm btn-outline btn-primary">Reenviar el enlace</button>
+    </form>
+  </div>
+</div>
