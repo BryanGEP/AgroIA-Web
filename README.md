@@ -298,6 +298,7 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - [Documento del Entregable 1](docs/Entregable1_AgroIAWeb.docx)
 - [Documento del Entregable 2](docs/entregable-2.md)
 - [Documento del Entregable 3](docs/entregable-3.md) y su [matriz de accesos](docs/entregable-3/matriz-accesos.md)
+- [Documento del Entregable 4](docs/entregable-4.md): eventos con Redis Streams e IA asíncrona, con su evidencia, resultados y Scrum.
 - [Contrato de identidad](docs/contrato-identidad.md): qué emite svc-usuarios y cómo valida el token cada servicio.
 - [Créditos de imágenes](docs/creditos-imagenes.md): fuente, autor y licencia de cada foto del sitio.
 - [Eventos entre servicios](docs/eventos.md): qué es asíncrono, catálogo de eventos, sobre común, reintentos, fallidos y diagrama del flujo.
@@ -311,6 +312,10 @@ Si PowerShell no deja ejecutar `Activate.ps1`, corre una vez `Set-ExecutionPolic
 - **Entrega 3:** seguridad: autenticación JWT con rotación y blacklist, propagación de identidad a los microservicios, API Gateway, control de acceso por roles, buenas prácticas (CORS, CSP, límites de intentos, log de seguridad) y las pantallas protegidas.
   - [Documento del Entregable 3](docs/entregable-3.md)
   - [Matriz de accesos](docs/entregable-3/matriz-accesos.md)
+- **Entrega 4:** comunicación asíncrona con Redis Streams: eventos de negocio entre servicios, correos en segundo plano, IA asíncrona con svc-ia como worker, reintentos, fallidos y reproceso, correlación de punta a punta y pruebas de integración. Además, el widget de AgroIA, el rediseño «Altura» y el panel de administración.
+  - [Documento del Entregable 4](docs/entregable-4.md)
+  - [Resultados de las pruebas](docs/entregable-4/resultados-pruebas.md), [matriz de accesos](docs/entregable-4/matriz-accesos.md) y [evidencia en logs](docs/entregable-4/evidencia-logs.md)
+  - [Scrum del sprint (propuesta)](docs/entregable-4/scrum.md) y [guion del video](docs/entregable-4/guion-video.md)
 
 ## Cómo contribuir
 

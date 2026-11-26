@@ -179,3 +179,20 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Fase 4: cierre de la Entrega 4 (corrida final, evidencia con logs, capturas y video, `docs/entregable-4.md`, métricas de Scrum y release v4.0).
 
 **Bloqueos:** Ninguno.
+
+
+## 2026-11-26 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Corrida final de la Entrega 4: 1124 pruebas, Postman (258 aserciones), prueba de punta a punta (62 de 62) y matriz de accesos (186 de 186), todo en verde.
+- Evidencia del flujo asíncrono: logs por correlación de una pregunta, de un fallo con reintento y de un flujo de negocio, sin datos sensibles; 13 capturas y un video sin narración.
+- `docs/entregable-4.md` con la decisión de Redis Streams, el catálogo y el diagrama de eventos, productores y consumidores, confiabilidad, seguridad, pruebas, evidencia y pendientes de la Entrega 5.
+- Propuesta de Scrum del Sprint 4 (7 historias, 63 puntos) y guion del video narrado.
+
+**Qué sigue:**
+- Validar los puntos del Sprint 4 con el equipo y grabar el video narrado.
+- Release v4.0 y, después, la Entrega 5 (despliegue en Cloud Run y CI/CD).
+
+**Bloqueos:** Ninguno.
