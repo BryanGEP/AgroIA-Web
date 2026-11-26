@@ -3,7 +3,7 @@
 Código que comparten los servicios. Tiene dos partes:
 
 - **Núcleo, sin Django** (`pip install -e /comun`): `tokens.py` y el paquete `eventos/`. Lo instalan todos, también `svc-ia` (FastAPI), que lo usa para los eventos. Dependencias: PyJWT, cryptography y redis.
-- **Extra `[django]`** (`pip install -e "/comun[django]"`): todo lo demás, para `web`, `svc-usuarios`, `svc-tienda` y `svc-contenido`. Agrega simplejwt. `svc-ia` valida el JWT con PyJWT en su propio código.
+- **Extra `[django]`** (`pip install -e "/comun[django]"`): todo lo demás, para `web`, `svc-usuarios`, `svc-tienda` y `svc-contenido`. Agrega simplejwt y django-filter. `svc-ia` valida el JWT con PyJWT en su propio código.
 
 | Módulo | Contenido |
 | --- | --- |
@@ -13,6 +13,7 @@ Código que comparten los servicios. Tiene dos partes:
 | `seguridad.py` | Log de seguridad: `registrar_evento(evento, request, **datos)` escribe una línea JSON en el logger `seguridad`, sin contraseñas ni tokens; `ip_cliente(request)` (un proxy de confianza) |
 | `errores.py` | Manejador de excepciones con el formato común y `ErrorDeNegocio` para las reglas de negocio |
 | `openapi.py` | Hook de drf-spectacular `documentar_errores`: agrega a cada respuesta de error de Swagger el esquema común y un ejemplo por código |
+| `filtros.py` | `FechaDesde` y `FechaHasta` de django-filter: días completos en la zona del servidor (hora de México) aunque la base guarde en UTC. Los usan los filtros `desde`/`hasta` de pedidos (svc-tienda) y de usuarios (svc-usuarios) |
 | `pruebas.py` | Solo para pruebas: par de llaves temporal y `firmar_token(...)` (con `usuario_id` UUID y `emisor=`) |
 | `eventos/` (núcleo) | Eventos con Redis Streams (ver [`docs/eventos.md`](../docs/eventos.md)): `catalogo.py` (tipos, streams y campos permitidos), `sobre.py` (sobre común y `correlacion_valida`), `productor.py` (`publicar`, sin romper si Redis no responde), `consumidor.py` (`Consumidor`: grupos, reintentos con espera creciente y política por stream, latido, fallidos, idempotencia, varios hilos y apagado limpio), `operacion.py` y `python -m agroia_comun.eventos estado\|reprocesar\|descartar`, `conexion.py` (clientes con timeout) y `registro.py` (logger `eventos`) |
 | `eventos/en_django.py` | `publicar_al_confirmar` (publica con `transaction.on_commit`) y `correlacion_de(request)` |
@@ -84,7 +85,7 @@ La lista de códigos está en la [definición técnica](../docs/definicion-tecni
 
 ## Cómo se instala
 
-- **Docker:** cada `Dockerfile` copia `comun/` a `/comun` y lo instala en modo editable: los servicios Django con `pip install -e "/comun[django]"` (PyJWT, cryptography, redis y simplejwt) y svc-ia con `pip install -e /comun` (sin simplejwt ni Django). `docker-compose.yml` monta `./comun` en `/comun`, así que los cambios de código se ven sin reconstruir; los de `pyproject.toml` piden `docker compose up --build`.
+- **Docker:** cada `Dockerfile` copia `comun/` a `/comun` y lo instala en modo editable: los servicios Django con `pip install -e "/comun[django]"` (PyJWT, cryptography, redis, simplejwt y django-filter) y svc-ia con `pip install -e /comun` (sin simplejwt ni Django). `docker-compose.yml` monta `./comun` en `/comun`, así que los cambios de código se ven sin reconstruir; los de `pyproject.toml` piden `docker compose up --build`.
 - **Venv local de la raíz:** el `requirements-dev.txt` de la raíz lo instala en modo editable (`-e ./comun`).
 
 No copies este código dentro de los servicios: impórtalo desde `agroia_comun`.
