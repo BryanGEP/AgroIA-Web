@@ -57,6 +57,7 @@ services:
       URL_SVC_IA: ${URL_SVC_IA:-http://svc-ia:8000}
       SERVICIOS_TIMEOUT: ${SERVICIOS_TIMEOUT:-10}
       IA_TIMEOUT: ${IA_TIMEOUT:-50}
+      PANEL_UMBRAL_STOCK_BAJO: ${PANEL_UMBRAL_STOCK_BAJO:-5}
       # Orígenes que pueden usar el proxy /api/ desde un navegador (separados por coma).
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     secrets:
