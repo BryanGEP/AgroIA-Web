@@ -161,3 +161,21 @@ Se cargará a Jira como evidencia de los dailies de cada sprint.
 - Después, la fase 4: cierre de la Entrega 4.
 
 **Bloqueos:** Ninguno.
+
+
+## 2026-11-26 · Sprint 4
+
+**Integrante:** Bryan Gael Esquivel Pérez
+
+**Qué se hizo:**
+- Resumen del panel de administración: pedidos pendientes y por enviar, ventas de hoy, 7 días y mes (por la nueva fecha `pagado_en`, en hora de México), stock bajo y agotados, usuarios nuevos y últimos pedidos. Si un servicio falla, solo su tarjeta muestra el error.
+- Pantalla de bitácora con eventos legibles y filtros por tipo, usuario, correlación, pedido y fechas; tocar una correlación muestra el flujo completo.
+- Pantalla de solo lectura del estado de los eventos (streams, grupos, pendientes y fallidos sin datos).
+- Mejoras en productos (filtro de existencias, vista previa de foto, editor de ficha técnica), pedidos (búsqueda, fechas, cliente y línea de tiempo), usuarios (detalle y filtros) y categorías.
+- Barra lateral en escritorio, menú en móvil y confirmaciones con `<dialog>` en lugar del diálogo nativo.
+- Endpoints nuevos solo para administrador en svc-tienda, svc-usuarios y svc-contenido; filtros de fecha compartidos en `comun`.
+
+**Qué sigue:**
+- Fase 4: cierre de la Entrega 4 (corrida final, evidencia con logs, capturas y video, `docs/entregable-4.md`, métricas de Scrum y release v4.0).
+
+**Bloqueos:** Ninguno.
