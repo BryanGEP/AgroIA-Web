@@ -1,6 +1,6 @@
 # Matriz de accesos
 
-Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-24 19:48 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 109 s.
+Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-26 13:14 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 102 s.
 
 Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas de [`docs/contrato-identidad.md`](../contrato-identidad.md); **coincide** exige el mismo código HTTP y, en las denegadas, el mismo código de error del cuerpo. La matriz prueba el control de acceso, no la disponibilidad del agente: un 503 `agente_no_disponible` o `modelo_no_disponible` donde se esperaba acceso permitido cuenta como coincidencia, marcado como «permitido (servicio externo no disponible)» (✓*).
 
@@ -8,11 +8,11 @@ Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas d
 
 | Concepto | Casos |
 | --- | --- |
-| Combinaciones probadas | 154 |
-| Permitidas (2xx esperado) | 35 |
-| Denegadas (4xx esperado) | 119 |
-| Coinciden con lo esperado | **154 de 154 (100 %)** |
-| De ellas, permitido (servicio externo no disponible) | 3 |
+| Combinaciones probadas | 186 |
+| Permitidas (2xx esperado) | 39 |
+| Denegadas (4xx esperado) | 147 |
+| Coinciden con lo esperado | **186 de 186 (100 %)** |
+| De ellas, permitido (servicio externo no disponible) | 0 |
 
 ## Matriz
 
@@ -27,9 +27,13 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✓* permitido (servic
 | Ver carrito | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Crear pedido | 401 ✓ | 403 ✓ | 201 ✓ | 403 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Cambiar estado de un pedido (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Resumen del panel (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Listar usuarios (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Ver un usuario (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Cambiar rol (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
-| Pregunta al agente | 401 ✓ | 503 ✓* | 503 ✓* | 503 ✓* | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Pregunta al agente | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Bitácora de un pedido (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
+| Estado de los eventos (administrador) | 401 ✓ | 403 ✓ | 403 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Conversación propia | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Conversación ajena | 401 ✓ | 404 ✓ | 404 ✓ | 404 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
 | Foto de diagnóstico propia | 401 ✓ | 200 ✓ | 200 ✓ | 200 ✓ | 401 ✓ | 401 ✓ | 401 ✓ | 403 ✓ |
@@ -140,9 +144,39 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✓* permitido (servic
 | Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
 | Origen no permitido | 403 `origen_no_permitido` | 403 | `origen_no_permitido` | sí |  |
 
+### Resumen del panel (administrador)
+
+`GET /api/tienda/resumen/`
+
+| Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
+| --- | --- | --- | --- | --- | --- |
+| Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
+| Cliente sin verificar | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Cliente verificado | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Administrador | 200 | 200 | — | sí |  |
+| Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Origen no permitido | 403 `origen_no_permitido` | 403 | `origen_no_permitido` | sí |  |
+
 ### Listar usuarios (administrador)
 
 `GET /api/usuarios/usuarios/`
+
+| Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
+| --- | --- | --- | --- | --- | --- |
+| Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
+| Cliente sin verificar | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Cliente verificado | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Administrador | 200 | 200 | — | sí |  |
+| Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Origen no permitido | 403 `origen_no_permitido` | 403 | `origen_no_permitido` | sí |  |
+
+### Ver un usuario (administrador)
+
+`GET /api/usuarios/usuarios/<id>/`
 
 | Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
 | --- | --- | --- | --- | --- | --- |
@@ -177,9 +211,39 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✓* permitido (servic
 | Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
 | --- | --- | --- | --- | --- | --- |
 | Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
-| Cliente sin verificar | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
-| Cliente verificado | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
-| Administrador | 200 | 503 | `agente_no_disponible` | sí, permitido (servicio externo no disponible) |  |
+| Cliente sin verificar | 200 | 200 | — | sí |  |
+| Cliente verificado | 200 | 200 | — | sí |  |
+| Administrador | 200 | 200 | — | sí |  |
+| Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Origen no permitido | 403 `origen_no_permitido` | 403 | `origen_no_permitido` | sí |  |
+
+### Bitácora de un pedido (administrador)
+
+`GET /api/contenido/bitacora/?pedido_id=<id>`
+
+| Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
+| --- | --- | --- | --- | --- | --- |
+| Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
+| Cliente sin verificar | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Cliente verificado | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Administrador | 200 | 200 | — | sí |  |
+| Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
+| Origen no permitido | 403 `origen_no_permitido` | 403 | `origen_no_permitido` | sí |  |
+
+### Estado de los eventos (administrador)
+
+`GET /api/contenido/eventos/estado/`
+
+| Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
+| --- | --- | --- | --- | --- | --- |
+| Anónimo | 401 `no_autenticado` | 401 | `no_autenticado` | sí |  |
+| Cliente sin verificar | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Cliente verificado | 403 `sin_permiso` | 403 | `sin_permiso` | sí |  |
+| Administrador | 200 | 200 | — | sí |  |
 | Token vencido | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
 | Token de otra llave | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
 | Refresh en blacklist | 401 `token_invalido` | 401 | `token_invalido` | sí |  |
@@ -358,7 +422,7 @@ Código obtenido por actor; ✓ coincide con lo esperado, ✓* permitido (servic
 
 | Actor | Esperado | Obtenido | Código de error | Coincide | Nota |
 | --- | --- | --- | --- | --- | --- |
-| Anónimo | 429 `demasiados_intentos` | 429 | `demasiados_intentos` | sí | aceptadas antes del 429 en esta corrida (200 genérico): 2, Retry-After: 3469 s |
+| Anónimo | 429 `demasiados_intentos` | 429 | `demasiados_intentos` | sí | aceptadas antes del 429 en esta corrida (200 genérico): 3, Retry-After: 3600 s |
 
 ## Qué capa decide
 
