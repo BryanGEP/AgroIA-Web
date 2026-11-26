@@ -1158,6 +1158,249 @@
           ]
         },
         {
+          "name": "Ver un usuario (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/{{cliente_id}}/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{cliente_id}}",
+                ""
+              ]
+            },
+            "description": "Panel: detalle de un usuario. Los mismos campos que el listado, sin contraseña.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Trae el correo y no la contraseña\", () => {",
+                  "    const u = pm.response.json();",
+                  "    pm.expect(u.id).to.eql(pm.environment.get(\"cliente_id\"));",
+                  "    pm.expect(u).to.have.property(\"email\");",
+                  "    pm.expect(u).to.not.have.property(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver un usuario como cliente → 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/{{cliente_id}}/",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{cliente_id}}",
+                ""
+              ]
+            },
+            "description": "Solo administrador.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_usuario}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuarios por ids (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/?ids={{cliente_id}},{{admin_id}}",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "ids",
+                  "value": "{{cliente_id}},{{admin_id}}"
+                }
+              ]
+            },
+            "description": "Panel: nombra a los usuarios de una página de pedidos o de la bitácora con una sola llamada (hasta 20 UUID).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Trae los dos usuarios\", () => pm.expect(pm.response.json().count).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ids que no es UUID → 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/?ids={{cliente_id}},no-es-uuid",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "ids",
+                  "value": "{{cliente_id}},no-es-uuid"
+                }
+              ]
+            },
+            "description": "Cada id se valida.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"El error es del campo ids\", () => pm.expect(pm.response.json().campos).to.have.property(\"ids\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin verificar desde una fecha (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_usuarios}}/api/v1/usuarios/?email_verificado=false&desde=2026-01-01",
+              "host": [
+                "{{base_usuarios}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "email_verificado",
+                  "value": "false"
+                },
+                {
+                  "key": "desde",
+                  "value": "2026-01-01"
+                }
+              ]
+            },
+            "description": "Filtros del panel: `email_verificado` y `desde` (fecha de registro, hora de México).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Solo sin verificar\", () => pm.response.json().results.forEach(u => pm.expect(u.email_verificado).to.eql(false)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Cambiar el rol (admin)",
           "request": {
             "method": "PATCH",
@@ -1598,6 +1841,48 @@
               ]
             },
             {
+              "name": "Categorías con su número de productos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/categorias/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categorias",
+                    ""
+                  ]
+                },
+                "description": "Campo de solo lectura `productos`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Cada categoría trae productos\", () => pm.response.json().results.forEach(x => pm.expect(x.productos).to.be.a(\"number\")));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Crear categoría (admin)",
               "request": {
                 "method": "POST",
@@ -1938,6 +2223,62 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Productos con stock bajo (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/productos/?stock_max=5&ordering=stock",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "productos",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "stock_max",
+                      "value": "5"
+                    },
+                    {
+                      "key": "ordering",
+                      "value": "stock"
+                    }
+                  ]
+                },
+                "description": "Panel: `stock_max` (existencias menores o iguales) y orden por `stock`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Todos con 5 o menos, de menor a mayor\", () => {",
+                      "    const s = pm.response.json().results.map(p => p.stock);",
+                      "    s.forEach(x => pm.expect(x).to.be.at.most(5));",
+                      "    pm.expect(s).to.eql([...s].sort((a, b) => a - b));",
+                      "});"
                     ]
                   }
                 }
@@ -2852,6 +3193,49 @@
               ]
             },
             {
+              "name": "El pedido pagado trae pagado_en",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/{{pedido_id}}/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    "{{pedido_id}}",
+                    ""
+                  ]
+                },
+                "description": "Se pone al pasar a pagado, una sola vez.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"pagado_en tiene fecha\", () => pm.expect(pm.response.json().pagado_en).to.be.a(\"string\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Cliente cambia estado → 403",
               "request": {
                 "method": "PATCH",
@@ -3133,6 +3517,251 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Resumen del panel (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/resumen/?umbral=5",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "resumen",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "umbral",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Pedidos por atender, ventas de hoy, 7 días y mes (por `pagado_en`, en hora de México), stock bajo y agotados, últimos pedidos.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Trae pedidos, ventas, stock y últimos pedidos\", () => {",
+                      "    const r = pm.response.json();",
+                      "    pm.expect(r.pedidos).to.have.property(\"pendientes\");",
+                      "    pm.expect(r.ventas.hoy.total).to.be.a(\"string\");",
+                      "    pm.expect(r.ventas.mes.pedidos).to.be.a(\"number\");",
+                      "    pm.expect(r.ventas).to.have.property(\"respaldo\");",
+                      "    pm.expect(r.stock.umbral).to.eql(5);",
+                      "    pm.expect(r.ultimos_pedidos).to.be.an(\"array\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Resumen como cliente → 403",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/resumen/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "resumen",
+                    ""
+                  ]
+                },
+                "description": "Solo administrador.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Resumen sin token → 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/resumen/",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "resumen",
+                    ""
+                  ]
+                },
+                "description": "Sin token.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Umbral inválido → 400",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/resumen/?umbral=-1",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "resumen",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "umbral",
+                      "value": "-1"
+                    }
+                  ]
+                },
+                "description": "`umbral` va de 0 a 1000.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"El error es del campo umbral\", () => pm.expect(pm.response.json().campos).to.have.property(\"umbral\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Pedido por número y fecha (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_tienda}}/api/v1/pedidos/?id={{pedido_id}}&desde=2026-01-01",
+                  "host": [
+                    "{{base_tienda}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pedidos",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "id",
+                      "value": "{{pedido_id}}"
+                    },
+                    {
+                      "key": "desde",
+                      "value": "2026-01-01"
+                    }
+                  ]
+                },
+                "description": "Filtros del panel: `id`, `usuario_id`, `desde` y `hasta` (hora de México).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Encuentra el pedido\", () => {",
+                      "    const r = pm.response.json();",
+                      "    pm.expect(r.count).to.eql(1);",
+                      "    pm.expect(r.results[0].id).to.eql(Number(pm.environment.get(\"pedido_id\")));",
+                      "});"
                     ]
                   }
                 }
@@ -4627,6 +5256,241 @@
               ]
             },
             {
+              "name": "Línea de tiempo de un pedido (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?pedido_id={{pedido_id}}",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "pedido_id",
+                      "value": "{{pedido_id}}"
+                    }
+                  ]
+                },
+                "description": "Filtro `pedido_id` (busca en `datos.pedido_id`). Los eventos llegan por Redis: puede tardar un momento.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Solo eventos de ese pedido\", () => pm.response.json().results.forEach(e =>",
+                      "    pm.expect(e.datos.pedido_id).to.eql(Number(pm.environment.get(\"pedido_id\")))));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "pedido_id inválido → 400",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/bitacora/?pedido_id=doce",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bitacora",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "pedido_id",
+                      "value": "doce"
+                    }
+                  ]
+                },
+                "description": "Entero mayor que 0.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                      "pm.test(\"El error es del campo pedido_id\", () => pm.expect(pm.response.json().campos).to.have.property(\"pedido_id\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado de los eventos (admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/eventos/estado/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "eventos",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "Lo mismo que `python -m agroia_comun.eventos estado`, sin el sobre ni los datos; el motivo es solo el nombre de la excepción.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Streams y fallidos, sin datos\", () => {",
+                      "    const r = pm.response.json();",
+                      "    pm.expect(r.streams).to.be.an(\"array\").that.is.not.empty;",
+                      "    pm.expect(r.fallidos).to.have.property(\"total\");",
+                      "    r.fallidos.ultimos.forEach(f => {",
+                      "        pm.expect(f).to.not.have.property(\"sobre\");",
+                      "        if (f.motivo) pm.expect(f.motivo).to.not.include(\":\");",
+                      "    });",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado de los eventos como cliente → 403",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/eventos/estado/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "eventos",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "Solo administrador.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado de los eventos sin token → 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_contenido}}/api/v1/eventos/estado/",
+                  "host": [
+                    "{{base_contenido}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "eventos",
+                    "estado",
+                    ""
+                  ]
+                },
+                "description": "Sin token.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                      "pm.test(\"Formato común de error\", () => {",
+                      "    const cuerpo = pm.response.json();",
+                      "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                      "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Filtro que no es UUID → 400",
               "request": {
                 "method": "GET",
@@ -5460,6 +6324,94 @@
                 "exec": [
                   "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
                   "pm.test(\"Error no_encontrado\", () => pm.expect(pm.response.json().error).to.eql(\"no_encontrado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumen del panel por el gateway (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_gateway}}/api/tienda/resumen/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "tienda",
+                "resumen",
+                ""
+              ]
+            },
+            "description": "El proxy /api/<servicio>/ con el token en Authorization.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de los eventos por el gateway como cliente → 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_gateway}}/api/contenido/eventos/estado/",
+              "host": [
+                "{{base_gateway}}"
+              ],
+              "path": [
+                "api",
+                "contenido",
+                "eventos",
+                "estado",
+                ""
+              ]
+            },
+            "description": "Solo administrador, también por el gateway.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Formato común de error\", () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo).to.have.property(\"error\").that.is.a(\"string\");",
+                  "    pm.expect(cuerpo).to.have.property(\"detalle\").that.is.a(\"string\");",
+                  "});"
                 ]
               }
             }
