@@ -11,6 +11,7 @@ from agroia_comun.eventos import Consumidor, publicar
 def test_django_no_esta_instalado_en_svc_ia():
     assert importlib.util.find_spec("django") is None
     assert importlib.util.find_spec("rest_framework") is None
+    assert importlib.util.find_spec("django_filters") is None
 
 
 def test_publica_y_consume_sin_django():
