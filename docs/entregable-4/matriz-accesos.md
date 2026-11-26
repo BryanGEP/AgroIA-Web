@@ -1,6 +1,6 @@
 # Matriz de accesos
 
-Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-26 13:14 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 102 s.
+Generada por [`infra/matriz_seguridad.py`](../../infra/matriz_seguridad.py) el 2026-11-26 13:40 contra el sistema levantado con `docker compose`, a través del gateway (`http://127.0.0.1:8000`). Duración: 80 s.
 
 Cómo leerla: cada caso es una petición real. **Esperado** sale de las reglas de [`docs/contrato-identidad.md`](../contrato-identidad.md); **coincide** exige el mismo código HTTP y, en las denegadas, el mismo código de error del cuerpo. La matriz prueba el control de acceso, no la disponibilidad del agente: un 503 `agente_no_disponible` o `modelo_no_disponible` donde se esperaba acceso permitido cuenta como coincidencia, marcado como «permitido (servicio externo no disponible)» (✓*).
 
